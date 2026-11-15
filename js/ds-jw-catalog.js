@@ -1,0 +1,1 @@
+window.DSJW_CATALOG=[];

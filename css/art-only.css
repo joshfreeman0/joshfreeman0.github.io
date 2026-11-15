@@ -1,0 +1,28 @@
+/* Art-only gallery format */
+body{background:#fbfaf7;color:#1b1b1b}
+.wh-book,#jewelry,#photographs,.shop-section#jewelry,.shop-section#photographs{display:none!important}
+#grid,#paint-grid{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))!important;gap:56px 40px!important;max-width:1280px;margin:48px auto!important;padding:0 32px}
+#grid img,#paint-grid img{width:100%;height:auto;object-fit:contain;background:#fff;box-shadow:0 1px 0 rgba(0,0,0,.04)}
+#grid figcaption,#paint-grid figcaption,#grid .cap,#paint-grid .cap{font-family:"Cormorant Garamond",serif;font-size:1.05rem;letter-spacing:.02em;margin-top:12px;color:#333}
+.wh-hero img{max-height:82vh;object-fit:contain;background:#fbfaf7}
+section{padding-block:clamp(32px,6vw,96px)}
+/* money/metals chrome hidden */
+[data-kitco-silver-ask],[data-kitco-gold-ask],[data-kitco-copper-ask],[class*="kitco"],[class*="metal"],.jf-fx-note,.x-price{display:none!important}
+/* hide visible prices/currency; keep add-to-cart */
+#lb-price,.price,.product-price,[class*="price"]:not(button):not(.add-to-cart),[data-price]:not(button){display:none!important}
+
+/* art2: jewelry/wampum/kitco */
+a[href*="#jewelry"],a[href*="wampum" i],.jf-fx-note,[data-kitco-silver-ask],[data-kitco-gold-ask],[data-kitco-copper-ask],[class*="kitco"],[id*="kitco"],[class*="fx-"],[id*="jf-fx"]{display:none!important}
+#jf-lang{display:inline-block!important}#jf-ulang{position:fixed;right:12px;bottom:12px;z-index:9999;font:14px system-ui;padding:6px;border:1px solid #ccc;border-radius:6px;background:#fff}.goog-te-banner-frame,#goog-gt-tt,.skiptranslate iframe{display:none!important}body{top:0!important}
+
+/* art6 simplify */
+.wh-hero,.wh-book,.wh-about,.site-footer nav a[href*="jewelry"],.merch{display:none!important}
+.wh-hero{display:none!important}
+/* art6: home = 9-work grid only */
+.wh-hero,.wh-intro,.wh-book,.featured,.featured-strip,.x-rate,[data-x-rate]{display:none!important}
+.wh-gtitle{margin-top:2rem;text-align:center}
+
+/* hide shop nav */
+a[href*="shop.html"]{display:none!important}
+
+a[href*="cart"],.jfm-cart,.cart-add{display:none!important}

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#111">
+<title></title>
+<meta property="og:title" content="">
+<meta property="og:site_name" content="joshfreeman.org">
+<meta property="og:url" content="https://joshfreeman.org/">
+<meta name="twitter:title" content="">
+<meta name="description" content="Art by Josh Freeman">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{margin:0;height:100%;background:#111;color:#fff}
+body{
+  min-height:100svh;min-height:100dvh;
+  display:flex;align-items:center;justify-content:center;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  overflow:hidden;
+  font-family:system-ui,-apple-system,sans-serif;
+}
+.art-grid{margin:0;width:100%;height:100%;max-width:none;display:flex;align-items:center;justify-content:center;padding:0}
+.art-item{margin:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.j-art-collage,.art-item picture{display:contents}
+.art-item img{
+  display:block;width:100%;height:100%;
+  max-width:100vw;max-height:100svh;max-height:100dvh;
+  object-fit:contain;background:#111;
+}
+.art-item img:focus-visible{outline:3px solid #0a5bd8;outline-offset:3px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+.full-gallery-link{position:fixed;top:calc(10px + env(safe-area-inset-top));right:calc(14px + env(safe-area-inset-right));z-index:10;color:#fff;background:rgba(0,0,0,.55);padding:6px 12px;border-radius:4px;font-size:14px;text-decoration:none}.full-gallery-link:hover,.full-gallery-link:focus-visible{background:#000;outline:2px solid #fff}
+</style>
+</head>
+<body>
+<a class="full-gallery-link" href="gallery/">Full Gallery</a>
+<main class="art-grid">
+<figure class="art-item art-collage"><picture class="j-art-collage">
+  <source type="image/webp" media="(max-width: 600px)" srcset="images/j-art-collage-phone-828.webp 828w, images/j-art-collage-iphone-1170.webp 1170w" sizes="100vw">
+  <source type="image/jpeg" media="(max-width: 600px)" srcset="images/j-art-collage-phone-828.jpg 828w, images/j-art-collage-iphone-1170.jpg 1170w" sizes="100vw">
+  <source type="image/webp" srcset="images/j-art-collage-laptop-1440.webp 1440w, images/j-art-collage-desktop-1920.webp 1920w" sizes="100vw">
+  <img src="images/j-art-collage-desktop-1920.jpg" srcset="images/j-art-collage-laptop-1440.jpg 1440w, images/j-art-collage-desktop-1920.jpg 1920w" sizes="100vw" alt="Art by Josh Freeman — nine works" decoding="async">
+</picture></figure>
+</main>
+</body>
+</html>
