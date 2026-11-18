@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#111">
+<title>More Websites — Josh Freeman</title>
+<meta name="description" content="More websites">
+<meta property="og:title" content="More Websites — Josh Freeman">
+<meta property="og:site_name" content="joshfreeman.org">
+<meta property="og:url" content="https://joshfreeman.org/websites/more/">
+<link rel="canonical" href="https://joshfreeman.org/websites/more/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{margin:0;background:#111;color:#fff;font-family:system-ui,-apple-system,sans-serif}
+body{min-height:100svh;min-height:100dvh}
+header{
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px 16px;
+  padding:12px 20px;
+  padding-top:calc(12px + env(safe-area-inset-top));
+  padding-right:calc(20px + env(safe-area-inset-right));
+  padding-left:calc(20px + env(safe-area-inset-left));
+}
+header nav{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+a{color:#fff}
+h1{font-size:1.2rem;margin:0;font-weight:500}
+a:focus-visible{outline:3px solid #0a5bd8;outline-offset:3px}
+main{
+  display:flex;flex-direction:column;align-items:center;
+  padding:24px 20px 48px;
+  padding-left:calc(20px + env(safe-area-inset-left));
+  padding-right:calc(20px + env(safe-area-inset-right));
+  padding-bottom:calc(48px + env(safe-area-inset-bottom));
+}
+.page-stack{width:min(999px,100%);display:flex;flex-direction:column;gap:40px}
+.group{margin:0;display:flex;flex-direction:column;gap:22px}
+.group-label{margin:0 2px;font-size:.85rem;font-weight:500;color:#ccc;letter-spacing:.06em}
+.site-figure{margin:0;width:100%}
+.site-card{
+  display:block;width:100%;text-decoration:none;color:inherit;
+  background:#0a0a0a;
+}
+.site-card:hover{outline:1px solid #d9bf86;outline-offset:4px}
+.site-card:focus-visible{outline:3px solid #0a5bd8;outline-offset:4px}
+.card-inner{
+  display:flex;align-items:center;
+  gap:clamp(16px,5vw,36px);
+  padding:clamp(22px,4.5vw,36px) clamp(20px,5vw,48px);
+  min-height:120px;
+}
+.card-inner.center{justify-content:center}
+.mark{height:clamp(56px,12vw,96px);width:auto;flex:0 0 auto;display:block}
+.logo{width:min(420px,80%);height:auto;display:block}
+.card-name{
+  font-family:Oswald,Arial,sans-serif;
+  font-weight:500;
+  font-size:clamp(1.6rem,5.4vw,2.8rem);
+  letter-spacing:.18em;
+  line-height:1;
+  color:#f5f5f5;
+  margin:0;
+  white-space:nowrap;
+}
+.card-domain{
+  font-family:system-ui,-apple-system,sans-serif;
+  font-weight:500;
+  font-size:clamp(1.4rem,4.8vw,2.2rem);
+  letter-spacing:.02em;
+  color:#f0e8d8;
+  margin:0;
+}
+.caption{
+  margin:14px 2px 0;
+  font-size:.85rem;
+  color:#ccc;
+  text-align:center;
+  font-weight:400;
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>More Websites</h1>
+  <nav aria-label="Site">
+    <a href="../">Websites</a>
+    <a href="../../gallery/">Full Gallery</a>
+    <a href="../../">← Home</a>
+  </nav>
+</header>
+<main>
+  <div class="page-stack">
+    <section class="group" aria-labelledby="hugh-label">
+      <h2 id="hugh-label" class="group-label">Hugh</h2>
+      <figure class="site-figure">
+        <a class="site-card" href="https://allyat.com" target="_blank" rel="noopener" aria-label="ALLYAT">
+          <span class="card-inner">
+            <img class="mark" src="../../images/allyat-mark.png" alt="" width="280" height="281">
+            <span class="card-name">ALLYAT</span>
+          </span>
+        </a>
+        <figcaption class="caption">The mechanisms of transformation — an institute for prosperity</figcaption>
+      </figure>
+      <figure class="site-figure">
+        <a class="site-card" href="https://hugh.buzz" target="_blank" rel="noopener" aria-label="hugh.buzz">
+          <span class="card-inner center">
+            <span class="card-domain">hugh.buzz</span>
+          </span>
+        </a>
+      </figure>
+    </section>
+    <section class="group" aria-label="Wampum World">
+      <figure class="site-figure">
+        <a class="site-card" href="https://wampumworld.com" target="_blank" rel="noopener" aria-label="Wampum World">
+          <span class="card-inner center">
+            <img class="logo" src="../../images/wampumworld-logo.png" alt="Wampum World" width="347" height="114">
+          </span>
+        </a>
+        <figcaption class="caption">Wampum World — quahog wampum jewelry</figcaption>
+      </figure>
+    </section>
+  </div>
+</main>
+</body>
+</html>

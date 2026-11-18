@@ -70,6 +70,14 @@ main{
   text-align:center;
   font-weight:400;
 }
+.sites-list{width:min(999px,100%);display:flex;flex-direction:column;align-items:center;gap:36px}
+.more-card{
+  display:flex;align-items:center;justify-content:center;
+  width:100%;background:#0a0a0a;text-decoration:none;color:#f0e8d8;
+  padding:28px 24px;font-size:1.15rem;font-weight:500;letter-spacing:.04em;
+}
+.more-card:hover{outline:1px solid #d9bf86;outline-offset:4px}
+.more-card:focus-visible{outline:3px solid #0a5bd8;outline-offset:4px}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 </style>
 </head>
@@ -82,6 +90,7 @@ main{
   </nav>
 </header>
 <main>
+  <div class="sites-list">
   <figure class="site-figure">
     <a class="site-card" href="https://tesseractprogram.pages.dev" target="_blank" rel="noopener" aria-label="Tesseract Program">
       <span class="card-logo">
@@ -106,6 +115,10 @@ main{
     </a>
     <figcaption class="caption">Tesseract Program — podcast</figcaption>
   </figure>
+  <figure class="site-figure">
+    <a class="more-card" href="more/">More websites</a>
+  </figure>
+  </div>
 </main>
 </body>
 </html>
