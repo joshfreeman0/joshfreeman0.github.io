@@ -1,4 +1,4 @@
-/* Shop front end for /websites/more/shop/ */
+/* Shop front end for /websites/shop/ */
 const ORDER_EMAIL = 'orders@example.com';
 const ORDER_EMAIL_PLACEHOLDER = 'orders@example.com';
 

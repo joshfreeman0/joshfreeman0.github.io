@@ -1,6 +1,6 @@
 # Shop
 
-A simple sales section of joshfreeman.org, at `/websites/more/shop/`.
+A simple sales section of joshfreeman.org, at `/websites/shop/`.
 
 ## Adding items
 
