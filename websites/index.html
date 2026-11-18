@@ -105,6 +105,30 @@ a.site-card:focus-visible{outline:3px solid #0a5bd8;outline-offset:4px}
   font-weight:400;
   line-height:1.4;
 }
+/* Settings card only — other cards unchanged */
+.card-inner.photo{
+  position:relative;
+  display:block;
+  padding:0;
+  min-height:0;
+  gap:0;
+  overflow:hidden;
+}
+.settings-card-art{
+  width:100%;
+  height:auto;
+  display:block;
+  aspect-ratio:5/4;
+  object-fit:cover;
+  object-position:center 35%;
+}
+.settings-card-title{
+  position:absolute;
+  left:0;right:0;bottom:0;
+  padding:20px 16px 14px;
+  background:linear-gradient(to top, rgba(0,0,0,.62), transparent);
+  color:#fff8f0;
+}
 /* Tesseract featured card, matched to /websites/ */
 .tess{container-type:inline-size;container-name:logo;background:#0a0a0a}
 .tess-logo{
@@ -236,9 +260,13 @@ a.site-card:focus-visible{outline:3px solid #0a5bd8;outline-offset:4px}
     <section class="group" aria-label="Other sites">
       <div class="grid grid-3">
         <article class="site-figure">
-          <a class="site-card" href="https://joshfreeman.org/settings-draft/" target="_blank" rel="noopener" aria-label="Settings">
-            <span class="card-inner stack">
-              <span class="card-title">Settings</span>
+          <a class="site-card" href="/settings/" aria-label="Settings">
+            <span class="card-inner photo">
+              <picture>
+                <source type="image/webp" srcset="../images/settings-cover.webp">
+                <img class="settings-card-art" src="../images/settings-cover.jpg" alt="" width="1200" height="960">
+              </picture>
+              <span class="card-title settings-card-title">Settings</span>
             </span>
           </a>
           <p class="caption">Richard's Providence findings and settings work</p>
