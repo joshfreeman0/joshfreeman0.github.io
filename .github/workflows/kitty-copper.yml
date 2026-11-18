@@ -1,0 +1,30 @@
+name: Refresh Kitty Cash copper price
+on:
+  schedule:
+    - cron: "15 12 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch Kitco copper ask
+        run: |
+          python3 - <<'PY'
+          import re, json, urllib.request, datetime
+          req = urllib.request.Request("https://www.kitco.com/price/base-metals/copper", headers={"User-Agent": "Mozilla/5.0"})
+          t = urllib.request.urlopen(req, timeout=30).read().decode()
+          m = re.search(r'"symbol":"CU".*?"ask":([0-9.]+)', t, re.S)
+          ask = float(m.group(1))
+          assert 0.5 < ask < 50, ask
+          d = {"ask_usd_per_lb": ask, "as_of": datetime.datetime.utcnow().strftime("%Y-%m-%d"), "source": "Kitco copper ask", "source_url": "https://www.kitco.com/price/base-metals/copper"}
+          json.dump(d, open("kitty-cash/copper.json", "w"))
+          PY
+      - name: Commit if changed
+        run: |
+          git config user.name "joshfreeman0"
+          git config user.email "joshfreeman0@users.noreply.github.com"
+          git add kitty-cash/copper.json
+          git diff --cached --quiet || (git commit -m "Refresh Kitty Cash copper price" && git push)
