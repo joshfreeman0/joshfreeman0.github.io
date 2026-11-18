@@ -32,12 +32,13 @@ body{
 }
 .art-item img:focus-visible{outline:3px solid #0a5bd8;outline-offset:3px}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
-.site-links{position:fixed;top:calc(10px + env(safe-area-inset-top));right:calc(14px + env(safe-area-inset-right));z-index:10;display:flex;gap:8px}.site-links a{color:#fff;background:rgba(0,0,0,.55);padding:6px 12px;border-radius:4px;font-size:14px;text-decoration:none}.site-links a:hover,.site-links a:focus-visible{background:#000;outline:2px solid #fff}
+.site-links{position:fixed;top:calc(10px + env(safe-area-inset-top));right:calc(14px + env(safe-area-inset-right));z-index:10;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;max-width:calc(100vw - 28px)}.site-links a{color:#fff;background:rgba(0,0,0,.55);padding:6px 12px;border-radius:4px;font-size:14px;text-decoration:none}.site-links a:hover,.site-links a:focus-visible{background:#000;outline:2px solid #fff}
 </style>
 </head>
 <body>
 <nav class="site-links" aria-label="Site">
 <a href="websites/">Websites</a>
+<a href="websites/more/">More Websites</a>
 <a href="gallery/">Full Gallery</a>
 </nav>
 <main class="art-grid">
