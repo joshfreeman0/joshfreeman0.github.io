@@ -85,7 +85,9 @@
 
   /* Plain dark day pages get a navy, starry tint at night. */
   function tint() {
-    if (!document.body || side === "night") return;
+    if (!document.body) return;
+    if (root.hasAttribute("data-always-night")) { root.classList.add("jf-tint"); return; }
+    if (side === "night") return;
     root.classList.remove("jf-tint");
     if (mode !== "night") return;
     var bg = getComputedStyle(document.body).backgroundColor;
