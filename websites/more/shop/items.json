@@ -1,0 +1,26 @@
+[
+  {
+    "id": "example-1",
+    "name": "Example item 1",
+    "price": 10,
+    "description": "A sample listing to show how an available item appears. This is not a real product, and the price is an example only.",
+    "image": "img/example-1.svg",
+    "status": "available"
+  },
+  {
+    "id": "example-2",
+    "name": "Example item 2",
+    "price": 25,
+    "description": "A sample listing with an example price in US dollars. This is not a real product.",
+    "image": "img/example-2.svg",
+    "status": "available"
+  },
+  {
+    "id": "example-3",
+    "name": "Example item 3",
+    "price": 15,
+    "description": "A sample listing to show how a sold item appears. This is not a real product, and the price is an example only.",
+    "image": "img/example-3.svg",
+    "status": "sold"
+  }
+]

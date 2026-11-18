@@ -69,6 +69,8 @@ a.site-card:focus-visible{outline:3px solid #0a5bd8;outline-offset:4px}
 .card-inner.stack{flex-direction:column;align-items:flex-start;justify-content:space-between;gap:18px;min-height:148px}
 .mark{height:clamp(52px,11vw,88px);width:auto;flex:0 0 auto;display:block}
 .logo{width:min(380px,86%);height:auto;display:block}
+.logo-on-light{background:#fff;padding:clamp(12px,3vw,24px);min-height:160px}
+.logo-on-light .logo{width:min(220px,70%);height:auto;max-height:160px;object-fit:contain}
 .card-name{
   font-family:Oswald,Arial,sans-serif;
   font-weight:500;
@@ -198,24 +200,43 @@ a.site-card:focus-visible{outline:3px solid #0a5bd8;outline-offset:4px}
       </figure>
     </section>
 
-    <section class="group" aria-label="Coming soon">
+    <section class="group" aria-label="Tower Jewelry and Shop">
+      <div class="grid grid-2">
+        <figure class="site-figure">
+          <a class="site-card" href="tower/" aria-label="Tower Jewelry, logo concepts">
+            <span class="card-inner center logo-on-light">
+              <img class="logo" src="tower/img/tower-logo.jpg" alt="Tower Jewelry logo concept" width="1024" height="1024">
+            </span>
+          </a>
+          <figcaption class="caption">Tower Jewelry, logo concepts</figcaption>
+        </figure>
+        <figure class="site-figure">
+          <a class="site-card" href="shop/" aria-label="Shop">
+            <span class="card-inner center stack" style="align-items:center;justify-content:center">
+              <span class="card-title">Shop</span>
+            </span>
+          </a>
+          <figcaption class="caption">Items for sale</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="group" aria-label="Other sites">
       <div class="grid grid-3">
         <article class="site-figure">
-          <div class="site-card is-soon" aria-label="Settings, coming soon">
-            <div class="card-inner stack">
-              <p class="card-title">Settings</p>
-              <span class="badge">Coming soon</span>
-            </div>
-          </div>
+          <a class="site-card" href="https://joshfreeman.org/settings-draft/" target="_blank" rel="noopener" aria-label="Settings">
+            <span class="card-inner stack">
+              <span class="card-title">Settings</span>
+            </span>
+          </a>
           <p class="caption">Richard's Providence findings and settings work</p>
         </article>
         <article class="site-figure">
-          <div class="site-card is-soon" aria-label="London Boroughs, coming soon">
-            <div class="card-inner stack">
-              <p class="card-title">London Boroughs</p>
-              <span class="badge">Coming soon</span>
-            </div>
-          </div>
+          <a class="site-card" href="https://joshfreeman.org/london-boroughs/" target="_blank" rel="noopener" aria-label="London Boroughs">
+            <span class="card-inner stack">
+              <span class="card-title">London Boroughs</span>
+            </span>
+          </a>
           <p class="caption">All 33 areas, with Redbridge featured</p>
         </article>
         <article class="site-figure span-2" id="redbridge">
