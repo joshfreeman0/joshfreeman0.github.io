@@ -132,14 +132,16 @@
     s.textContent =
       "#jf-dn{position:fixed;left:calc(12px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));z-index:2147483000;font:14px/1.35 system-ui,-apple-system,sans-serif;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:8px;max-width:calc(100vw - 24px)}" +
       "#jf-dn .jf-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}" +
-      "#jf-dn button,#jf-dn a.jf-pill{font:inherit;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.62);color:#fff;border-radius:999px;padding:7px 13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);min-height:36px}" +
+      "#jf-dn button,#jf-dn a.jf-pill{font:inherit;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.62);color:#fff;border-radius:999px;padding:8px 15px;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);min-height:44px;font-size:15px;box-shadow:0 4px 14px rgba(0,0,0,.18)}" +
       "#jf-dn svg{width:18px;height:18px;display:block}" +
       "#jf-dn button:focus-visible,#jf-dn a:focus-visible{outline:3px solid #e8c77a;outline-offset:2px}" +
       "#jf-dn .jf-menu{background:#0d1426;color:#efe4cc;border:1px solid #2c3a5c;border-radius:12px;padding:12px;width:min(300px,calc(100vw - 24px));box-shadow:0 12px 30px rgba(0,0,0,.45)}" +
       "#jf-dn .jf-menu[hidden]{display:none}" +
       "#jf-dn .jf-menu p{margin:0 0 10px;color:#c9bfa8;font-size:13px}" +
+      "#jf-dn .jf-menu h2{margin:0 0 8px;font-size:15px;color:#f3e8c8}" +
+      "#jf-dn .jf-caret{opacity:.7;font-size:12px}" +
       "#jf-dn .jf-opts{display:flex;gap:6px;margin-bottom:10px}" +
-      "#jf-dn .jf-opts button{flex:1;justify-content:center;padding:7px 8px;border-radius:8px;background:#16203a;border-color:#2c3a5c}" +
+      "#jf-dn .jf-opts button{flex:1;justify-content:center;padding:7px 8px;min-height:44px;border-radius:8px;background:#16203a;border-color:#2c3a5c}" +
       "#jf-dn .jf-opts button[aria-pressed=true]{background:#e8c77a;color:#1a1408;border-color:#e8c77a;font-weight:600}" +
       "#jf-dn .jf-geo{width:100%;justify-content:center;border-radius:8px!important;background:#16203a!important;border-color:#2c3a5c!important}" +
       "#jf-dn [hidden]{display:none!important}" +
@@ -158,8 +160,9 @@
     ui = document.createElement("div");
     ui.id = "jf-dn";
     ui.innerHTML =
-      '<div class="jf-row"><button type="button" class="jf-toggle" aria-expanded="false" aria-controls="jf-dn-menu"></button><a class="jf-pill jf-side" href="/night/"></a></div>' +
+      '<div class="jf-row"><button type="button" class="jf-toggle" aria-expanded="false" aria-controls="jf-dn-menu"></button><a class="jf-pill jf-side" href="/night/"></a><a class="jf-pill jf-home" href="/" hidden>⌂ Home</a></div>' +
       '<div class="jf-menu" id="jf-dn-menu" role="group" aria-label="Day and night" hidden>' +
+      '<h2>Day or night?</h2>' +
       '<div class="jf-opts"><button type="button" data-c="auto">Auto</button><button type="button" data-c="day">Day</button><button type="button" data-c="night">Night</button></div>' +
       '<p class="jf-status" aria-live="polite"></p>' +
       '<button type="button" class="jf-geo" hidden>Use my location for sunrise and sunset</button>' +
@@ -181,13 +184,15 @@
     geoBtn.addEventListener("click", function () { geoBtn.disabled = true; askLocation(); });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !menu.hidden) { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); btn.focus(); } });
     document.addEventListener("click", function (e) { if (!menu.hidden && !ui.contains(e.target)) { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); } });
+    // A way home on pages without the site's own header (project pages, Settings, gallery, 404).
+    if (!root.hasAttribute("data-night-home") && !document.querySelector(".dy-top, header.top")) ui.querySelector(".jf-home").hidden = false;
     tint(); render();
   }
 
   function render() {
     if (!ui) return;
     var c = choice();
-    btn.innerHTML = (mode === "night" ? ICON_MOON : ICON_SUN) + "<span>" + (mode === "night" ? "Night" : "Day") + (c === "auto" ? " · Auto" : "") + "</span>";
+    btn.innerHTML = (mode === "night" ? ICON_MOON : ICON_SUN) + "<span>" + (mode === "night" ? "Night" : "Day") + (c === "auto" ? " · Auto" : "") + "</span><span class=\"jf-caret\" aria-hidden=\"true\">▲</span>";
     btn.setAttribute("aria-label", "Day and night: " + mode + (c === "auto" ? ", automatic" : ", chosen by you") + ". Open options");
     ui.querySelectorAll(".jf-opts button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-c") === c)); });
     var where = source === "location" ? "at your location" : "estimated from your time zone";
