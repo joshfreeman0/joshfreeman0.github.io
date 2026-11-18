@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en" data-side="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#070b1a">
+<title>Sky — Night · joshfreeman.org</title>
+<meta name="description" content="Tonight&#x27;s sunset, sunrise and moon phase, worked out in your browser.">
+<link rel="canonical" href="https://joshfreeman.org/night/sky/">
+<script src="/js/daynight.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&amp;family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/night/night.css">
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  function fmt(d){ return d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}); }
+  function moon(t){
+    var syn = 29.530588853, ref = Date.UTC(2000,0,6,18,14);
+    var p = (((t - ref) / 864e5) % syn + syn) % syn / syn;
+    var names = ["New moon","Waxing crescent","First quarter","Waxing gibbous","Full moon","Waning gibbous","Last quarter","Waning crescent"];
+    var name = names[Math.floor((p * 8) + 0.5) % 8];
+    var lit = Math.round((1 - Math.cos(2 * Math.PI * p)) / 2 * 100);
+    return {p:p, name:name, lit:lit};
+  }
+  function moonSvg(p){
+    var r = 40, k = Math.abs(Math.cos(2*Math.PI*p)) * r, d;
+    if (p < 0.5) d = "M50 10 A40 40 0 0 1 50 90 A"+k+" 40 0 0 "+(p<0.25?0:1)+" 50 10";
+    else d = "M50 10 A40 40 0 0 0 50 90 A"+k+" 40 0 0 "+(p<0.75?0:1)+" 50 10";
+    return '<svg viewBox="0 0 100 100" class="moonball" role="img" aria-label="Moon phase"><circle cx="50" cy="50" r="40" fill="#1c2540"/><path d="'+d+'" fill="#f3e8c8"/></svg>';
+  }
+  function update(){
+    var api = window.JFDayNight; if (!api) return;
+    var s = api.sun(), t = api.now(), src = api.source() === "location" ? "at your location" : "estimated from your time zone (location not used)";
+    var el = function(id){ return document.getElementById(id); };
+    if (s && s.rise) { el("sk-set").textContent = fmt(s.set); el("sk-rise").textContent = fmt(s.rise); }
+    else if (s && s.polar) { el("sk-set").textContent = el("sk-rise").textContent = s.polar === "day" ? "Sun up all day" : "Sun down all day"; }
+    el("sk-src").textContent = "Times " + src + ".";
+    var m = moon(t); el("sk-moon").textContent = m.name + " · " + m.lit + "% lit";
+    el("sk-moonpic").innerHTML = moonSvg(m.p);
+  }
+  update();
+  document.addEventListener("jfmodechange", update);
+});
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/night/"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="#f3e8c8" d="M20.2 15.1A8.6 8.6 0 0 1 8.9 3.8a.6.6 0 0 0-.8-.7A9.6 9.6 0 1 0 20.9 15.9a.6.6 0 0 0-.7-.8z"/></svg> The Night Side</a>
+  <a class="dayside" href="/day/">☀ Day side</a>
+</header>
+<nav class="tabs" aria-label="Night pages">
+  <a class="tab" href="/night/">Night</a>
+  <a class="tab" href="/night/music/">Music</a>
+  <a class="tab" href="/night/podcast/">Podcast</a>
+  <a class="tab" href="/night/art/">Night Art</a>
+  <a class="tab" href="/night/sky/" aria-current="page">Sky</a>
+  <a class="tab" href="/night/dreams/">Dreams &amp; Ideas</a>
+  <a class="tab" href="/night/picks/">Night Picks</a>
+  <a class="tab" href="/night/sponsors/">Sponsors</a>
+  <a class="tab" href="/night/business/">Night Business</a>
+  <a class="tab" href="/night/friction/">Friction into Fuel</a>
+</nav>
+<main id="main" class="stage">
+  <div class="notebook"><article class="paper">
+
+<p class="kicker">Night side · Sky</p>
+<h1>Sky</h1>
+<p class="lede">The sun decides which side of this site you see. Here is today's sun and tonight's moon, worked out in your browser.</p>
+<div class="sky-facts">
+<div class="fact"><b>Sunset</b><span id="sk-set">…</span></div>
+<div class="fact"><b>Sunrise</b><span id="sk-rise">…</span></div>
+<div class="fact"><b>Moon</b><span id="sk-moon">…</span></div>
+</div>
+<div id="sk-moonpic" aria-hidden="false"></div>
+<p class="note" id="sk-src"></p>
+<p class="note">Moon phase is approximate. Your location, if you share it, stays on your device.</p>
+<h2>What to look for</h2>
+<p><span class="placeholder">[To fill in: stars, planets or constellations worth looking for]</span></p>
+<h2>Sky in the paintings</h2>
+<p><a href="/night/art/">Pine with Star, Jar, Star and Pine</a>, and the other night paintings.</p>
+  </article></div>
+</main>
+<footer class="foot"><p>The night side of joshfreeman.org · <a href="/day/">Day side</a> · <a href="/gallery/">Full Gallery</a></p></footer>
+</div>
+</body>
+</html>
