@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Submit Artwork - Josh Freeman</title>
+<meta property="og:title" content="Submit Artwork - Josh Freeman">
+<meta property="og:url" content="https://joshfreeman.org/submit/">
+<style>*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Jost",system-ui,-apple-system,sans-serif;font-weight:300;background:#f6f5f3;color:#111;line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;padding:max(32px,env(safe-area-inset-top)) 20px max(32px,env(safe-area-inset-bottom))}
+main{max-width:560px;margin:0 auto}
+h1{font-family:"Cormorant Garamond",Georgia,serif;font-weight:400;font-size:clamp(2.2rem,9vw,3.2rem);line-height:1.1;margin-bottom:12px;text-align:center}
+p.intro{color:#333;font-size:1.05rem;margin-bottom:12px}
+p.note{color:#555;font-size:.95rem;margin-bottom:24px}
+label{display:block;font-weight:400;margin:16px 0 6px;font-size:1rem}
+input[type=text],input[type=email],input[type=tel],input[type=url],textarea,input[type=file]{width:100%;font:inherit;font-size:16px;padding:12px;border:2px solid #cfcdc8;border-radius:8px;background:#fff;color:#111}
+textarea{min-height:110px}
+input:focus,textarea:focus{outline:3px solid #0a5bd8;outline-offset:1px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hint{color:#666;font-size:.85rem;margin-top:4px}
+.chk{display:flex;gap:12px;align-items:flex-start;margin:22px 0}
+.chk input{width:24px;height:24px;margin-top:3px;flex:none}
+.chk label{margin:0;font-weight:300}
+button.btn,a.btn{display:block;width:100%;text-align:center;padding:18px 20px;min-height:60px;background:#111;color:#fff;text-decoration:none;font:inherit;font-size:1.15rem;font-weight:400;letter-spacing:.03em;border-radius:10px;border:2px solid #111;cursor:pointer}
+button.btn:hover,a.btn:hover,button.btn:focus-visible,a.btn:focus-visible{background:#fff;color:#111;outline:3px solid #0a5bd8;outline-offset:2px}
+.hp{position:absolute;left:-9999px;height:0;overflow:hidden}
+.back{display:inline-block;margin-top:20px;color:#111;text-decoration:underline;text-underline-offset:3px}
+.c{text-align:center}
+@media(max-width:420px){.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<h1>Submit Artwork</h1>
+<p class="intro">Artists can submit work for consideration for upcoming exhibitions. If a piece is selected, each piece will need a certificate of authenticity, and the artist will sign a contract.</p>
+<p class="note">Please include photos of everything you would like to sell.</p>
+<form action="https://formsubmit.co/josh@joshfreeman.org" method="POST" enctype="multipart/form-data">
+<input type="hidden" name="_subject" value="New artwork submission">
+<input type="hidden" name="_template" value="table">
+<input type="hidden" name="_captcha" value="true">
+<input type="hidden" name="_next" value="https://joshfreeman.org/submit/thanks/">
+<input type="text" name="_honey" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+<label for="name">Artist name *</label>
+<input type="text" id="name" name="Artist name" required autocomplete="name">
+<label for="email">Email *</label>
+<input type="email" id="email" name="Email" required autocomplete="email">
+<label for="phone">Phone (optional)</label>
+<input type="tel" id="phone" name="Phone" autocomplete="tel">
+<label for="web">Website or Instagram</label>
+<input type="text" id="web" name="Website or Instagram">
+<label for="title">Artwork title *</label>
+<input type="text" id="title" name="Artwork title" required>
+<label for="medium">Medium *</label>
+<input type="text" id="medium" name="Medium" required>
+<div class="row">
+<div><label for="size">Size</label><input type="text" id="size" name="Size"></div>
+<div><label for="year">Year</label><input type="text" id="year" name="Year" inputmode="numeric"></div>
+</div>
+<label for="price">Asking price</label>
+<input type="text" id="price" name="Asking price">
+<label for="desc">Short description or statement</label>
+<textarea id="desc" name="Description"></textarea>
+<label for="images">Images (1 to 3) *</label>
+<input type="file" id="images" name="attachment" accept="image/*" multiple required>
+<p class="hint">Choose up to 3 images. Please keep each under about 5 MB.</p>
+<div class="chk"><input type="checkbox" id="rights" name="Rights confirmed" value="Yes" required><label for="rights">I am the artist and own the rights to this work *</label></div>
+<button class="btn" type="submit">Submit artwork</button>
+</form>
+<p class="c"><a class="back" href="/">&larr; Back to home</a></p>
+</main>
+</body>
+</html>
