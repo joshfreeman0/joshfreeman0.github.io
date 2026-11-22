@@ -116,6 +116,18 @@ function detailTex() { // grass/soil micro-detail (grey around 0.5), tiles every
   for (let i = 0; i < S * S; i++) { const a = 0.5 + (A2[i] - 0.5) * 2.2 + (A[i] - 0.5) * 0.25, b = 0.5 + (B2[i] - 0.5) * 5.0; img.data[i * 4] = Math.max(0, Math.min(255, a * 255)); img.data[i * 4 + 1] = Math.max(0, Math.min(255, b * 255)); img.data[i * 4 + 2] = 128; img.data[i * 4 + 3] = 255; }
   g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 16; return t;
 }
+function grassTex() { // sharp repeating grass/soil: thousands of short blades over mottled soil, ~3 m tile
+  const S = 1024, c = canvas(S, S), g = c.getContext('2d');
+  g.fillStyle = '#6f7a45'; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 1400; i++) { const x = Math.random() * S, y = Math.random() * S, r = 6 + Math.random() * 30; g.fillStyle = Math.random() < 0.35 ? 'rgba(110,92,60,0.18)' : 'rgba(60,90,35,0.2)'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+  for (let i = 0; i < 26000; i++) {
+    const x = Math.random() * S, y = Math.random() * S, l = 6 + Math.random() * 16, a = -Math.PI / 2 + (Math.random() - 0.5) * 1.3, h = 70 + Math.random() * 40, li = 22 + Math.random() * 30;
+    g.strokeStyle = 'hsl(' + h + ',' + (35 + Math.random() * 30) + '%,' + li + '%)'; g.lineWidth = 1 + Math.random() * 1.6; g.beginPath();
+    for (const dx of [0, -S, S]) for (const dy of [0, -S, S]) { g.moveTo(x + dx, y + dy); g.lineTo(x + dx + Math.cos(a) * l, y + dy + Math.sin(a) * l); }
+    g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 16; t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 function cofferTex() { // round coffered dome: rings of recessed coffers with gold rosettes, lapis star oculus at the crown
   const c = hcanvas(1024), g = c.getContext('2d'); noiseFill(g, 1024, 1024, '#e9d6ab', 0.04, 20000);
   g.fillStyle = '#163a7a'; g.fillRect(0, 0, 1024, 150); g.fillStyle = '#e8c255'; for (let x = 16; x < 1024; x += 42) star(g, x, 40 + (x % 84 ? 0 : 50), 10), star(g, x + 21, 105, 8);
@@ -130,12 +142,35 @@ function cofferTex() { // round coffered dome: rings of recessed coffers with go
   g.fillStyle = '#b5342b'; g.fillRect(0, 1000, 1024, 24);
   return tex(c);
 }
-function rippleNormal() {
-  const S = 256, c = canvas(S, S), g = c.getContext('2d'), img = g.createImageData(S, S);
+function rippleNormal() { // tileable noise height field -> normal map (no stripes)
+  const S = 256, c = canvas(S, S), g = c.getContext('2d'), img = g.createImageData(S, S), Hh = new Float32Array(S * S);
+  const oct = (f, a, ph) => { for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const u = x / S * 6.2832, v = y / S * 6.2832; Hh[y * S + x] += a * Math.sin(u * f[0] + v * f[1] + ph); } };
+  for (let k = 0; k < 28; k++) { const fx = Math.round((Math.random() - 0.5) * 2 * (2 + k * 0.6)), fy = Math.round((Math.random() - 0.5) * 2 * (2 + k * 0.6)); if (!fx && !fy) continue; oct([fx, fy], 1 / Math.sqrt(fx * fx + fy * fy), Math.random() * 6.28); }
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-    const a = Math.sin(x / S * Math.PI * 8 + Math.sin(y / S * Math.PI * 4) * 1.5), b = Math.cos(y / S * Math.PI * 10 + Math.sin(x / S * Math.PI * 6));
-    const i = (y * S + x) * 4; img.data[i] = 128 + a * 30; img.data[i + 1] = 128 + b * 30; img.data[i + 2] = 255; img.data[i + 3] = 255; }
-  g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+    const dx = Hh[y * S + (x + 1) % S] - Hh[y * S + (x + S - 1) % S], dy = Hh[((y + 1) % S) * S + x] - Hh[((y + S - 1) % S) * S + x];
+    const nx = -dx * 2.2, ny = -dy * 2.2, l = Math.hypot(nx, ny, 1), i = (y * S + x) * 4;
+    img.data[i] = 128 + 127 * nx / l; img.data[i + 1] = 128 + 127 * ny / l; img.data[i + 2] = 128 + 127 / l; img.data[i + 3] = 255; }
+  g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
+}
+/* one shared water look for Fowling Pond, King's Pond and the rivers: blue-green, two drifting ripple layers sampled in
+   world space (so overlapping water meshes match exactly), sky reflection with Fresnel from the PBR env map. */
+function waterMat(alphaMap) {
+  const mat = new THREE.MeshStandardMaterial({color: 0x24605e, roughness: 0.07, metalness: 0.0, alphaMap: alphaMap || null, alphaTest: alphaMap ? 0.5 : 0,
+    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2});
+  if (W3D.env) { mat.envMap = W3D.env; mat.envMapIntensity = 1.35; }
+  if (!W3D.waterU) W3D.waterU = {wN: {value: rippleNormal()}, wT: {value: 0}};
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.wN = W3D.waterU.wN; sh.uniforms.wT = W3D.waterU.wT;
+    sh.vertexShader = 'varying vec3 vWw;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvWw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'uniform sampler2D wN; uniform float wT; varying vec3 vWw;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', [
+      'vec2 wp = vWw.xz;',
+      'vec3 n1 = texture2D(wN, wp / 21.0 + vec2(0.011, 0.007) * wT).xyz * 2.0 - 1.0;',
+      'vec3 n2 = texture2D(wN, mat2(0.8, -0.6, 0.6, 0.8) * wp / 6.5 + vec2(-0.017, 0.012) * wT).xyz * 2.0 - 1.0;',
+      'float wd = length(vWw - cameraPosition); vec2 sl = (n1.xy + n2.xy * 0.6 * (1.0 - smoothstep(40.0, 260.0, wd))) * 0.32 * mix(1.0, 0.3, smoothstep(120.0, 900.0, wd));',
+      'normal = normalize((viewMatrix * vec4(normalize(vec3(sl.x, 1.0, sl.y)), 0.0)).xyz);'].join('\n'));
+  };
+  mat.customProgramCacheKey = () => 'jfwater' + (alphaMap ? 'a' : '');
+  return mat;
 }
 
 /* ---------- geometry helpers ---------- */
@@ -174,12 +209,12 @@ W3D.build = function (scene3, sceneEl) {
     fragmentShader: 'uniform vec3 sun; varying vec3 vd; void main(){ float h = clamp(vd.y,0.0,1.0); vec3 zen = vec3(0.23,0.47,0.82); vec3 hor = vec3(0.80,0.88,0.95); vec3 c = mix(hor, zen, pow(h,0.55)); if(vd.y<0.0) c = mix(hor, vec3(0.55,0.6,0.55), clamp(-vd.y*3.0,0.0,1.0)); float s = max(dot(normalize(vd), sun),0.0); c += vec3(1.0,0.9,0.7)*pow(s,400.0)*2.0 + vec3(1.0,0.85,0.6)*pow(s,8.0)*0.25; gl_FragColor = vec4(c,1.0);\n#include <colorspace_fragment>\n}'});
   const sky = new THREE.Mesh(new THREE.SphereGeometry(7000, 48, 24), skyMat); sky.renderOrder = -10; root.add(sky); W3D.sky = sky;
   try { const pm = new THREE.PMREMGenerator(renderer); const es = new THREE.Scene(); es.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), skyMat)); W3D.env = pm.fromScene(es).texture; } catch (e) {}
-  W3D.fog = new THREE.Fog(0xcfdde8, 700, 5200);
+  W3D.fog = new THREE.Fog(0xcfdde8, 700, 5200); W3D.bg = new THREE.Color(0xcfdde8); // anything past the far plane shows haze, never black
   const hemi = new THREE.HemisphereLight(0xe3ecff, 0x5b6440, 0.85); root.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff0d8, 1.55); sun.position.set(HQ.x - 260, HQ.y + 360, HQ.z + 210); sun.target.position.set(HQ.x + 20, HQ.y, HQ.z - 10);
   sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -130; sc.right = 130; sc.top = 130; sc.bottom = -130; sc.near = 50; sc.far = 900; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.05;
   root.add(sun); root.add(sun.target);
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true; // sun is fixed: redraw shadows ~6x/s, not every frame
   // materials
   const ash = ashlarTex();
   M = {
@@ -205,11 +240,12 @@ W3D.build = function (scene3, sceneEl) {
   W3D.M = M;
   W3D.lib = {box: box, floorOnly: floorOnly, canvas: canvas, tex: tex, starCeilingTex: starCeilingTex, HQ: HQ, walls: walls, floors: floors};
   return Promise.all([
-    fetch(BASE + 'terrain.u16').then(r => r.arrayBuffer()),
-    fetch(BASE + 'trees.f32').then(r => r.arrayBuffer())
-  ]).then(([hb, tb]) => {
+    fetch(BASE + 'terrain_v2.u16').then(r => r.arrayBuffer()),
+    fetch(BASE + 'trees_v2.f32').then(r => r.arrayBuffer()),
+    fetch(BASE + 'water.json?v=1').then(r => r.json())
+  ]).then(([hb, tb, wj]) => {
     const u = new Uint16Array(hb); heights = new Float32Array(u.length); for (let i = 0; i < u.length; i++) heights[i] = u[i] * 0.01 - 10;
-    buildTerrain(); buildWater(); buildTrees(new Float32Array(tb)); buildRailPortals();
+    buildTerrain(); buildWater(); buildRivers(wj); buildTrees(new Float32Array(tb)); buildRailPortals();
     buildBank(); buildOffice(); buildConservatory(); buildSigns();
     if (W3D.buildRooms) try { W3D.buildRooms(root); } catch (e) { console.warn('exhibit rooms failed', e); }
     if (W3D.buildBankPlus) try { W3D.buildBankPlus(root); } catch (e) { console.warn('bank upgrade failed', e); }
@@ -221,21 +257,25 @@ function buildTerrain() {
   const geo = new THREE.PlaneGeometry(SIZE, SIZE, N - 1, N - 1); geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, heights[i]);
   geo.computeVertexNormals();
-  const t = new THREE.TextureLoader().load(BASE + 'ortho_v6.jpg?v=1'); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16;
+  const t = new THREE.TextureLoader().load(BASE + 'ortho_v6_v2.jpg?v=1'); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16;
   // sharper ground near the compound and pond: 0.5 m/px USGS tile (x -324..1724, z -1249..799) + fine detail texture that fades in within ~200 m
-  const hi = new THREE.TextureLoader().load(BASE + 'ortho_hi.jpg?v=1'); hi.colorSpace = THREE.SRGBColorSpace; hi.anisotropy = 16;
-  const det = detailTex();
+  const hi = new THREE.TextureLoader().load(BASE + 'ortho_hi_v2.jpg?v=1'); hi.colorSpace = THREE.SRGBColorSpace; hi.anisotropy = 16;
+  const det = detailTex(), grs = grassTex();
   const tm = new THREE.MeshLambertMaterial({map: t});
   tm.onBeforeCompile = sh => {
-    sh.uniforms.hiMap = {value: hi}; sh.uniforms.detMap = {value: det}; sh.uniforms.hiRect = {value: new THREE.Vector4(-324, -1249, 2048, 2048)};
+    sh.uniforms.hiMap = {value: hi}; sh.uniforms.detMap = {value: det}; sh.uniforms.grsMap = {value: grs}; sh.uniforms.hiRect = {value: new THREE.Vector4(-324, -1249, 2048, 2048)};
     sh.vertexShader = 'varying vec3 vWp;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvWp = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'uniform sampler2D hiMap; uniform sampler2D detMap; uniform vec4 hiRect; varying vec3 vWp;\n' + sh.fragmentShader.replace('#include <map_fragment>', [
+    sh.fragmentShader = 'uniform sampler2D hiMap; uniform sampler2D detMap; uniform sampler2D grsMap; uniform vec4 hiRect; varying vec3 vWp;\n' + sh.fragmentShader.replace('#include <map_fragment>', [
       'vec4 texelColor = texture2D(map, vMapUv);',
       'vec2 hu = (vWp.xz - hiRect.xy) / hiRect.zw;',
       'if (hu.x > 0.0 && hu.x < 1.0 && hu.y > 0.0 && hu.y < 1.0) { vec4 hc = texture2D(hiMap, vec2(hu.x, 1.0 - hu.y)); float e = min(min(hu.x, 1.0 - hu.x), min(hu.y, 1.0 - hu.y)); texelColor = mix(texelColor, hc, smoothstep(0.0, 0.03, e)); }',
-      'float dd = length(vWp - cameraPosition); float df = 1.0 - smoothstep(30.0, 220.0, dd);',
-      'float dtl = texture2D(detMap, vWp.xz / 2.5).r * 0.55 + texture2D(detMap, vWp.xz / 13.0).g * 0.45;',
-      'texelColor.rgb *= mix(1.0, 0.5 + dtl * 1.0, df);',
+      'float dd = length(vWp - cameraPosition); float df = 1.0 - smoothstep(60.0, 650.0, dd);',
+      'float dtl = texture2D(detMap, vWp.xz / 2.5).r * 0.4 + texture2D(detMap, vWp.xz / 13.0).g * 0.35 + texture2D(detMap, vWp.xz / 0.7).r * 0.25;',
+      'texelColor.rgb *= mix(1.0, 0.55 + dtl * 0.9, df);',
+      'vec3 gt = mix(texture2D(grsMap, vWp.xz / 3.0).rgb, texture2D(grsMap, vWp.xz / 9.7).rgb, 0.35);',
+      'vec3 tint = clamp(texelColor.rgb / vec3(0.16, 0.19, 0.08), 0.35, 2.2);',
+      'float gn = 1.0 - smoothstep(25.0, 220.0, dd); float veg = smoothstep(0.0, 0.05, texelColor.g - texelColor.b);',
+      'texelColor.rgb = mix(texelColor.rgb, gt * tint, gn * mix(0.35, 0.8, veg));',
       'diffuseColor *= texelColor;'].join('\n'));
   };
   const mesh = new THREE.Mesh(geo, tm); mesh.receiveShadow = true; mesh.name = 'terrain'; root.add(mesh);
@@ -244,18 +284,48 @@ function buildTerrain() {
   for (const [w, d, x, z] of [[20000, 9000, 0, -HALF - 4500], [20000, 9000, 0, HALF + 4500], [9000, SIZE, -HALF - 4500, 0], [9000, SIZE, HALF + 4500, 0]]) {
     const pl = new THREE.Mesh(new THREE.PlaneGeometry(w, d), gm); pl.rotation.x = -Math.PI / 2; pl.position.set(x, 12, z); root.add(pl); }
 }
-function buildWater() {
-  const x0 = -1790, x1 = 560, z0 = -660, z1 = 610, w = x1 - x0, d = z1 - z0;
-  const am = new THREE.TextureLoader().load(BASE + 'pondmask.png'); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
-  const nm = rippleNormal(); nm.repeat.set(60, 32);
-  const mat = new THREE.MeshStandardMaterial({color: 0x2c6680, roughness: 0.06, metalness: 0.35, alphaMap: am, alphaTest: 0.5, normalMap: nm, normalScale: new THREE.Vector2(0.35, 0.35)});
-  if (W3D.env) { mat.envMap = W3D.env; mat.envMapIntensity = 1.2; }
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, WATER, (z0 + z1) / 2); m.receiveShadow = true; root.add(m);
-  W3D.waterNormal = nm;
+function buildWater() { // Fowling Pond: shoreline = where the reshaped terrain meets the 16.5 m surface; mask only keeps the lowlands dry
+  const x0 = -1830, x1 = 600, z0 = -700, z1 = 650, w = x1 - x0, d = z1 - z0;
+  const am = new THREE.TextureLoader().load(BASE + 'pondmask_v2.png?v=1'); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d, 8, 4), waterMat(am)); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, WATER, (z0 + z1) / 2); m.receiveShadow = true; root.add(m);
+}
+function buildRivers(J) { // King's Pond surface, the herring passage into Fowling Pond, the channel below King's dam, and the dam road
+  const K = J.kings, kw = K.x1 - K.x0, kd = K.z1 - K.z0;
+  const kp = new THREE.Mesh(new THREE.PlaneGeometry(kw, kd, 6, 4), waterMat()); kp.rotation.x = -Math.PI / 2; kp.position.set((K.x0 + K.x1) / 2, K.level, (K.z0 + K.z1) / 2); kp.receiveShadow = true; root.add(kp);
+  const rm = waterMat();
+  for (const R of J.rivers) { // ribbon 26 m wide; its edges tuck under the carved banks
+    const P = R.pts, L = R.lev, pos = [], idx = []; let k = 0;
+    for (let i = 0; i < P.length - 1; i++) {
+      const [ax, az] = P[i], [bx, bz] = P[i + 1], len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(len / 4));
+      for (let j = (i ? 1 : 0); j <= n; j++) {
+        const t = j / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, y = L[i] + (L[i + 1] - L[i]) * t;
+        const p0 = P[Math.max(0, i - (t === 0 ? 1 : 0))], p1 = P[Math.min(P.length - 1, i + 1 + (t === 1 ? 1 : 0))];
+        let tx = p1[0] - p0[0], tz = p1[1] - p0[1]; const tl = Math.hypot(tx, tz); tx /= tl; tz /= tl;
+        pos.push(x - tz * 13, y, z + tx * 13, x + tz * 13, y, z - tx * 13);
+        if (k) idx.push(2 * k - 2, 2 * k - 1, 2 * k, 2 * k - 1, 2 * k + 1, 2 * k); k++;
+      }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(new Array(pos.length / 3 * 2).fill(0), 2)); g.computeVertexNormals();
+    // normals must face up regardless of winding
+    const nr = g.attributes.normal; for (let i = 0; i < nr.count; i++) if (nr.getY(i) < 0) nr.setXYZ(i, -nr.getX(i), -nr.getY(i), -nr.getZ(i));
+    const m = new THREE.Mesh(g, rm); m.material.side = THREE.DoubleSide; m.receiveShadow = true; root.add(m);
+  }
+  // dam road: asphalt deck with white edge lines, yellow centre dashes and stone kerbs, bridging the spillway
+  const D = J.dam, len = D.x1 - D.x0;
+  const c = canvas(2048, 128), gc = c.getContext('2d'); noiseFill(gc, 2048, 128, '#3a3b3d', 0.10, 40000);
+  gc.fillStyle = '#e8e8e2'; gc.fillRect(0, 10, 2048, 5); gc.fillRect(0, 113, 2048, 5);
+  gc.fillStyle = '#e2b52a'; for (let x = 0; x < 2048; x += 64) gc.fillRect(x, 60, 34, 4), gc.fillRect(x, 66, 34, 4);
+  const at = tex(c); at.wrapS = THREE.ClampToEdgeWrapping; at.anisotropy = 16;
+  const road = new THREE.Mesh(new THREE.BoxGeometry(len, 0.5, D.w), new THREE.MeshStandardMaterial({map: at, roughness: 0.85}));
+  road.position.set((D.x0 + D.x1) / 2, D.y - 0.25, D.z); road.receiveShadow = true; road.castShadow = true; root.add(road);
+  for (const sgn of [-1, 1]) { const kb = new THREE.Mesh(new THREE.BoxGeometry(len, 0.6, 0.45), M.stone); kb.position.set((D.x0 + D.x1) / 2, D.y + 0.3, D.z + sgn * (D.w / 2 - 0.22)); kb.castShadow = true; root.add(kb); }
+  const face = new THREE.Mesh(new THREE.BoxGeometry(32, 3.2, 1.2), M.stone); face.position.set(1205, D.y - 1.9, D.z + D.w / 2 - 0.4); root.add(face); // spillway headwall under the bridge
+  floors.push({x0: D.x0, x1: D.x1, z0: D.z - D.w / 2, z1: D.z + D.w / 2, y: D.y});
 }
 function buildTrees(a) {
   const n = a.length / 4; const con = [], dec = [];
-  for (let i = 0; i < n; i++) { const x = a[i * 4], z = a[i * 4 + 1], s = a[i * 4 + 2], k = a[i * 4 + 3]; const y = terrainH(x, z); if (y < WATER + 0.3) continue; (k < 0.5 ? con : dec).push([x, y, z, s]); }
+  for (let i = 0; i < n; i++) { const x = a[i * 4], z = a[i * 4 + 1], s = a[i * 4 + 2], k = a[i * 4 + 3]; const y = terrainH(x, z); if (y < -5) continue; (k < 0.5 ? con : dec).push([x, y, z, s]); }
   const mk = (geo, mat, list, yOff, sy, colors) => {
     const im = new THREE.InstancedMesh(geo, mat, list.length); const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), col = new THREE.Color();
     list.forEach((t, i) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (i * 2.39996) % 6.283); sv.set(t[3], t[3] * sy, t[3]); pv.set(t[0], t[1] + yOff * t[3], t[2]); m4.compose(pv, q, sv); im.setMatrixAt(i, m4);
@@ -266,7 +336,7 @@ function buildTrees(a) {
   mk(trunkG, M.trunk, con, 0, 1); mk(trunkG, M.trunk, dec, 0, 1);
   const coneG = new THREE.ConeGeometry(2.6, 9, 8); coneG.translate(0, 7.5, 0);
   mk(coneG, new THREE.MeshLambertMaterial({color: 0xffffff}), con, 0, 1, ['#2f5a2c', '#2a4f2a', '#355f30']);
-  const crownG = new THREE.IcosahedronGeometry(3.6, 1); crownG.scale(1, 0.85, 1); crownG.translate(0, 6.5, 0);
+  const crownG = new THREE.DodecahedronGeometry(3.7, 0); crownG.scale(1, 0.85, 1); crownG.translate(0, 6.5, 0);
   mk(crownG, new THREE.MeshLambertMaterial({color: 0xffffff, flatShading: true}), dec, 0, 1, ['#4e7a2e', '#5d8a34', '#3f6b2a', '#6b8f3a']);
 }
 function buildRailPortals() { // v6: railroad runs in a 1.67 km tunnel; portals >= 274 m from shore (approx positions)
@@ -494,7 +564,10 @@ W3D.spots = {
 const keys = {};
 document.addEventListener('keydown', e => { keys[e.code] = true; }); document.addEventListener('keyup', e => { keys[e.code] = false; });
 AFRAME.registerComponent('w3d-keys', { tick: function (t, dt) { if (!W3D.active || !JFVR.fly || !dt) return; const p = this.el.object3D.position, s = 30 * dt / 1000; if (keys.Space) p.y += s; if (keys.ShiftLeft || keys.ShiftRight) p.y -= s; if (W3D.waterNormal) {} } });
-AFRAME.registerComponent('w3d-anim', { tick: function (t, dt) { if (W3D.waterNormal) { W3D.waterNormal.offset.x = t * 0.00002; W3D.waterNormal.offset.y = t * 0.000013; } if (W3D.tickWildlife && W3D.active) W3D.tickWildlife(t, dt); if (W3D.tickRooms && W3D.active) W3D.tickRooms(t, dt); } });
+const _cp = new THREE.Vector3(); let _sf = 0;
+AFRAME.registerComponent('w3d-anim', { tick: function (t, dt) { if (W3D.waterU) W3D.waterU.wT.value = t / 1000; if (!W3D.active) return; if (W3D.tickWildlife) W3D.tickWildlife(t, dt); if (W3D.tickRooms) W3D.tickRooms(t, dt);
+  const r = this.el.renderer; if (r && ++_sf % 12 === 0) r.shadowMap.needsUpdate = true;
+  if (W3D.sky && this.el.camera) { this.el.camera.getWorldPosition(_cp); W3D.sky.position.copy(_cp); } } });
 // lifts between hall and office
 AFRAME.registerComponent('w3d-lift', { schema: {to: {type: 'string'}}, init: function () { this.el.addEventListener('click', () => { if (this.data.to === 'office') W3D.spots.office(); else W3D.teleportTo(958, HQ.y + 0.3, HQ.z, -90); JFVR.hud && JFVR.hud(this.data.to === 'office' ? "Josh's office - top floor" : 'Banking hall'); }); } });
 })();
