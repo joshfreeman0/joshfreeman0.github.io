@@ -25,7 +25,7 @@ const EXHIBITS = {
   ufo: {
     title: 'UFO / UAP ROOM',
     subtitle: 'A timeline of public UAP history',
-    intro: { title: 'About this room', tag: 'READ ME', text: 'UAP = unidentified anomalous phenomena (formerly UFOs). These panels summarize public reports and official documents. "Reported" and "alleged" mean exactly that - not proven. The hovering saucer is an illustrative 1950s-style model, not a depiction of any real object.' },
+    intro: { title: 'About this room', tag: 'READ ME', text: 'UAP = unidentified anomalous phenomena (formerly UFOs). These panels summarize public reports and official documents. "Reported" and "alleged" mean exactly that - not proven. The hovering saucer is an illustrative model in the style of the 1947 Roswell-era "flying saucer" reports, not a depiction of any real object.' },
     panels: [ // west wall (4), east wall (4), north wall left, north wall right
       { title: '1947 - Roswell, New Mexico', tag: 'REPORTED', icon: 'news', text: 'In July 1947 Roswell Army Air Field announced it had recovered a "flying disc"; the Army quickly said it was a weather balloon. A 1994 US Air Force report attributed the debris to Project Mogul, a classified balloon program. Claims of a crashed craft remain alleged.' },
       { title: '1952-1969 - Project Blue Book', tag: 'OFFICIAL', icon: 'doc', text: 'US Air Force study of UFO reports, following Projects Sign and Grudge. It logged 12,618 reports, of which 701 stayed "unidentified". It closed in 1969 after the University of Colorado (Condon) report.' },
@@ -215,7 +215,7 @@ function saucer(x, z) {
   lights.forEach(l => l.material = l.material.clone());
   // small label on the dais
   const c = L.canvas(512, 128), gg = c.getContext('2d'); gg.fillStyle = '#0c1424'; gg.fillRect(0, 0, 512, 128); gg.strokeStyle = '#d4af37'; gg.lineWidth = 5; gg.strokeRect(4, 4, 504, 120);
-  gg.fillStyle = '#f3e6c0'; gg.font = '26px Georgia, serif'; gg.textAlign = 'center'; gg.fillText('Illustrative 1950s-style "flying saucer"', 256, 52); gg.fillText('model - not a real object', 256, 92);
+  gg.fillStyle = '#f3e6c0'; gg.font = '26px Georgia, serif'; gg.textAlign = 'center'; gg.fillText('Roswell-era (1947) "flying saucer"', 256, 52); gg.fillText('illustrative model - not a real object', 256, 92);
   const lab = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.35), new THREE.MeshBasicMaterial({map: L.tex(c), toneMapped: false})); lab.position.set(x, fy + 0.6, z + 3.4); lab.rotation.x = -0.5; root.add(lab);
   L.box(1.5, 0.45, 0.2, x, fy, z + 3.5, M.granite, {collide: false});
 }
