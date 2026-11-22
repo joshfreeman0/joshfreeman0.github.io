@@ -218,7 +218,7 @@
     try { lib = await import('/vr/mp-p2p.js?v=1'); }
     catch (e) { MP.status = 'error'; renderUI(); console.warn('multiplayer load failed', e); return; }
     // Relay (TURN) servers for players behind strict networks. Fill in when the free relay account is ready.
-    const TURN = [];
+    const TURN = [{"urls":"stun:stun.relay.metered.ca:80"},{"urls":"turn:global.relay.metered.ca:80","username":"1a98aefd4237266704402170","credential":"ypNAB48B+K5zTEAi"},{"urls":"turn:global.relay.metered.ca:80?transport=tcp","username":"1a98aefd4237266704402170","credential":"ypNAB48B+K5zTEAi"},{"urls":"turn:global.relay.metered.ca:443","username":"1a98aefd4237266704402170","credential":"ypNAB48B+K5zTEAi"},{"urls":"turns:global.relay.metered.ca:443?transport=tcp","username":"1a98aefd4237266704402170","credential":"ypNAB48B+K5zTEAi"}]; // free Metered relay (500 MB/month cap); WebRTC uses it only when a direct connection fails
     const room = MP.room = lib.joinRoom({ appId: APP, identity: 'none', maxUsers: CAP, rtcConfig: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }].concat(TURN) } }, ROOM);
     room.onError && room.onError(err => { console.warn('mp error', err); if (err && err.code === 'room-full') { MP.status = 'full'; renderUI(); } });
     try { const me = await room.getSelf(); MP.selfId = me.peerId; } catch (e) {}
