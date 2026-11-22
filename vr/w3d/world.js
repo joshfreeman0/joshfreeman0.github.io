@@ -326,8 +326,8 @@ W3D.build = function (scene3, sceneEl) {
   const need = r => { if (!r.ok) throw new Error(r.url.replace(/^.*\//, '').replace(/\?.*/, '') + ' HTTP ' + r.status); return r; };
   W3D.status('Loading terrain data 0/5...');
   return Promise.all([
-    fetch(BASE + 'terrain_t4.u16?v=1').then(need).then(r => r.arrayBuffer()).then(step),
-    fetch(BASE + 'trees_t5.f32?v=1').then(need).then(r => r.arrayBuffer()).then(step),
+    fetch(BASE + 'terrain_t4.u16?v=2').then(need).then(r => r.arrayBuffer()).then(step),
+    fetch(BASE + 'trees_t5.f32?v=2').then(need).then(r => r.arrayBuffer()).then(step),
     fetch(BASE + 'water_t.json?v=4').then(need).then(r => r.json()).then(step),
     fetch(BASE + 'ring_mid.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step),
     fetch(BASE + 'ring_far.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step)
@@ -349,9 +349,9 @@ function buildTerrain() {
   const geo = new THREE.PlaneGeometry(SIZE, SIZE, N - 1, N - 1); geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, heights[i]);
   geo.computeVertexNormals();
-  const t = new THREE.TextureLoader().load(BASE + (LITE ? 'ortho_t_lite.jpg?v=4' : 'ortho_t.jpg?v=3')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = LITE ? 4 : 16;
+  const t = new THREE.TextureLoader().load(BASE + (LITE ? 'ortho_t_lite.jpg?v=5' : 'ortho_t.jpg?v=4')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = LITE ? 4 : 16;
   // sharper ground near the compound and pond: 0.5 m/px USGS tile (x -324..1724, z -1249..799) + fine detail texture that fades in within ~200 m
-  const hi = LITE ? t : new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=3'); hi.colorSpace = THREE.SRGBColorSpace; if (!LITE) hi.anisotropy = 16;   // lite: no 0.5 m tile (hiRect moved off the map)
+  const hi = LITE ? t : new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=4'); hi.colorSpace = THREE.SRGBColorSpace; if (!LITE) hi.anisotropy = 16;   // lite: no 0.5 m tile (hiRect moved off the map)
   const det = detailTex(), grs = grassTex();
   const tm = new THREE.MeshLambertMaterial({map: t});
   tm.onBeforeCompile = sh => {
@@ -404,7 +404,7 @@ function buildRings() {
 }
 function buildWater(J) { // Fowling Pond (restored) inside the real pond bed (OSM Pine Swamp); the soft mask gives a smooth natural shoreline
   const P = J.pond, x0 = P.x0, x1 = P.x1, z0 = P.z0, z1 = P.z1, w = x1 - x0, d = z1 - z0;
-  const am = new THREE.TextureLoader().load(BASE + 'pondmask_t4.png?v=1'); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
+  const am = new THREE.TextureLoader().load(BASE + 'pondmask_t4.png?v=2'); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d, 8, 4), waterMat(am)); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, WATER, (z0 + z1) / 2); m.receiveShadow = true; root.add(m);
 }
 /* Smooth river banks: the 10.7 m terrain grid makes the waterline stair-step, so each side gets a thin ground-textured strip that
@@ -738,32 +738,15 @@ function buildBank() {
   box(18, 29.6, 18, 976, y0, zc, M.relief, {T: 6});
   W3D.liftHall = {x: 961.5, y: y0 + 0.3, z: zc};
 }
-function sphinxes(list) { // one instanced mesh per part for the whole avenue (few draw calls). Recumbent lion body with a human head in a gold nemes, on a stepped sandstone plinth, facing the avenue axis toward the pond (-x)
-  if (!M.sand) { M.sand = new THREE.MeshStandardMaterial({color: 0xb8915a, roughness: 0.85}); M.sandD = new THREE.MeshStandardMaterial({color: 0x9c7b4f, roughness: 0.9});
-    M.nemes = new THREE.MeshStandardMaterial({color: 0xd4a53a, roughness: 0.35, metalness: 0.6}); }
-  const m4 = new THREE.Matrix4(), w4 = new THREE.Matrix4();
-  const add = (geo, m, px, py, pz, sx, sy, sz) => { const o = new THREE.Object3D(); o.position.set(px, py, pz); if (sx) o.scale.set(sx, sy, sz);
-    const im = new THREE.InstancedMesh(geo, m, list.length); im.castShadow = true; im.frustumCulled = false; root.add(im);
-    const rot = {z: 0, y: 0}; const fin = () => { o.rotation.set(0, rot.y, rot.z); o.updateMatrix(); list.forEach(([x, y, z], i) => { w4.makeTranslation(x, y, z); m4.multiplyMatrices(w4, o.matrix); im.setMatrixAt(i, m4); }); im.instanceMatrix.needsUpdate = true; };
-    fin(); return {rotation: {set z(v) { rot.z = v; fin(); }, set y(v) { rot.y = v; fin(); }}}; };
-  const B = (w, h, d) => new THREE.BoxGeometry(w, h, d), S = new THREE.SphereGeometry(1, 12, 9);
-  add(B(4.8, 0.85, 2.3), M.sandD, 0, 0.425, 0); add(B(5.0, 0.15, 2.5), M.sandD, 0, 0.92, 0);          // plinth + cornice
-  const top = 1.0;
-  add(S, M.sand, 0.35, top + 0.55, 0, 1.55, 0.55, 0.62);                                          // long lion body
-  add(S, M.sand, 1.35, top + 0.6, 0, 0.78, 0.62, 0.7);                                            // haunches
-  add(S, M.sand, -0.75, top + 0.78, 0, 0.62, 0.78, 0.6);                                          // chest
-  for (const sz of [-1, 1]) { add(B(1.55, 0.32, 0.38), M.sand, -1.25, top + 0.16, sz * 0.36);      // forelegs stretched forward
-    add(S, M.sand, -2.02, top + 0.17, sz * 0.36, 0.2, 0.17, 0.2);                                  // paws
-    add(S, M.sand, 1.25, top + 0.22, sz * 0.5, 0.7, 0.22, 0.2); }                                  // folded hind legs
-  const tail = add(new THREE.CylinderGeometry(0.07, 0.09, 1.6, 6), M.sand, 0.9, top + 0.1, 0.62); tail.rotation.z = Math.PI / 2;
-  add(new THREE.CylinderGeometry(0.26, 0.32, 0.5, 10), M.sand, -0.95, top + 1.5, 0);               // neck
-  add(S, M.sand, -1.0, top + 1.95, 0, 0.32, 0.4, 0.3);                                            // human head
-  add(B(0.1, 0.12, 0.16), M.sandD, -1.32, top + 1.92, 0);                                         // nose
-  const nm = add(new THREE.CylinderGeometry(0.36, 0.5, 0.62, 4, 1), M.nemes, -0.88, top + 2.08, 0); nm.rotation.y = Math.PI / 4;  // nemes crown
-  for (const sz of [-1, 1]) add(B(0.18, 0.75, 0.16), M.nemes, -1.06, top + 1.62, sz * 0.36);      // lappets either side of the face
-  add(B(0.45, 0.6, 0.5), M.nemes, -0.62, top + 1.65, 0);                                          // nemes back fall
-  add(B(0.12, 0.3, 0.1), M.nemes, -1.2, top + 1.45, 0);                                           // beard
-  for (const [x, y, z] of list) walls.push({x0: x - 2.4, x1: x + 2.4, z0: z - 1.2, z1: z + 1.2, y0: y, y1: y + 3.3});
+function sphinxes(list) { // sculpted sphinx (w3d/sphinx.js) shared by the whole avenue: one instanced mesh per material, simpler geometry on phones
+  const P = sphinxParts(LITE);
+  const mats = {sand: new THREE.MeshStandardMaterial({color: 0xb8915a, roughness: 0.85}), dark: new THREE.MeshStandardMaterial({color: 0x9c7b4f, roughness: 0.9}),
+    nem: new THREE.MeshStandardMaterial({map: P.stripe, roughness: 0.45, metalness: 0.25}), gold: M.gold, blue: new THREE.MeshStandardMaterial({map: P.stripe, roughness: 0.5}),
+    kohl: new THREE.MeshStandardMaterial({color: 0x3d2b1a, roughness: 0.7})};
+  const m4 = new THREE.Matrix4();
+  for (const k in mats) { const im = new THREE.InstancedMesh(P[k], mats[k], list.length); im.castShadow = !LITE; im.frustumCulled = false;
+    list.forEach(([x, y, z], i) => { m4.makeTranslation(x, y, z); im.setMatrixAt(i, m4); }); root.add(im); }
+  for (const [x, y, z] of list) walls.push({x0: x - 2.5, x1: x + 2.5, z0: z - 1.25, z1: z + 1.25, y0: y, y1: y + 3.4});
 }
 function obelisk(x, y, z, h) {
   const geo = new THREE.CylinderGeometry(0.85, 1.3, h, 4, 1); geo.rotateY(Math.PI / 4);
