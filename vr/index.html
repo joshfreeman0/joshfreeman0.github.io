@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Josh Freeman's VR World</title>
+<meta name="description" content="Explore Josh Freeman's growing virtual world in 360. Works on Meta Quest, desktop and phone.">
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<style>
+body{margin:0;font-family:Georgia,serif;color:#fff}
+#intro{position:fixed;top:0;left:0;right:0;z-index:10;padding:14px 18px;background:linear-gradient(rgba(0,0,0,.75),rgba(0,0,0,0));text-align:center;pointer-events:none}
+#intro h1{margin:0;font-size:28px;letter-spacing:1px}
+#intro p{margin:6px auto 0;max-width:640px;font-size:15px;opacity:.92}
+#ui{position:fixed;left:0;right:0;bottom:0;z-index:10;padding:12px;background:rgba(0,0,0,.72);text-align:center}
+#ui a{display:inline-block;margin:4px;padding:12px 18px;border-radius:10px;background:#c9a24a;color:#111;text-decoration:none;font-size:18px;font-weight:bold}
+#ui .soon{display:inline-block;margin:4px;padding:12px 18px;border-radius:10px;border:1px dashed #c9a24a;color:#e8d9a8;font-size:16px}
+#ui small{display:block;margin-top:6px;font-size:12px;opacity:.85;font-family:system-ui,sans-serif}
+</style></head><body>
+<a-scene vr-mode-ui="enabled: true">
+  <a-assets><img id="lobby" src="bank3/pano_terrace.jpg" crossorigin="anonymous"></a-assets>
+  <a-sky src="#lobby" rotation="0 -90 0"></a-sky>
+  <a-entity camera look-controls position="0 1.6 0"><a-entity cursor="rayOrigin:mouse" raycaster="objects:.world"></a-entity></a-entity>
+  <a-entity laser-controls="hand:right" raycaster="objects:.world"></a-entity>
+  <a-entity laser-controls="hand:left" raycaster="objects:.world"></a-entity>
+  <a-text value="Josh Freeman's VR World" position="0 2.7 -3" align="center" width="8" color="#fff"></a-text>
+  <a-text value="Explore the world as it is built" position="0 2.35 -3" align="center" width="5" color="#e8d9a8"></a-text>
+  <a-plane class="world" id="w-bank3" position="0 1.6 -3" width="3.6" height="0.85" color="#c9a24a">
+    <a-text value="Enter: Bank of the United States (3rd ed.)\n& Fowling Pond compound" align="center" color="#111" width="3.3"></a-text>
+  </a-plane>
+  <a-text value="More places coming soon" position="0 1.0 -3" align="center" width="4" color="#ddd"></a-text>
+</a-scene>
+<div id="intro">
+  <h1>Josh Freeman's VR World</h1>
+  <p>Welcome. This is a growing virtual world, built place by place in 360. Drag to look around, or put on a Meta Quest and tap the goggles icon. Pick a place below to step in.</p>
+</div>
+<div id="ui">
+  <a href="bank3/">Bank of the United States (3rd ed.) &amp; Fowling Pond compound</a>
+  <span class="soon">More places coming soon</span>
+  <small>Everything here is a concept rendering (AI-generated), a mockup of ideas and plans, not real photos or a real institution.</small>
+</div>
+<script>document.getElementById('w-bank3').addEventListener('click',function(){location.href='bank3/'});</script>
+</body></html>
