@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Bank of the United States (3rd edition) – 360 concept tour</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script src="../locomotion.js?v=4"></script>
+<script src="../locomotion.js?v=5"></script>
 <script src="../hd.js"></script>
 <style>
 body{margin:0;font-family:system-ui,sans-serif}
@@ -20,7 +20,7 @@ body{margin:0;font-family:system-ui,sans-serif}
     <a-entity cursor="fuse:false; rayOrigin:mouse" raycaster="objects:.btn"></a-entity>
   </a-entity>
   <a-entity laser-controls="hand:right" snap-turn raycaster="objects:.btn"></a-entity>
-  <a-entity laser-controls="hand:left" thumbstick-move raycaster="objects:.btn"></a-entity>
+  <a-entity laser-controls="hand:left" thumbstick-move menu-toggle raycaster="objects:.btn"></a-entity>
   </a-entity>
   <a-entity id="markers"></a-entity>
   <a-entity id="vrbar" position="0 0.6 -2.2" rotation="-25 0 0">

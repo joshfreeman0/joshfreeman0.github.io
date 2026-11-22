@@ -79,3 +79,22 @@ document.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') 
     p.y = Math.min(Math.max(p.y, 0), 500);
   };
 })();
+
+/* Press the LEFT thumbstick in to hide/show the menu rectangles. */
+AFRAME.registerComponent('menu-toggle', {
+  init: function () {
+    this.el.addEventListener('thumbstickdown', () => {
+      const els = document.querySelectorAll('#vrbar, #w-bank3, .vr-menu');
+      if (!els.length) return;
+      const show = !els[0].getAttribute('visible');
+      els.forEach(m => {
+        m.setAttribute('visible', show);
+        [m, ...m.querySelectorAll('*')].forEach(c => {
+          if (show) { if (c.dataset.cls) { c.classList.add(c.dataset.cls); delete c.dataset.cls; } }
+          else ['btn', 'world'].forEach(k => { if (c.classList && c.classList.contains(k)) { c.dataset.cls = k; c.classList.remove(k); } });
+        });
+      });
+      JFVR.hud && JFVR.hud(show ? 'Menu shown' : 'Menu hidden (press left stick to show)');
+    });
+  }
+});

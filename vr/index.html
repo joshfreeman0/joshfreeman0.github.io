@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/vr/icon-192.png">
 <meta name="theme-color" content="#c9a24a">
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script src="locomotion.js?v=4"></script>
+<script src="locomotion.js?v=5"></script>
 <script src="hd.js"></script>
 <style>
 body{margin:0;font-family:Georgia,serif;color:#fff}
@@ -26,7 +26,7 @@ body{margin:0;font-family:Georgia,serif;color:#fff}
     <a-entity id="flydisk" position="0 6 0" rotation="90 0 0"><a-plane class="world" fly-toggle width="1.2" height="0.45" material="src:url(/vr/winged-sun.png);transparent:true;alphaTest:0.3;side:double;shader:flat"></a-plane><a-text id="flylabel" value="Fly: OFF" align="center" position="0 -0.4 0" width="1.6" color="#ffe9a8" side="double"></a-text></a-entity>
     <a-entity camera="near: 0.05; far: 2000" look-controls wasd-controls="enabled:false" position="0 1.6 0"><a-entity cursor="rayOrigin:mouse" raycaster="objects:.world"></a-entity></a-entity>
   <a-entity laser-controls="hand:right" snap-turn raycaster="objects:.world"></a-entity>
-  <a-entity laser-controls="hand:left" thumbstick-move raycaster="objects:.world"></a-entity>
+  <a-entity laser-controls="hand:left" thumbstick-move menu-toggle raycaster="objects:.world"></a-entity>
   </a-entity>
   <a-entity id="markers"></a-entity>
   <a-text value="Josh Freeman's VR World" position="0 2.7 -3" align="center" width="8" color="#fff"></a-text>
