@@ -217,7 +217,9 @@
     let lib;
     try { lib = await import('/vr/mp-p2p.js?v=1'); }
     catch (e) { MP.status = 'error'; renderUI(); console.warn('multiplayer load failed', e); return; }
-    const room = MP.room = lib.joinRoom({ appId: APP, identity: 'none', maxUsers: CAP }, ROOM);
+    // Relay (TURN) servers for players behind strict networks. Fill in when the free relay account is ready.
+    const TURN = [];
+    const room = MP.room = lib.joinRoom({ appId: APP, identity: 'none', maxUsers: CAP, rtcConfig: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }].concat(TURN) } }, ROOM);
     room.onError && room.onError(err => { console.warn('mp error', err); if (err && err.code === 'room-full') { MP.status = 'full'; renderUI(); } });
     try { const me = await room.getSelf(); MP.selfId = me.peerId; } catch (e) {}
     MP.status = 'ok'; renderUI();
