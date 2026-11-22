@@ -3,6 +3,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Josh Freeman's VR World</title>
 <meta name="description" content="Explore Josh Freeman's growing virtual world in 360. Works on Meta Quest, desktop and phone.">
+<link rel="manifest" href="/vr/manifest.webmanifest">
+<link rel="icon" href="/vr/icon-192.png">
+<link rel="apple-touch-icon" href="/vr/icon-192.png">
+<meta name="theme-color" content="#c9a24a">
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="locomotion.js"></script>
 <script src="hd.js"></script>
@@ -42,4 +46,13 @@ body{margin:0;font-family:Georgia,serif;color:#fff}
   <small>Everything here is a concept rendering (AI-generated), a mockup of ideas and plans, not real photos or a real institution.</small>
 </div>
 <script>document.getElementById('w-bank3').addEventListener('click',function(){location.href='bank3/'});</script>
+<div id="installbox" style="position:fixed;top:10px;right:10px;z-index:20;font-family:system-ui,sans-serif">
+<button id="installbtn" style="display:none;padding:10px 14px;border-radius:10px;border:0;background:#c9a24a;color:#111;font-weight:600">Add to Quest home</button>
+</div>
+<script>
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/vr/sw.js',{scope:'/vr/'});}
+let dp=null;const ib=document.getElementById('installbtn');
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e;ib.style.display='inline-block';});
+ib.addEventListener('click',async()=>{if(!dp)return;dp.prompt();await dp.userChoice;dp=null;ib.style.display='none';});
+</script>
 </body></html>
