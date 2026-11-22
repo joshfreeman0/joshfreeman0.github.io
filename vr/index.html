@@ -20,8 +20,8 @@ body{margin:0;font-family:Georgia,serif;color:#fff}
 #ui .soon{display:inline-block;margin:4px;padding:12px 18px;border-radius:10px;border:1px dashed #c9a24a;color:#e8d9a8;font-size:16px}
 #ui small{display:block;margin-top:6px;font-size:12px;opacity:.85;font-family:system-ui,sans-serif}
 </style></head><body>
-<a-scene vr-mode-ui="enabled: true" renderer="antialias: true; colorManagement: true; highRefreshRate: true; foveationLevel: 0; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160" hd-renderer="scale: 1.3">
-  <a-entity hd-sky="src: bank3/pano_terrace.jpg"></a-entity>
+<a-scene vr-mode-ui="enabled: true" renderer="antialias: true; colorManagement: true; highRefreshRate: true; foveationLevel: 0; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160" hd-renderer="scale: 1.5">
+  <a-entity hd-sky="src: bank3/pano_terrace.jpg?v=2"></a-entity>
   <a-entity id="rig" wasd-controls="acceleration: 25">
     <a-entity id="flydisk" position="0 6 0" rotation="90 0 0"><a-plane class="world" fly-toggle width="1.2" height="0.45" material="src:url(/vr/winged-sun.png);transparent:true;alphaTest:0.3;side:double;shader:flat"></a-plane><a-text id="flylabel" value="Fly: OFF" align="center" position="0 -0.4 0" width="1.6" color="#ffe9a8" side="double"></a-text></a-entity>
     <a-entity camera="near: 0.05; far: 2000" look-controls wasd-controls="enabled:false" position="0 1.6 0"><a-entity cursor="rayOrigin:mouse" raycaster="objects:.world"></a-entity></a-entity>

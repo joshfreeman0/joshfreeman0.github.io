@@ -12,8 +12,8 @@ body{margin:0;font-family:system-ui,sans-serif}
 #ui button.on{background:#fff}
 #note{font-size:12px;opacity:.85;margin-top:4px}
 </style></head><body>
-<a-scene vr-mode-ui="enabled: true" renderer="antialias: true; colorManagement: true; highRefreshRate: true; foveationLevel: 0; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160; precision: high" hd-renderer="scale: 1.3">
-  <a-entity id="sky" hd-sky="src: pano_terrace.jpg"></a-entity>
+<a-scene vr-mode-ui="enabled: true" renderer="antialias: true; colorManagement: true; highRefreshRate: true; foveationLevel: 0; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160; precision: high" hd-renderer="scale: 1.5">
+  <a-entity id="sky" hd-sky="src: pano_terrace.jpg?v=2"></a-entity>
   <a-entity id="rig" wasd-controls="acceleration: 25">
     <a-entity id="flydisk" position="0 6 0" rotation="90 0 0"><a-plane class="btn" fly-toggle width="1.2" height="0.45" material="src:url(/vr/winged-sun.png);transparent:true;alphaTest:0.3;side:double;shader:flat"></a-plane><a-text id="flylabel" value="Fly: OFF" align="center" position="0 -0.4 0" width="1.6" color="#ffe9a8" side="double"></a-text></a-entity>
     <a-entity camera="near: 0.05; far: 2000" look-controls wasd-controls="enabled:false" position="0 1.6 0">
@@ -42,7 +42,7 @@ body{margin:0;font-family:system-ui,sans-serif}
 </div>
 <script>
 function show(t){
-  document.getElementById('sky').setAttribute('hd-sky','src','pano_'+t+'.jpg');
+  document.getElementById('sky').setAttribute('hd-sky','src','pano_'+t+'.jpg?v=2');
   document.querySelectorAll('#ui button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
 }
 document.querySelectorAll('#ui button').forEach(b=>b.addEventListener('click',()=>show(b.dataset.t)));
