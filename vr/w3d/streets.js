@@ -58,7 +58,9 @@ function project() {
     // split where outside the world or under the restored pond (non-bridge). Low valley ground (the Forge / Taunton river towns sit at 4-9 m) is NOT water,
     // so roads there stay continuous (an old 'gh > 9' test cut them into dashes)
     let cur = [];
-    const flush = () => { if (cur.length > 1) R.push({cls, nm, br, p: cur}); cur = []; };
+    const flush = () => { if (cur.length > 1) { // run each ribbon 1.2 m past its ends so joining streets overlap (no slit at junctions / bridge ends)
+        const ext = (p, q) => { const dx = p[0] - q[0], dz = p[1] - q[1], l = Math.hypot(dx, dz) || 1; return [p[0] + dx / l * 1.2, p[1] + dz / l * 1.2]; };
+        cur[0] = ext(cur[0], cur[1]); cur[cur.length - 1] = ext(cur[cur.length - 1], cur[cur.length - 2]); R.push({cls, nm, br, p: cur}); } cur = []; };
     for (const p of D) { if (Math.abs(p[0]) < E && Math.abs(p[1]) < E && (br || !underPond(p[0], p[1]))) cur.push(p); else flush(); }
     flush();
   }
@@ -80,10 +82,13 @@ function project() {
 function buildRoads() {
   const G = []; for (let l = 0; l < 8; l++) G.push({pos: [], uv: [], idx: []});
   const BR = {pos: [], idx: []};   // bridge slab + rails (plain grey)
+  const WJ = W3D.water || {}, CVL = (WJ.culverts || (WJ.culvert ? [WJ.culvert] : [])).filter(c => !c.br);
   R.forEach((r, ri) => {
     const lvl = Math.min(3, r.cls) * 2 + (ri & 1), g = G[lvl], pos = g.pos, uv = g.uv, idx = g.idx, LIFT = 0.15 + 0.03 * lvl, w = RW[r.cls] / 2, P = r.p;
     let y0 = 0, y1 = 0, tot = 0;
-    if (r.br) { y0 = gh(P[0][0], P[0][1]); y1 = gh(P[P.length - 1][0], P[P.length - 1][1]); for (let k = 1; k < P.length; k++) tot += Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]); }
+    // bridge deck ends meet the approach roads at exactly their height (same 'max over +-5 m' rule), then rise in a gentle arch - no 0.7 m step
+    const endH = (i, j) => { const x = P[i][0], z = P[i][1], dx = P[j][0] - x, dz = P[j][1] - z, l = Math.hypot(dx, dz) || 1; return Math.max(gh(x, z), gh(x - dx / l * 5, z - dz / l * 5), gh(x + dx / l * 5, z + dz / l * 5), 0); };
+    if (r.br) { y0 = endH(0, 1); y1 = endH(P.length - 1, P.length - 2); for (let k = 1; k < P.length; k++) tot += Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]); }
     let prev = -1, run = 0, bprev = -1;
     for (let k = 0; k < P.length; k++) {
       const a = P[Math.max(0, k - 1)], b = P[Math.min(P.length - 1, k + 1)];
@@ -91,11 +96,12 @@ function buildRoads() {
       const px = -dz * w, pz = dx * w, x = P[k][0], z = P[k][1];
       if (k) run += Math.hypot(x - P[k - 1][0], z - P[k - 1][1]);
       let yl, yr;
-      if (r.br) { const y = Math.max(y0 + (y1 - y0) * (tot ? run / tot : 0), 0) + 0.7 + LIFT; yl = yr = y; }
+      if (r.br) { const t = tot ? run / tot : 0, y = y0 + (y1 - y0) * t + Math.min(1.2, tot * 0.02) * Math.sin(Math.PI * t) + LIFT; yl = yr = Math.max(y, gh(x, z) + 0.35 + LIFT); }
       else { // never below the ground anywhere across the carriageway or 5 m either way along it (a 10 m terrain grid otherwise pokes through and the road looks broken)
         const hs = (ox, oz) => Math.max(gh(x + ox, z + oz), gh(x + ox + dx * 5, z + oz + dz * 5), gh(x + ox - dx * 5, z + oz - dz * 5));
         const hc = hs(0, 0); yl = Math.max(hs(px, pz), hc - 0.3) + LIFT; yr = Math.max(hs(-px, -pz), hc - 0.3) + LIFT;
-        const C = W3D.water && W3D.water.culvert; if (C && Math.hypot(x - C.x, z - C.z) < 18) { yl = Math.max(yl, 17.3 + LIFT); yr = Math.max(yr, 17.3 + LIFT); } }
+        // over a culvert the road keeps the embankment height, easing in/out over 18-32 m (no kink)
+        for (const C of CVL) { const d = Math.hypot(x - C.x, z - C.z); if (d < 32) { const t = d < 18 ? 1 : 1 - (d - 18) / 14, w = t * t * (3 - 2 * t), Y = (C.road || 17.3) + LIFT; yl = Math.max(yl, yl + (Y - yl) * w); yr = Math.max(yr, yr + (Y - yr) * w); } } }
       const i0 = pos.length / 3; pos.push(x + px, yl, z + pz, x - px, yr, z - pz); uv.push(0, 0, 1, 0);
       if (prev >= 0) idx.push(prev, prev + 1, i0, i0, prev + 1, i0 + 1);
       prev = i0;
@@ -226,7 +232,7 @@ AFRAME.registerSystem('w3d-streets', {
   tick(time, dt) {
     if (!window.W3D || !W3D.root || !window.W3D_READY) return;
     if (!data) { if (!loading) { loading = true;
-      Promise.all([fetch('/vr/w3d/streets.json?v=7').then(r => r.json()), fetch('/vr/w3d/geo.json?v=1').then(r => r.json())])
+      Promise.all([fetch('/vr/w3d/streets.json?v=8').then(r => r.json()), fetch('/vr/w3d/geo.json?v=1').then(r => r.json())])
         .then(([j, g]) => { geo = g; data = j; }).catch(e => console.warn('street labels unavailable', e)); } return; }
     const cam = this.el.camera; if (!cam) return;
     if (!ready) { try { init(); } catch (e) { console.warn('street labels failed', e); data = null; loading = true; } return; }

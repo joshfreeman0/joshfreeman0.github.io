@@ -326,9 +326,9 @@ W3D.build = function (scene3, sceneEl) {
   const need = r => { if (!r.ok) throw new Error(r.url.replace(/^.*\//, '').replace(/\?.*/, '') + ' HTTP ' + r.status); return r; };
   W3D.status('Loading terrain data 0/5...');
   return Promise.all([
-    fetch(BASE + 'terrain_t3.u16?v=1').then(need).then(r => r.arrayBuffer()).then(step),
-    fetch(BASE + 'trees_t4.f32?v=1').then(need).then(r => r.arrayBuffer()).then(step),
-    fetch(BASE + 'water_t.json?v=3').then(need).then(r => r.json()).then(step),
+    fetch(BASE + 'terrain_t4.u16?v=1').then(need).then(r => r.arrayBuffer()).then(step),
+    fetch(BASE + 'trees_t5.f32?v=1').then(need).then(r => r.arrayBuffer()).then(step),
+    fetch(BASE + 'water_t.json?v=4').then(need).then(r => r.json()).then(step),
     fetch(BASE + 'ring_mid.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step),
     fetch(BASE + 'ring_far.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step)
   ]).then(([hb, tb, wj, rmid, rfar]) => {
@@ -349,9 +349,9 @@ function buildTerrain() {
   const geo = new THREE.PlaneGeometry(SIZE, SIZE, N - 1, N - 1); geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, heights[i]);
   geo.computeVertexNormals();
-  const t = new THREE.TextureLoader().load(BASE + (LITE ? 'ortho_t_lite.jpg?v=3' : 'ortho_t.jpg?v=2')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = LITE ? 4 : 16;
+  const t = new THREE.TextureLoader().load(BASE + (LITE ? 'ortho_t_lite.jpg?v=4' : 'ortho_t.jpg?v=3')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = LITE ? 4 : 16;
   // sharper ground near the compound and pond: 0.5 m/px USGS tile (x -324..1724, z -1249..799) + fine detail texture that fades in within ~200 m
-  const hi = LITE ? t : new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=2'); hi.colorSpace = THREE.SRGBColorSpace; if (!LITE) hi.anisotropy = 16;   // lite: no 0.5 m tile (hiRect moved off the map)
+  const hi = LITE ? t : new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=3'); hi.colorSpace = THREE.SRGBColorSpace; if (!LITE) hi.anisotropy = 16;   // lite: no 0.5 m tile (hiRect moved off the map)
   const det = detailTex(), grs = grassTex();
   const tm = new THREE.MeshLambertMaterial({map: t});
   tm.onBeforeCompile = sh => {
@@ -404,7 +404,7 @@ function buildRings() {
 }
 function buildWater(J) { // Fowling Pond (restored) inside the real pond bed (OSM Pine Swamp); the soft mask gives a smooth natural shoreline
   const P = J.pond, x0 = P.x0, x1 = P.x1, z0 = P.z0, z1 = P.z1, w = x1 - x0, d = z1 - z0;
-  const am = new THREE.TextureLoader().load(BASE + 'pondmask_t3.png?v=1'); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
+  const am = new THREE.TextureLoader().load(BASE + 'pondmask_t4.png?v=1'); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d, 8, 4), waterMat(am)); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, WATER, (z0 + z1) / 2); m.receiveShadow = true; root.add(m);
 }
 /* Smooth river banks: the 10.7 m terrain grid makes the waterline stair-step, so each side gets a thin ground-textured strip that
@@ -412,7 +412,7 @@ function buildWater(J) { // Fowling Pond (restored) inside the real pond bed (OS
 function riverBanks(R, hw) {
   const tm0 = W3D._terrainMat; if (!tm0) return;
   const bm = new THREE.MeshLambertMaterial({map: tm0.map}); bm.onBeforeCompile = tm0.onBeforeCompile;
-  const P = R.pts, L = R.lev, OFF = [hw - 2.5, hw + 1.5, hw + 6, hw + 15], NR = OFF.length, CV = W3D.water && W3D.water.culvert;
+  const P = R.pts, L = R.lev, OFF = [hw - 2.5, hw + 1.5, hw + 6, hw + 15], NR = OFF.length, CV = W3D.water && W3D.water.culvert, CVL = (W3D.water && W3D.water.culverts || []).filter(c => !c.br);
   for (const sd of [-1, 1]) {
     const pos = [], uv = [], idx = []; let k = 0;
     for (let i = 0; i < P.length - 1; i++) {
@@ -425,7 +425,7 @@ function riverBanks(R, hw) {
         for (let r = 0; r < NR; r++) {
           const px = x + nx * OFF[r], pz = z + nz * OFF[r], g = terrainH(px, pz);
           let y = r === 0 ? Math.min(g, w - 0.4) : r === NR - 1 ? g + 0.3 : lift ? Math.max(g + 0.3, w + (r === 1 ? 0.3 : 0.25 + (outer - w) * 0.35)) : g + 0.3; // 30 cm clear of the ground mesh: no depth fight
-          if (CV && Math.hypot(px - CV.x, pz - CV.z) < 24) y = Math.min(y, g - 0.4);   // the shore road crosses here on the culvert: no bank strip over the road
+          if ((CVL.length ? CVL : CV ? [CV] : []).some(c => Math.hypot(px - c.x, pz - c.z) < 24)) y = Math.min(y, g - 0.4);   // the shore road crosses here on the culvert: no bank strip over the road
           pos.push(px, y, pz); uv.push((px + HALF) / SIZE, 1 - (pz + HALF) / SIZE);
         }
         if (k) for (let r = 0; r < NR - 1; r++) { const a = (k - 1) * NR + r, b = k * NR + r; if (sd < 0) idx.push(a, b, a + 1, a + 1, b, b + 1); else idx.push(a, a + 1, b, a + 1, b + 1, b); } // counter-clockwise from above on both sides
@@ -472,11 +472,14 @@ function buildRivers(J) {
       R.pts.forEach((p, i) => { if (keep[i]) { P.push(p); L.push(R.lev[i]); } }); riverBanks({pts: P, lev: L}, R.hw || 7); }
   }
   (J.taunton || []).forEach((P, i) => ribbon(P, J.taunton_lev[i], 30, rm, 'taunton-river'));
-  // Pine Swamp Brook runs straight under the shore road into the pond through a stone culvert (a headwall each side of the road)
-  if (J.culvert) { const C = J.culvert, ry = Math.atan2(C.nx, C.nz);
-    for (const sd of [-1, 1]) { const x = C.x + C.nx * 11 * sd, z = C.z + C.nz * 11 * sd, gy = terrainH(x, z), g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry + (sd > 0 ? 0 : Math.PI);
-      const w = new THREE.Mesh(new THREE.BoxGeometry(9, 2.6, 0.8), M.stone); w.position.y = Math.max(gy, 15.2) + 0.2; g.add(w);
-      const mo = new THREE.Mesh(new THREE.CircleGeometry(1.1, 12, 0, Math.PI), new THREE.MeshBasicMaterial({color: 0x0c0c0a})); mo.position.set(0, w.position.y - 1.05, 0.42); g.add(mo); root.add(g); } }
+  // Pine Swamp Brook passes under each road it crosses through a culvert: a low dark-stone headwall at each road edge, its top
+  // just under the road surface (nothing stands on the carriageway), with a dark pipe mouth at the water line
+  const CVS = (J.culverts || (J.culvert ? [Object.assign({w: 6.5, lev: 15.9}, J.culvert)] : [])).filter(c => !c.br);
+  const hwM = new THREE.MeshStandardMaterial({color: 0x5b5850, roughness: 0.95}), moM = new THREE.MeshBasicMaterial({color: 0x0b0c0a});
+  for (const C of CVS) { const ry = Math.atan2(C.nx, C.nz), top = (C.road || 17.3) - 0.3, bot = (C.lev || 15.9) - 0.6, off = (C.w || 6.5) / 2 + 1.4;
+    for (const sd of [-1, 1]) { const g = new THREE.Group(); g.position.set(C.x + C.nx * off * sd, 0, C.z + C.nz * off * sd); g.rotation.y = ry + (sd > 0 ? 0 : Math.PI);
+      const w = new THREE.Mesh(new THREE.BoxGeometry(7, top - bot, 0.6), hwM); w.position.y = (top + bot) / 2; g.add(w);
+      const mo = new THREE.Mesh(new THREE.CircleGeometry(0.85, 14, 0, Math.PI), moM); mo.position.set(0, bot + 0.55, 0.32); g.add(mo); root.add(g); } }
   // King's dam spillway headwall (the real road over it comes from the streets layer)
   const D = J.dam; if (D) { const face = new THREE.Mesh(new THREE.BoxGeometry(D.w * 2.4, 3.2, 1.2), M.stone); face.position.set(D.x, K.level - 0.6, D.z + 2); face.castShadow = true; root.add(face); }
 }
@@ -492,9 +495,9 @@ function buildTrees(a) {
   const trunkG = new THREE.CylinderGeometry(0.25, 0.35, 4, 5, 1, true); trunkG.translate(0, 2, 0);   // lean geometry: Quest 3S triangle budget
   mk(trunkG, M.trunk, con, 0, 1); mk(trunkG, M.trunk, dec, 0, 1);
   const coneG = new THREE.ConeGeometry(2.6, 9, 7, 1, true); coneG.translate(0, 7.5, 0);
-  mk(coneG, new THREE.MeshLambertMaterial({color: 0xffffff, side: THREE.DoubleSide}), con, 0, 1, ['#2f5a2c', '#2a4f2a', '#355f30']);
+  mk(coneG, new THREE.MeshLambertMaterial({color: 0xffffff, side: THREE.DoubleSide}), con, 0, 1, ['#26402a', '#2c472d', '#22392a', '#2f4a2f']);
   const crownG = new THREE.IcosahedronGeometry(3.8, 0); crownG.scale(1, 0.85, 1); crownG.translate(0, 6.5, 0);
-  mk(crownG, new THREE.MeshLambertMaterial({color: 0xffffff, flatShading: true}), dec, 0, 1, ['#4e7a2e', '#5d8a34', '#3f6b2a', '#6b8f3a']);
+  mk(crownG, new THREE.MeshLambertMaterial({color: 0xffffff, flatShading: true}), dec, 0, 1, ['#3d5a2a', '#46632e', '#3a5530', '#52683a', '#4a5e34']);
 }
 /* The real line passes under King Philip St (north) and E Britannia St (south) about 300 m back from the pond; it runs in a cutting
    down to a tunnel portal just short of each road, then in tunnel under the road and the restored pond. Carves the core height grid. */
@@ -597,7 +600,7 @@ function buildPark(P) {
     if (Math.max(Math.abs(x - px), Math.abs(z - pz)) < B + 25) continue; if (Math.abs(f - 0.42) < 0.02 || Math.abs(f - 0.8) < 0.02) continue; pts.push([x, K.deckY(x, z), z, 0.9 + rnd() * 0.5]); }
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3();
   const tg = new THREE.CylinderGeometry(0.25, 0.35, 4, 5, 1, true); tg.translate(0, 2, 0); const crg = new THREE.IcosahedronGeometry(3.8, 0); crg.scale(1, 0.85, 1); crg.translate(0, 6.5, 0);
-  for (const [geo, mat] of [[tg, M.trunk], [crg, new THREE.MeshLambertMaterial({color: 0x5d8a34, flatShading: true})]]) { const im = new THREE.InstancedMesh(geo, mat, pts.length);
+  for (const [geo, mat] of [[tg, M.trunk], [crg, new THREE.MeshLambertMaterial({color: 0x4a6534, flatShading: true})]]) { const im = new THREE.InstancedMesh(geo, mat, pts.length);
     pts.forEach((t, i) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * 2.4); sv.set(t[3], t[3], t[3]); pv.set(t[0], t[1] - 0.3, t[2]); m4.compose(pv, q, sv); im.setMatrixAt(i, m4); }); root.add(im); }
   W3D.parkInfo = {x: px, z: pz, y: y0, trees: pts.length, cut: K.cut, plane: K.plane.map(v => +v.toFixed(4))};
 }
@@ -690,7 +693,7 @@ function buildBank() {
   box(16, 1.05, 0.8, 845, y0, zc - 28, M.stone, {}); box(16, 1.05, 0.8, 845, y0, zc + 28, M.stone, {});
   // sphinx avenue
   box(38, 0.3, 10, 872, y0 - 0.1, zc, M.marble, {floor: true, collide: false});
-  for (let i = 0; i < 6; i++) for (const s of [-1, 1]) sphinx(857 + i * 6, y0, zc + s * 7.5, s);
+  { const sp = []; for (let i = 0; i < 6; i++) for (const s of [-1, 1]) sp.push([857 + i * 6, y0, zc + s * 7.5]); sphinxes(sp); }
   // obelisks
   for (const s of [-1, 1]) obelisk(890, y0, zc + s * 12, 22);
   // pylon (two battered towers + gateway)
@@ -735,16 +738,32 @@ function buildBank() {
   box(18, 29.6, 18, 976, y0, zc, M.relief, {T: 6});
   W3D.liftHall = {x: 961.5, y: y0 + 0.3, z: zc};
 }
-function sphinx(x, y, z, s) {
-  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = s > 0 ? Math.PI / 2 * 0 : 0;
-  const b = (w, h, d, px, py, pz, m) => { const mm = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m || M.stone); mm.position.set(px, py, pz); mm.castShadow = true; g.add(mm); return mm; };
-  b(4.6, 1.1, 2.4, 0, 0.55, 0);               // plinth
-  b(3.4, 1.2, 1.6, 0.2, 1.7, 0);              // lion body
-  b(1.3, 0.5, 0.5, -1.7, 1.35, 0.45); b(1.3, 0.5, 0.5, -1.7, 1.35, -0.45); // paws (facing avenue toward pond: -x)
-  b(0.9, 1.5, 1.1, -1.2, 2.6, 0);             // chest/head block
-  b(1.0, 1.0, 1.5, -1.15, 3.05, 0, M.band);   // nemes headdress (blue)
-  b(0.4, 0.7, 0.7, -1.7, 2.8, 0, M.stone);    // face
-  root.add(g); walls.push({x0: x - 2.3, x1: x + 2.3, z0: z - 1.2, z1: z + 1.2, y0: y, y1: y + 3.5});
+function sphinxes(list) { // one instanced mesh per part for the whole avenue (few draw calls). Recumbent lion body with a human head in a gold nemes, on a stepped sandstone plinth, facing the avenue axis toward the pond (-x)
+  if (!M.sand) { M.sand = new THREE.MeshStandardMaterial({color: 0xb8915a, roughness: 0.85}); M.sandD = new THREE.MeshStandardMaterial({color: 0x9c7b4f, roughness: 0.9});
+    M.nemes = new THREE.MeshStandardMaterial({color: 0xd4a53a, roughness: 0.35, metalness: 0.6}); }
+  const m4 = new THREE.Matrix4(), w4 = new THREE.Matrix4();
+  const add = (geo, m, px, py, pz, sx, sy, sz) => { const o = new THREE.Object3D(); o.position.set(px, py, pz); if (sx) o.scale.set(sx, sy, sz);
+    const im = new THREE.InstancedMesh(geo, m, list.length); im.castShadow = true; im.frustumCulled = false; root.add(im);
+    const rot = {z: 0, y: 0}; const fin = () => { o.rotation.set(0, rot.y, rot.z); o.updateMatrix(); list.forEach(([x, y, z], i) => { w4.makeTranslation(x, y, z); m4.multiplyMatrices(w4, o.matrix); im.setMatrixAt(i, m4); }); im.instanceMatrix.needsUpdate = true; };
+    fin(); return {rotation: {set z(v) { rot.z = v; fin(); }, set y(v) { rot.y = v; fin(); }}}; };
+  const B = (w, h, d) => new THREE.BoxGeometry(w, h, d), S = new THREE.SphereGeometry(1, 12, 9);
+  add(B(4.8, 0.85, 2.3), M.sandD, 0, 0.425, 0); add(B(5.0, 0.15, 2.5), M.sandD, 0, 0.92, 0);          // plinth + cornice
+  const top = 1.0;
+  add(S, M.sand, 0.35, top + 0.55, 0, 1.55, 0.55, 0.62);                                          // long lion body
+  add(S, M.sand, 1.35, top + 0.6, 0, 0.78, 0.62, 0.7);                                            // haunches
+  add(S, M.sand, -0.75, top + 0.78, 0, 0.62, 0.78, 0.6);                                          // chest
+  for (const sz of [-1, 1]) { add(B(1.55, 0.32, 0.38), M.sand, -1.25, top + 0.16, sz * 0.36);      // forelegs stretched forward
+    add(S, M.sand, -2.02, top + 0.17, sz * 0.36, 0.2, 0.17, 0.2);                                  // paws
+    add(S, M.sand, 1.25, top + 0.22, sz * 0.5, 0.7, 0.22, 0.2); }                                  // folded hind legs
+  const tail = add(new THREE.CylinderGeometry(0.07, 0.09, 1.6, 6), M.sand, 0.9, top + 0.1, 0.62); tail.rotation.z = Math.PI / 2;
+  add(new THREE.CylinderGeometry(0.26, 0.32, 0.5, 10), M.sand, -0.95, top + 1.5, 0);               // neck
+  add(S, M.sand, -1.0, top + 1.95, 0, 0.32, 0.4, 0.3);                                            // human head
+  add(B(0.1, 0.12, 0.16), M.sandD, -1.32, top + 1.92, 0);                                         // nose
+  const nm = add(new THREE.CylinderGeometry(0.36, 0.5, 0.62, 4, 1), M.nemes, -0.88, top + 2.08, 0); nm.rotation.y = Math.PI / 4;  // nemes crown
+  for (const sz of [-1, 1]) add(B(0.18, 0.75, 0.16), M.nemes, -1.06, top + 1.62, sz * 0.36);      // lappets either side of the face
+  add(B(0.45, 0.6, 0.5), M.nemes, -0.62, top + 1.65, 0);                                          // nemes back fall
+  add(B(0.12, 0.3, 0.1), M.nemes, -1.2, top + 1.45, 0);                                           // beard
+  for (const [x, y, z] of list) walls.push({x0: x - 2.4, x1: x + 2.4, z0: z - 1.2, z1: z + 1.2, y0: y, y1: y + 3.3});
 }
 function obelisk(x, y, z, h) {
   const geo = new THREE.CylinderGeometry(0.85, 1.3, h, 4, 1); geo.rotateY(Math.PI / 4);
@@ -785,13 +804,30 @@ function buildConservatory() { // stone papyrus colonnade with glazing between, 
   const cols = []; for (let x = x0; x <= x1; x += 4) { cols.push([x, z0]); cols.push([x, z1]); } for (let z = z0 + 4; z < z1; z += 4) { cols.push([x0, z]); cols.push([x1, z]); }
   for (const [cx, cz] of cols) column(cx, y0 + 0.3, cz, Hc, 0.5);
   // glazing + low stone base between columns (door gap on north side at x 910-914)
-  const pane = (w, cx, cz, rot) => { const g = new THREE.Mesh(new THREE.PlaneGeometry(w, Hc - 1.4), M.glass); g.position.set(cx, y0 + 1.1 + (Hc - 1.4) / 2, cz); g.rotation.y = rot; root.add(g); };
+  const cgM = new THREE.MeshStandardMaterial({color: 0xcfe6ec, transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0.2, depthWrite: false, side: THREE.DoubleSide});
+  const pane = (w, cx, cz, rot) => { const g = new THREE.Mesh(new THREE.PlaneGeometry(w, Hc - 1.4), cgM); g.position.set(cx, y0 + 1.1 + (Hc - 1.4) / 2, cz); g.rotation.y = rot; root.add(g); };
   for (const zz of [z0, z1]) for (let x = x0; x < x1; x += 4) { if (zz === z0 && x === 908) continue; if (zz === z0 && x === 912) continue; box(4, 0.8, 0.5, x + 2, y0 + 0.3, zz, M.stone, {}); pane(3, x + 2, zz, 0); walls.push({x0: x, x1: x + 4, z0: zz - 0.2, z1: zz + 0.2, y0: y0, y1: y0 + Hc}); }
   for (const xx of [x0, x1]) for (let z = z0; z < z1; z += 4) { box(0.5, 0.8, 4, xx, y0 + 0.3, z + 2, M.stone, {}); pane(3, xx, z + 2, Math.PI / 2); walls.push({x0: xx - 0.2, x1: xx + 0.2, z0: z, z1: z + 4, y0: y0, y1: y0 + Hc}); }
   box(4, Hc - 3, 0.6, 910, y0 + 3.3 + 0, z0, M.relief, {collide: false});
   box(x1 - x0 + 1, 0.7, 1.0, (x0 + x1) / 2, y0 + Hc, z0, M.stone, {collide: false}); box(x1 - x0 + 1, 0.7, 1.0, (x0 + x1) / 2, y0 + Hc, z1, M.stone, {collide: false});
   box(1.0, 0.7, z1 - z0, x0, y0 + Hc, (z0 + z1) / 2, M.stone, {collide: false}); box(1.0, 0.7, z1 - z0, x1, y0 + Hc, (z0 + z1) / 2, M.stone, {collide: false});
-  // open-air palm court: the old near-invisible glass gable and its ridge beam (which looked like a slab floating ~5 m over the colonnade) are gone
+  // glazed roof: a low gable of glass resting directly on the entablature (no gap), bronze rafters every 4 m, ridge, eaves and glass gable ends
+  { const ye = y0 + Hc + 0.7, rise = 4.2, zm = (z0 + z1) / 2, xa = x0 - 0.5, xb = x1 + 0.5;
+    const gM = new THREE.MeshStandardMaterial({color: 0xcfe6ec, transparent: true, opacity: 0.3, roughness: 0.05, metalness: 0.2, depthWrite: false, side: THREE.DoubleSide});
+    const fM = new THREE.MeshStandardMaterial({color: 0x3b3428, roughness: 0.5, metalness: 0.4});
+    const tri = (pts) => { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pts.flat(), 3)); geo.setIndex(pts.length === 4 ? [0, 1, 2, 0, 2, 3] : [0, 1, 2]); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, gM); m.renderOrder = 3; root.add(m); };
+    for (const ze of [z0, z1]) tri([[xa, ye, ze], [xb, ye, ze], [xb, ye + rise, zm], [xa, ye + rise, zm]]);
+    for (const xe of [x0, x1]) tri([[xe, ye, z0], [xe, ye, z1], [xe, ye + rise, zm]]);
+    const bar = (a, b, r) => { const d = new THREE.Vector3().subVectors(b, a), m = new THREE.Mesh(new THREE.BoxGeometry(r, d.length(), r), fM); m.position.copy(a).addScaledVector(d, 0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); root.add(m); };
+    const V = (a, b, c) => new THREE.Vector3(a, b, c);
+    for (let x = x0; x <= x1 + 0.01; x += 4) for (const ze of [z0, z1]) bar(V(x, ye, ze), V(x, ye + rise, zm), 0.16);
+    bar(V(xa, ye + rise, zm), V(xb, ye + rise, zm), 0.3);
+    for (const ze of [z0, z1]) bar(V(xa, ye + rise / 2, (ze + zm) / 2), V(xb, ye + rise / 2, (ze + zm) / 2), 0.1);
+    for (const xe of [x0, x1]) for (const f of [0.33, 0.67]) bar(V(xe, ye, z0 + (z1 - z0) * f), V(xe, ye + rise * (1 - Math.abs(f - 0.5) * 2), z0 + (z1 - z0) * f), 0.12);
+    // horizontal glazing bars in the wall panes
+    for (const zz of [z0, z1]) bar(V(x0, y0 + 1.1 + (Hc - 1.4) / 2, zz), V(x1, y0 + 1.1 + (Hc - 1.4) / 2, zz), 0.1);
+    for (const xx of [x0, x1]) bar(V(xx, y0 + 1.1 + (Hc - 1.4) / 2, z0), V(xx, y0 + 1.1 + (Hc - 1.4) / 2, z1), 0.1);
+  }
   // lotus pool
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
   box(14, 0.5, 7, cx, y0 + 0.3, cz, M.granite, {collide: false});
