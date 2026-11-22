@@ -150,7 +150,7 @@ function rippleNormal() { // tileable noise height field -> normal map (no strip
     const dx = Hh[y * S + (x + 1) % S] - Hh[y * S + (x + S - 1) % S], dy = Hh[((y + 1) % S) * S + x] - Hh[((y + S - 1) % S) * S + x];
     const nx = -dx * 2.2, ny = -dy * 2.2, l = Math.hypot(nx, ny, 1), i = (y * S + x) * 4;
     img.data[i] = 128 + 127 * nx / l; img.data[i + 1] = 128 + 127 * ny / l; img.data[i + 2] = 128 + 127 / l; img.data[i + 3] = 255; }
-  g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
+  g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; return t;
 }
 /* one shared water look for Fowling Pond, King's Pond and the rivers: blue-green, two drifting ripple layers sampled in
    world space (so overlapping water meshes match exactly), sky reflection with Fresnel from the PBR env map. */
@@ -164,9 +164,9 @@ function waterMat(alphaMap) {
     sh.vertexShader = 'varying vec3 vWw;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvWw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = 'uniform sampler2D wN; uniform float wT; varying vec3 vWw;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', [
       'vec2 wp = vWw.xz;',
-      'vec3 n1 = texture2D(wN, wp / 21.0 + vec2(0.011, 0.007) * wT).xyz * 2.0 - 1.0;',
-      'vec3 n2 = texture2D(wN, mat2(0.8, -0.6, 0.6, 0.8) * wp / 6.5 + vec2(-0.017, 0.012) * wT).xyz * 2.0 - 1.0;',
-      'float wd = length(vWw - cameraPosition); vec2 sl = (n1.xy + n2.xy * 0.6 * (1.0 - smoothstep(40.0, 260.0, wd))) * 0.32 * mix(1.0, 0.3, smoothstep(120.0, 900.0, wd));',
+      'vec3 n1 = texture2D(wN, wp / 36.0 + vec2(0.011, 0.007) * wT).xyz * 2.0 - 1.0;',
+      'vec3 n2 = texture2D(wN, mat2(0.8, -0.6, 0.6, 0.8) * wp / 9.0 + vec2(-0.017, 0.012) * wT).xyz * 2.0 - 1.0;',
+      'float wd = length(vWw - cameraPosition); vec2 sl = (n1.xy + n2.xy * 0.6 * (1.0 - smoothstep(30.0, 180.0, wd))) * 0.30 * mix(1.0, 0.08, smoothstep(60.0, 450.0, wd));',
       'normal = normalize((viewMatrix * vec4(normalize(vec3(sl.x, 1.0, sl.y)), 0.0)).xyz);'].join('\n'));
   };
   mat.customProgramCacheKey = () => 'jfwater' + (alphaMap ? 'a' : '');
@@ -240,8 +240,8 @@ W3D.build = function (scene3, sceneEl) {
   W3D.M = M;
   W3D.lib = {box: box, floorOnly: floorOnly, canvas: canvas, tex: tex, starCeilingTex: starCeilingTex, HQ: HQ, walls: walls, floors: floors};
   return Promise.all([
-    fetch(BASE + 'terrain_v2.u16').then(r => r.arrayBuffer()),
-    fetch(BASE + 'trees_v2.f32').then(r => r.arrayBuffer()),
+    fetch(BASE + 'terrain_v2.u16?v=3').then(r => r.arrayBuffer()),
+    fetch(BASE + 'trees_v2.f32?v=3').then(r => r.arrayBuffer()),
     fetch(BASE + 'water.json?v=2').then(r => r.json()),
     fetch(BASE + 'ring.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null)
   ]).then(([hb, tb, wj, rb]) => {
@@ -308,7 +308,7 @@ function buildRing(rb) {
 }
 function buildWater() { // Fowling Pond: shoreline = where the reshaped terrain meets the 16.5 m surface; mask only keeps the lowlands dry
   const x0 = -1830, x1 = 600, z0 = -700, z1 = 650, w = x1 - x0, d = z1 - z0;
-  const am = new THREE.TextureLoader().load(BASE + 'pondmask_v2.png?v=1'); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
+  const am = new THREE.TextureLoader().load(BASE + 'pondmask_v2.png?v=2'); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d, 8, 4), waterMat(am)); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, WATER, (z0 + z1) / 2); m.receiveShadow = true; root.add(m);
 }
 /* Smooth river banks: the 10.7 m terrain grid makes the waterline stair-step, so each side gets a thin ground-textured strip that
@@ -381,15 +381,15 @@ function buildTrees(a) {
   for (let i = 0; i < n; i++) { const x = a[i * 4], z = a[i * 4 + 1], s = a[i * 4 + 2], k = a[i * 4 + 3]; const y = terrainH(x, z); if (y < -5) continue; (k < 0.5 ? con : dec).push([x, y, z, s]); }
   const mk = (geo, mat, list, yOff, sy, colors) => {
     const im = new THREE.InstancedMesh(geo, mat, list.length); const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), col = new THREE.Color();
-    list.forEach((t, i) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (i * 2.39996) % 6.283); sv.set(t[3], t[3] * sy, t[3]); pv.set(t[0], t[1] + yOff * t[3], t[2]); m4.compose(pv, q, sv); im.setMatrixAt(i, m4);
+    list.forEach((t, i) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (i * 2.39996) % 6.283); sv.set(t[3], t[3] * sy, t[3]); pv.set(t[0], t[1] - 0.35 + yOff * t[3], t[2]);   // sunk slightly so no tree base ever hovers on slopes m4.compose(pv, q, sv); im.setMatrixAt(i, m4);
       if (colors) { col.set(colors[i % colors.length]); col.offsetHSL(0, 0, ((i * 7919) % 100) / 1000 - 0.05); im.setColorAt(i, col); } });
     im.frustumCulled = false; root.add(im); return im;
   };
-  const trunkG = new THREE.CylinderGeometry(0.25, 0.35, 4, 6); trunkG.translate(0, 2, 0);
+  const trunkG = new THREE.CylinderGeometry(0.25, 0.35, 4, 5, 1, true); trunkG.translate(0, 2, 0);   // lean geometry: Quest 3S triangle budget
   mk(trunkG, M.trunk, con, 0, 1); mk(trunkG, M.trunk, dec, 0, 1);
-  const coneG = new THREE.ConeGeometry(2.6, 9, 8); coneG.translate(0, 7.5, 0);
-  mk(coneG, new THREE.MeshLambertMaterial({color: 0xffffff}), con, 0, 1, ['#2f5a2c', '#2a4f2a', '#355f30']);
-  const crownG = new THREE.DodecahedronGeometry(3.7, 0); crownG.scale(1, 0.85, 1); crownG.translate(0, 6.5, 0);
+  const coneG = new THREE.ConeGeometry(2.6, 9, 7, 1, true); coneG.translate(0, 7.5, 0);
+  mk(coneG, new THREE.MeshLambertMaterial({color: 0xffffff, side: THREE.DoubleSide}), con, 0, 1, ['#2f5a2c', '#2a4f2a', '#355f30']);
+  const crownG = new THREE.IcosahedronGeometry(3.8, 0); crownG.scale(1, 0.85, 1); crownG.translate(0, 6.5, 0);
   mk(crownG, new THREE.MeshLambertMaterial({color: 0xffffff, flatShading: true}), dec, 0, 1, ['#4e7a2e', '#5d8a34', '#3f6b2a', '#6b8f3a']);
 }
 function buildRail(R) { // real alignment (OSM: old rail line / South Coast Rail route); it passes under the restored pond in a tunnel with a portal at each shore
