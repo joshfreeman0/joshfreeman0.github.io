@@ -12,20 +12,45 @@
 <script src="hd.js?v=3"></script>
 <script src="w3d/world.js?v=1"></script>
 <script src="w3d/wildlife.js?v=1"></script>
+<script>
+/* Drag-to-look up/down on touch-style pointers (Quest browser 2D view): A-Frame look-controls only turns left/right for touch. */
+AFRAME.registerComponent('touch-pitch', {
+  init: function () {
+    let lastY = null; const c = this.el.sceneEl;
+    const lc = () => this.el.components['look-controls'];
+    const setup = () => {
+      const cv = c.canvas;
+      cv.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') lastY = e.clientY; });
+      cv.addEventListener('pointermove', e => {
+        if (lastY === null || c.is('vr-mode')) return;
+        const l = lc(); if (!l || !l.pitchObject) return;
+        const dy = e.clientY - lastY; lastY = e.clientY;
+        const r = l.pitchObject.rotation; r.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, r.x + dy * 0.004));
+      });
+      ['pointerup','pointercancel','pointerleave'].forEach(ev => cv.addEventListener(ev, () => lastY = null));
+    };
+    if (c.hasLoaded) setup(); else c.addEventListener('loaded', setup);
+  }
+});
+</script>
 <style>
 body{margin:0;font-family:system-ui,sans-serif}
-#ui{position:fixed;left:0;right:0;bottom:0;z-index:10;padding:10px;background:rgba(0,0,0,.65);color:#fff;text-align:center}
-#ui button{font-size:18px;margin:4px;padding:10px 16px;border-radius:8px;border:0;background:#c9a24a;color:#111;cursor:pointer}
+#ui{position:fixed;left:0;right:0;bottom:0;z-index:10;padding:6px 6px calc(14px + env(safe-area-inset-bottom));background:rgba(0,0,0,.65);color:#fff;text-align:center;max-height:45vh;overflow-y:auto;box-sizing:border-box}
+#ui button{font-size:15px;margin:3px;padding:8px 12px;border-radius:8px;border:0;background:#FFD700;color:#111;cursor:pointer}
+#ui.min .grp,#ui.min #note{display:none}
+#uitog{font-size:15px;padding:8px 12px;border-radius:8px;border:0;background:#FFD700;color:#111;position:fixed;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:11;display:none}
+#note{display:none}#ui.help #note{display:block}
 #ui button.on{background:#fff}
 #ui .sec{font-size:12px;opacity:.8;margin:0 6px}
 #load{position:fixed;top:40%;left:0;right:0;text-align:center;color:#ffe9a8;font-size:20px;z-index:5;text-shadow:0 0 6px #000}
 #note{font-size:12px;opacity:.85;margin-top:4px}
+#ui .tools button{background:#333;color:#ffe9a8;font-size:13px;padding:6px 10px}
 </style></head><body>
 <a-scene vr-mode-ui="enabled: true" light="defaultLightsEnabled: false" renderer="antialias: true; colorManagement: true; highRefreshRate: true; foveationLevel: 0; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160; precision: high" hd-renderer="scale: 1.5" w3d-anim>
   <a-entity id="sky" visible="false"></a-entity>
   <a-entity id="rig" wasd-controls="acceleration: 25" w3d-physics w3d-keys>
     <a-entity id="flydisk" position="0 6 0" rotation="90 0 0"><a-plane class="btn" fly-toggle width="1.6" height="0.42" material="src:url(/vr/winged-sun-stone.jpg);side:double;shader:flat"></a-plane><a-text id="flylabel" value="Fly: OFF" align="center" position="0 -0.4 0" width="1.6" color="#ffe9a8" side="double"></a-text></a-entity>
-    <a-entity camera="near: 0.05; far: 9000" look-controls wasd-controls="enabled:false" position="0 1.6 0">
+    <a-entity camera="near: 0.05; far: 9000" look-controls touch-pitch wasd-controls="enabled:false" position="0 1.6 0">
     <a-entity cursor="fuse:false; rayOrigin:mouse" raycaster="objects:.btn; far: 60"></a-entity>
   </a-entity>
   <a-entity laser-controls="hand:right" snap-turn w3d-teleport raycaster="objects:.btn; far: 60"></a-entity>
@@ -51,20 +76,22 @@ body{margin:0;font-family:system-ui,sans-serif}
     <a-plane class="btn" data-reload="1" position="0.75 -1.0 0" width="1.4" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Reload world" align="center" color="#111" width="2.4"></a-text></a-plane>
   </a-entity>
 </a-scene>
+<button id="uitog">Show menu</button>
 <div id="load">Building Josh's 3D world (USGS terrain + imagery)...</div>
 <div id="ui">
-  <span class="sec">3D world:</span>
+  <div class="tools"><button id="hidebtn">Hide menu</button><button id="helpbtn">Help / credits</button></div>
+  <div class="grp"><span class="sec">3D world:</span>
   <button data-w="terrace" class="on">Bank terrace</button>
   <button data-w="hall">Banking hall</button>
   <button data-w="office">Josh's office</button>
   <button data-w="conservatory">Conservatory</button>
-  <button data-w="pond">Fly over the pond</button><br>
-  <span class="sec">360 panoramas:</span>
+  <button data-w="pond">Fly over the pond</button></div>
+  <div class="grp"><span class="sec">360 panoramas:</span>
   <button data-t="terrace">Terrace</button>
   <button data-t="grounds">Grounds</button>
   <button data-t="hall">Hall</button>
   <button data-t="greenhouse">Conservatory</button>
-  <button data-t="office">Office</button>
+  <button data-t="office">Office</button></div>
   <div id="note">Concept rendering only, not a real institution or engineering design. Terrain: USGS 3DEP elevation. Ground imagery: USGS National Map orthoimagery (public domain), edited to show Fowling Pond Restoration Plan v6 (restored pond and wetlands, herring passage, King's Pond, regraded landfill/quarry, rail tunnel, relocated Thrasher St) approximately. Buildings, plants and animals are procedural concept models; panoramas are AI-generated concept art.
   Desktop: WASD + mouse, F = fly, Space/Shift = up/down. Quest: left stick move, right stick turn, right trigger teleport, A/X or the winged sun overhead = fly, press left stick = menu.</div>
 </div>
@@ -118,5 +145,11 @@ if('serviceWorker' in navigator){navigator.serviceWorker.register('/vr/sw.js',{s
 let dp=null;const ib=document.getElementById('installbtn');
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e;ib.style.display='inline-block';});
 ib.addEventListener('click',async()=>{if(!dp)return;dp.prompt();await dp.userChoice;dp=null;ib.style.display='none';});
+</script>
+<script>
+(function(){const ui=document.getElementById('ui'),t=document.getElementById('uitog');
+document.getElementById('hidebtn').onclick=()=>{ui.style.display='none';t.style.display='block';};
+t.onclick=()=>{ui.style.display='';t.style.display='none';};
+document.getElementById('helpbtn').onclick=()=>ui.classList.toggle('help');})();
 </script>
 </body></html>
