@@ -37,15 +37,33 @@ AFRAME.registerComponent('snap-turn', {
 window.JFVR = window.JFVR || {fly: false};
 AFRAME.registerComponent('fly-toggle', {
   init: function () {
-    this.el.addEventListener('click', () => {
+    const el = this.el; let last = 0;
+    const toggle = () => {
+      const now = performance.now(); if (now - last < 400) return; last = now;
       JFVR.fly = !JFVR.fly;
-      const l = document.querySelector('#flylabel'); if (l) l.setAttribute('value', 'Fly mode: ' + (JFVR.fly ? 'ON' : 'OFF'));
-      this.el.setAttribute('color', JFVR.fly ? '#66ddff' : '#ffcc33');
+      const l = document.querySelector('#flylabel'); if (l) l.setAttribute('value', 'Fly: ' + (JFVR.fly ? 'ON' : 'OFF'));
+      JFVR.hud('Fly mode ' + (JFVR.fly ? 'ON - push left stick to fly' : 'OFF'));
       const rig = document.querySelector('#rig'); if (!JFVR.fly && rig) rig.object3D.position.y = 0;
-    });
+    };
+    JFVR.toggleFly = toggle;
+    el.addEventListener('click', toggle);
+    /* fallback: trigger/grip on a controller whose laser is pointing at the disk */
+    const hook = hand => ['triggerdown', 'gripdown', 'abuttondown', 'xbuttondown'].forEach(ev => hand.addEventListener(ev, () => {
+      const rc = hand.components.raycaster; if (!rc) return;
+      if (rc.intersectedEls.indexOf(el) !== -1 || ev === 'abuttondown' || ev === 'xbuttondown') toggle();
+    }));
+    el.sceneEl.addEventListener('loaded', () => document.querySelectorAll('[laser-controls]').forEach(hook));
+    if (el.sceneEl.hasLoaded) document.querySelectorAll('[laser-controls]').forEach(hook);
   }
 });
-document.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') { const d = document.querySelector('.fly-toggle'); d && d.emit('click'); } });
+JFVR.hud = function (msg) {
+  const cam = document.querySelector('[camera]'); if (!cam) return;
+  let t = document.querySelector('#jfhud');
+  if (!t) { t = document.createElement('a-text'); t.id = 'jfhud'; t.setAttribute('position', '0 -0.25 -1'); t.setAttribute('align', 'center'); t.setAttribute('width', '1.2'); t.setAttribute('color', '#ffe9a8'); cam.appendChild(t); }
+  t.setAttribute('value', msg); t.setAttribute('visible', true);
+  clearTimeout(JFVR._h); JFVR._h = setTimeout(() => t.setAttribute('visible', false), 2500);
+};
+document.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') { JFVR.toggleFly && JFVR.toggleFly(); } });
 /* patch thumbstick-move to include pitch when flying */
 (function () {
   const C = AFRAME.components['thumbstick-move'].Component.prototype, orig = C.tick;

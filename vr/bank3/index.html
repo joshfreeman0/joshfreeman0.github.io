@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Bank of the United States (3rd edition) – 360 concept tour</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script src="../locomotion.js"></script>
+<script src="../locomotion.js?v=4"></script>
 <script src="../hd.js"></script>
 <style>
 body{margin:0;font-family:system-ui,sans-serif}
@@ -15,7 +15,7 @@ body{margin:0;font-family:system-ui,sans-serif}
 <a-scene vr-mode-ui="enabled: true" renderer="antialias: true; colorManagement: true; highRefreshRate: true; foveationLevel: 0; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160; precision: high" hd-renderer="scale: 1.3">
   <a-entity id="sky" hd-sky="src: pano_terrace.jpg"></a-entity>
   <a-entity id="rig" wasd-controls="acceleration: 25">
-    <a-entity id="flydisk" position="0 6 0" rotation="90 0 0"><a-circle class="btn" fly-toggle radius="0.6" color="#ffcc33" material="shader:flat;side:double"></a-circle><a-ring radius-inner="0.65" radius-outer="0.8" color="#fff2b0" material="shader:flat;side:double"></a-ring><a-text id="flylabel" value="Fly mode: OFF" align="center" position="0 -1.1 0" width="4" color="#fff" side="double"></a-text></a-entity>
+    <a-entity id="flydisk" position="0 6 0" rotation="90 0 0"><a-plane class="btn" fly-toggle width="1.2" height="0.45" material="src:url(/vr/winged-sun.png);transparent:true;alphaTest:0.3;side:double;shader:flat"></a-plane><a-text id="flylabel" value="Fly: OFF" align="center" position="0 -0.4 0" width="1.6" color="#ffe9a8" side="double"></a-text></a-entity>
     <a-entity camera="near: 0.05; far: 2000" look-controls wasd-controls="enabled:false" position="0 1.6 0">
     <a-entity cursor="fuse:false; rayOrigin:mouse" raycaster="objects:.btn"></a-entity>
   </a-entity>
