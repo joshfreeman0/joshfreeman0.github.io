@@ -171,7 +171,7 @@
     if (d.n && d.n !== p.name) { p.name = String(d.n).slice(0, 24); updateTag(p); if (!p.announced) { p.announced = 1; hud(p.name + ' is here'); } }
     p.scene = d.s;
     const tp = new THREE.Vector3(d.h[0], d.h[1], d.h[2]);
-    if (String(d.s).startsWith('pano:') && MP.selfId) tp.add(seat(peerId)).sub(seat(MP.selfId));
+    if (String(d.s).startsWith('pano:') && MP.selfId) { const o = seat(peerId).sub(seat(MP.selfId)); if (o.length() < 0.5) { const a = (hash(peerId + MP.selfId) % 360) * Math.PI / 180; o.set(Math.sin(a) * 1.5, 0, Math.cos(a) * 1.5); } tp.add(o); }
     const off = tp.clone().sub(new THREE.Vector3(d.h[0], d.h[1], d.h[2]));
     p.tq.set(d.h[3], d.h[4], d.h[5], d.h[6]);
     if (!p.tp) { p.hp.copy(tp); p.hq.copy(p.tq); }
