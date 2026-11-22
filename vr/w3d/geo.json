@@ -1,0 +1,72 @@
+{
+ "frame": "local equirectangular (east = +x, south = +z, metres), WGS84; accurate to <1 m within the 4 km core and a few m at 10 km",
+ "lon0": -71.06797286566898,
+ "lat0": 41.928658149882345,
+ "kx": 82938.77752702881,
+ "ky": 111071.935621676,
+ "toWorld": "x = (lon - lon0) * kx ; z = (lat0 - lat) * ky ; y = metres above sea level (NAVD88, USGS 3DEP)",
+ "toLonLat": "lon = lon0 + x / kx ; lat = lat0 - z / ky",
+ "anchor": {
+  "name": "bank (HQ) terrace centre",
+  "x": 920,
+  "z": -380,
+  "lon": -71.05688034625368,
+  "lat": 41.93207935612921
+ },
+ "oldFrame": "before 2026-11-22 the ground used a N-S squashed frame (USGS 4326 export of a square image: 1 world m = 1.341 real m N-S); landmarks were kept, the ground was rebuilt in this frame",
+ "axes": {
+  "x": "east positive",
+  "z": "south positive (north = -z)",
+  "y": "up, metres above sea level (NAVD88)",
+  "headingNote": "three.js: camera yaw 0 looks toward -z (north)"
+ },
+ "extent": {
+  "core": {
+   "x": [
+    -2048,
+    2048
+   ],
+   "z": [
+    -2048,
+    2048
+   ],
+   "grid": "385x385 heights, 10.667 m",
+   "photo": "ortho_t.jpg 4096 px, 1 m"
+  },
+  "hiPhoto": {
+   "x": [
+    -324,
+    1724
+   ],
+   "z": [
+    -1249,
+    799
+   ],
+   "photo": "ortho_hi_t.jpg 4096 px, 0.5 m"
+  },
+  "mid": {
+   "x": [
+    -6144,
+    6144
+   ],
+   "z": [
+    -6144,
+    6144
+   ],
+   "grid": "193x193, 64 m"
+  },
+  "far": {
+   "x": [
+    -16384,
+    16384
+   ],
+   "z": [
+    -16384,
+    16384
+   ],
+   "grid": "129x129, 256 m"
+  }
+ },
+ "groundHeight": "W3D.groundAt(x,z,y) / terrainH(x,z) in world.js (core + rings); drape roads at terrainH+0.15 or so",
+ "dataSource": "OSM coords converted with toWorld; USGS 3DEP DEM + USGS Imagery exported per exact lon/lat bbox for this frame"
+}
