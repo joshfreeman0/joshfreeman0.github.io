@@ -117,7 +117,7 @@ function show(t){ // 360 concept panorama, in this same page
   const s3 = scn.object3D; s3.fog = null; s3.environment = null;
   JFVR.fly = false; const l = document.querySelector('#flylabel'); if (l) l.setAttribute('value', 'Fly: OFF');
   rig.object3D.position.set(0, 0, 0); rig.object3D.rotation.set(0, 0, 0);
-  const sky = document.querySelector('#sky'); sky.setAttribute('hd-sky', 'src', 'pano/pano_' + t + '.jpg?v=2'); sky.setAttribute('visible', true);
+  const sky = document.querySelector('#sky'); sky.setAttribute('hd-sky', 'src', 'pano/pano_' + t + '.jpg?v=3'); sky.setAttribute('visible', true);
   mark('[data-t]', t); bringMenu();
 }
 function wire(el){
