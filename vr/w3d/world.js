@@ -307,7 +307,7 @@ function buildBank() {
     box(8, 1.2, 27.5, 896, y0 + 22, zt, M.stone, {collide: false});     // cavetto cornice (simplified)
     box(0.3, 14, 1.5, 892.3, y0 + 0.5, zt - s * 3, M.gold, {collide: false}); // flagpole mast (gilded)
   }
-  box(7, 3, 9, 896, y0 + 14, zc, M.relief, {collide: false});       // lintel over gate
+  box(6.4, 3, 12, 896, y0 + 14, zc, M.relief, {collide: false});    // lintel over gate (12 deep so it beds into both battered towers - no gaps)
   const disk = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.3, 32), M.gold); disk.rotation.z = Math.PI / 2; disk.position.set(892.3, y0 + 15.5, zc); root.add(disk);
   for (const s of [-1, 1]) { const wing = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.7, 3.2), new THREE.MeshStandardMaterial({color: 0x1f5fa8, roughness: 0.4})); wing.position.set(892.35, y0 + 15.6, zc + s * 2.6); root.add(wing); }
   floorOnly(8, 9, 896, y0 + 0.2, zc);
