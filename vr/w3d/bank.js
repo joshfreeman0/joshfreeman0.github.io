@@ -438,7 +438,7 @@ W3D.tickBank = function (t) { // the vault is only drawn when you are below grou
   const cam = W3D._cam || (W3D._cam = document.querySelector('[camera]')); if (!cam || !vaultG) return; const p = cam.object3D.getWorldPosition(W3D._bv || (W3D._bv = new THREE.Vector3()));
   const inside = p.y < 33.5 && p.x > 920 && p.x < 985 && p.z > -405 && p.z < -355; if (++frames > 3) vaultG.visible = inside; if (inside) for (const f of anim) f(t);
 };
-AFRAME.registerComponent('bank-lift', { schema: {to: {type: 'string'}}, init: function () { this.el.addEventListener('click', () => { if (this.data.to === 'vault') { W3D.spots.vault(); JFVR.hud && JFVR.hud("Bank vault - Josh's account"); } else { W3D.teleportTo(945, L ? L.HQ.y + 0.3 : 34.3, -383.5, -90); JFVR.hud && JFVR.hud('Banking hall'); } }); } });
+AFRAME.registerComponent('bank-lift', { schema: {to: {type: 'string'}}, init: function () { this.el.addEventListener('click', () => { if (this.data.to === 'vault') { W3D.spots.vault(); JFVR.hud && JFVR.hud("Bank vault - Josh's account"); } else { W3D.teleportTo(942.6, L ? L.HQ.y + 0.3 : 34.3, -380, -90); JFVR.hud && JFVR.hud('Banking hall'); } }); } });
 AFRAME.registerComponent('bank-tick', { tick: function (t) { if (W3D.active && W3D.tickBank) W3D.tickBank(t); } });
 const addSpots = () => { if (!W3D.spots) return setTimeout(addSpots, 50); W3D.spots.vault = () => W3D.teleportTo(931.5, V.y, V.zc, -65); };
 addSpots();

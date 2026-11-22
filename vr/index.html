@@ -12,7 +12,7 @@
 <script src="hd.js?v=3"></script>
 <script src="w3d/world.js?v=6"></script>
 <script src="w3d/rooms.js?v=4"></script>
-<script src="w3d/bank.js?v=1"></script>
+<script src="w3d/bank.js?v=2"></script>
 <script src="w3d/wildlife.js?v=2"></script>
 <script>
 /* Drag-to-look up/down on touch-style pointers (Quest browser 2D view): A-Frame look-controls only turns left/right for touch. */
@@ -62,7 +62,7 @@ body{margin:0;font-family:system-ui,sans-serif}
   <a-entity position="962 34.06 -380"><a-circle class="btn" w3d-lift="to: office" radius="1.1" rotation="-90 0 0" material="shader:flat;color:#FFD700;opacity:0.85;transparent:true"></a-circle><a-text value="LIFT - Josh's office (click)" align="center" position="0 1.9 0" rotation="0 -90 0" width="5" color="#FFD700"></a-text></a-entity>
   <a-entity position="968 64.06 -376"><a-circle class="btn" w3d-lift="to: hall" radius="0.9" rotation="-90 0 0" material="shader:flat;color:#FFD700;opacity:0.85;transparent:true"></a-circle><a-text value="LIFT - banking hall (click)" align="center" position="0 1.6 0" rotation="0 90 0" width="4" color="#FFD700"></a-text></a-entity>
   <!-- lifts: banking hall (centre aisle) <-> bank vault below (see w3d/bank.js) -->
-  <a-entity position="945 34.33 -383.5"><a-circle class="btn" bank-lift="to: vault" radius="1.1" rotation="-90 0 0" material="shader:flat;color:#FFD700;opacity:0.85;transparent:true"></a-circle><a-text value="LIFT - bank vault (click)" align="center" position="0 1.9 0" rotation="0 -90 0" width="5" color="#FFD700"></a-text></a-entity>
+  <a-entity position="945 34.33 -380"><a-circle class="btn" bank-lift="to: vault" radius="1.1" rotation="-90 0 0" material="shader:flat;color:#FFD700;opacity:0.85;transparent:true"></a-circle><a-text value="LIFT - bank vault (click)" align="center" position="0 1.9 0" rotation="0 -90 0" width="5" color="#FFD700"></a-text></a-entity>
   <a-entity position="929 24.03 -380"><a-circle class="btn" bank-lift="to: hall" radius="0.9" rotation="-90 0 0" material="shader:flat;color:#FFD700;opacity:0.85;transparent:true"></a-circle><a-text value="LIFT - banking hall (click)" align="center" position="0 1.7 0" rotation="0 90 0" width="4" color="#FFD700"></a-text></a-entity>
   <a-entity id="vrbar" class="vr-menu" position="0 0.6 -2.2" rotation="-20 0 0" visible="false">
     <a-text value="3D WORLD" align="center" color="#FFD700" position="0 0.3 0" width="2.2"></a-text>
