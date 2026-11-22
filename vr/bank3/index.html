@@ -4,6 +4,7 @@
 <title>Bank of the United States (3rd edition) – 360 concept tour</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="../locomotion.js"></script>
+<script src="../hd.js"></script>
 <style>
 body{margin:0;font-family:system-ui,sans-serif}
 #ui{position:fixed;left:0;right:0;bottom:0;z-index:10;padding:10px;background:rgba(0,0,0,.65);color:#fff;text-align:center}
@@ -11,17 +12,10 @@ body{margin:0;font-family:system-ui,sans-serif}
 #ui button.on{background:#fff}
 #note{font-size:12px;opacity:.85;margin-top:4px}
 </style></head><body>
-<a-scene vr-mode-ui="enabled: true" renderer="colorManagement: true">
-  <a-assets>
-    <img id="terrace" src="pano_terrace.jpg" crossorigin="anonymous">
-    <img id="grounds" src="pano_grounds.jpg" crossorigin="anonymous">
-    <img id="hall" src="pano_hall.jpg" crossorigin="anonymous">
-    <img id="office" src="pano_office.jpg" crossorigin="anonymous">
-    <img id="greenhouse" src="pano_greenhouse.jpg" crossorigin="anonymous">
-  </a-assets>
-  <a-sky id="sky" src="#terrace" rotation="0 -90 0"></a-sky>
+<a-scene vr-mode-ui="enabled: true" renderer="antialias: true; colorManagement: true; highRefreshRate: true; foveationLevel: 0; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160; precision: high" hd-renderer="scale: 1.3">
+  <a-entity id="sky" hd-sky="src: pano_terrace.jpg"></a-entity>
   <a-entity id="rig" wasd-controls="acceleration: 25">
-    <a-entity camera look-controls wasd-controls="enabled:false" position="0 1.6 0">
+    <a-entity camera="near: 0.05; far: 2000" look-controls wasd-controls="enabled:false" position="0 1.6 0">
     <a-entity cursor="fuse:false; rayOrigin:mouse" raycaster="objects:.btn"></a-entity>
   </a-entity>
   <a-entity laser-controls="hand:right" snap-turn raycaster="objects:.btn"></a-entity>
@@ -47,7 +41,7 @@ body{margin:0;font-family:system-ui,sans-serif}
 </div>
 <script>
 function show(t){
-  document.getElementById('sky').setAttribute('src','#'+t);
+  document.getElementById('sky').setAttribute('hd-sky','src','pano_'+t+'.jpg');
   document.querySelectorAll('#ui button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
 }
 document.querySelectorAll('#ui button').forEach(b=>b.addEventListener('click',()=>show(b.dataset.t)));
