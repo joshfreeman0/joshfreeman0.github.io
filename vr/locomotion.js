@@ -106,7 +106,7 @@ AFRAME.registerComponent('menu-toggle', {
   },
   toggle: function () {
     const now = performance.now(); if (now - this.last < 350) return; this.last = now;
-    const els = document.querySelectorAll('#vrbar, #w-bank3, .vr-menu');
+    const els = document.querySelectorAll('#vrbar, .vr-menu');
     if (!els.length) return;
     let show = !els[0].object3D.visible;
     const bar = document.querySelector('#vrbar'), cam = document.querySelector('[camera]');
