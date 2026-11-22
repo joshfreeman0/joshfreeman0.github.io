@@ -15,6 +15,7 @@ body{margin:0;font-family:system-ui,sans-serif}
     <img id="terrace" src="pano_terrace.jpg" crossorigin="anonymous">
     <img id="grounds" src="pano_grounds.jpg" crossorigin="anonymous">
     <img id="hall" src="pano_hall.jpg" crossorigin="anonymous">
+    <img id="office" src="pano_office.jpg" crossorigin="anonymous">
   </a-assets>
   <a-sky id="sky" src="#terrace" rotation="0 -90 0"></a-sky>
   <a-entity camera look-controls position="0 1.6 0">
@@ -26,12 +27,14 @@ body{margin:0;font-family:system-ui,sans-serif}
     <a-plane class="btn" data-t="terrace" position="-1.0 0 0" width="0.9" height="0.28" color="#c9a24a"><a-text value="Hilltop terrace" align="center" color="#111" width="2"></a-text></a-plane>
     <a-plane class="btn" data-t="grounds" position="0 0 0" width="0.9" height="0.28" color="#c9a24a"><a-text value="Grounds" align="center" color="#111" width="2"></a-text></a-plane>
     <a-plane class="btn" data-t="hall" position="1.0 0 0" width="0.9" height="0.28" color="#c9a24a"><a-text value="Banking hall" align="center" color="#111" width="2"></a-text></a-plane>
+    <a-plane class="btn" data-t="office" position="0 -0.35 0" width="1.4" height="0.28" color="#c9a24a"><a-text value="Josh's top-floor office" align="center" color="#111" width="2.4"></a-text></a-plane>
   </a-entity>
 </a-scene>
 <div id="ui">
-  <button data-t="terrace" class="on">Hilltop terrace</button>
-  <button data-t="grounds">Grounds (deer &amp; turkeys)</button>
+  <button data-t="terrace" class="on">Colonnade terrace</button>
+  <button data-t="grounds">Sphinx avenue &amp; grounds</button>
   <button data-t="hall">Banking hall</button>
+  <button data-t="office">From Josh's top-floor office</button>
   <div id="note">Concept renderings (AI-generated), not real photos. Mockup/concept only: not a chartered institution. In a Quest browser, tap "Enter VR" (goggles icon).</div>
 </div>
 <script>
