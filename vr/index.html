@@ -10,7 +10,7 @@
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="locomotion.js?v=13"></script>
 <script src="hd.js?v=3"></script>
-<script src="w3d/world.js?v=9"></script>
+<script src="w3d/world.js?v=10"></script>
 <script src="w3d/rooms.js?v=4"></script>
 <script src="w3d/bank.js?v=2"></script>
 <script src="w3d/showcase.js?v=1"></script>
@@ -104,7 +104,7 @@ const scn = document.querySelector('a-scene'), rig = document.querySelector('#ri
 let mode = 'world';
 function mark(sel, key){ document.querySelectorAll('#ui button').forEach(b => b.classList.toggle('on', b.matches(sel) && (b.dataset.w===key || b.dataset.t===key))); }
 function worldLimits(on){
-  if (on) { JFVR.flyRadius = 11000; JFVR.flyMaxY = 600; JFVR.groundAt = W3D.groundAt; }
+  if (on) { JFVR.flyRadius = 8000; JFVR.flyMaxY = 600; JFVR.groundAt = W3D.groundAt; }
   else { JFVR.flyRadius = 400; JFVR.flyMaxY = 400; JFVR.groundAt = null; }
 }
 function bringMenu(){ if (bar.object3D.visible && JFVR.placeInFront) setTimeout(() => JFVR.placeInFront(bar, 2.4, 0.4), 50); }
