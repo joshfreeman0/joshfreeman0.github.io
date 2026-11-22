@@ -22,7 +22,7 @@ AFRAME.registerComponent('thumbstick-move', {
       const q = cam.object3D.getWorldQuaternion(new THREE.Quaternion());
       const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q), r = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
       const mag = Math.min(1, Math.hypot(x, y) || Math.abs(up));
-      const p = rig.object3D.position, s = (12 + Math.max(p.y, 0) * 0.5) * (boost ? 8 : 1) * (0.3 + 0.7 * mag) * dt / 1000;
+      const p = rig.object3D.position, s = (40 + Math.max(p.y, 0) * 1.0) * (boost ? 15 : 1) * (0.3 + 0.7 * mag) * dt / 1000;
       p.addScaledVector(f, -y * s).addScaledVector(r, x * s);
       if (Math.abs(up) >= 0.2) p.y += -up * s;
       p.y = Math.min(Math.max(p.y, 0), 400);
@@ -108,7 +108,15 @@ AFRAME.registerComponent('menu-toggle', {
     const now = performance.now(); if (now - this.last < 350) return; this.last = now;
     const els = document.querySelectorAll('#vrbar, #w-bank3, .vr-menu');
     if (!els.length) return;
-    const show = !els[0].object3D.visible;
+    let show = !els[0].object3D.visible;
+    const bar = document.querySelector('#vrbar'), cam = document.querySelector('[camera]');
+    if (!show && bar && cam) {
+      /* menu is on but maybe far away or behind you: bring it to you instead of hiding */
+      const cp = cam.object3D.getWorldPosition(new THREE.Vector3()), bp = bar.object3D.getWorldPosition(new THREE.Vector3());
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.object3D.getWorldQuaternion(new THREE.Quaternion()));
+      const to = bp.clone().sub(cp); const far = to.length() > 4 || to.normalize().dot(dir) < 0.5;
+      if (far) { JFVR.placeInFront(bar, 2.2, -1.0); JFVR.hud('Menu moved to you'); return; }
+    }
     els.forEach(m => {
       m.setAttribute('visible', show); m.object3D.visible = show;
       if (show && m.id === 'vrbar') JFVR.placeInFront(m, 2.2, -1.0);
