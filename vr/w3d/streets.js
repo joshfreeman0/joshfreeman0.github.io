@@ -23,13 +23,9 @@ function tex(name) {
 }
 
 const RW = [5, 6.5, 8, 10];
-const FB = {lat0: 41.928836, lon0: -71.074334, ox: -516, oz: -112}; // fallback frame until geo.json exists
-function toWorld(lat, lon) {
-  const f = geo && geo.toWorld ? geo : null; if (f) return f.toWorld(lat, lon);
-  const kx = 111320 * Math.cos(FB.lat0 * Math.PI / 180); return [(lon - FB.lon0) * kx + FB.ox, -(lat - FB.lat0) * 110574 + FB.oz];
-}
+function toWorld(lat, lon) { return [(lon - geo.lon0) * geo.kx, (geo.lat0 - lat) * geo.ky]; } // geo.json frame: +x east, +z south
 function gh(x, z) { return W3D.terrainH(x, z); }
-const EXT = () => (geo && geo.extent) || 2040;
+const EXT = () => 6140;
 function roadTex() {
   const c = document.createElement('canvas'); c.width = 64; c.height = 8; const g = c.getContext('2d');
   g.fillStyle = '#34373a'; g.fillRect(0, 0, 64, 8); g.fillStyle = '#d9d6c8'; g.fillRect(3, 0, 2, 8); g.fillRect(59, 0, 2, 8);
@@ -83,7 +79,7 @@ function buildRoads() {
   const G = []; for (let l = 0; l < 8; l++) G.push({pos: [], uv: [], idx: []});
   const BR = {pos: [], idx: []};   // bridge slab + rails (plain grey)
   R.forEach((r, ri) => {
-    const lvl = Math.min(3, r.cls) * 2 + (ri & 1), g = G[lvl], pos = g.pos, uv = g.uv, idx = g.idx, LIFT = 0.25 + 0.035 * lvl, w = RW[r.cls] / 2, P = r.p;
+    const lvl = Math.min(3, r.cls) * 2 + (ri & 1), g = G[lvl], pos = g.pos, uv = g.uv, idx = g.idx, LIFT = 0.15 + 0.03 * lvl, w = RW[r.cls] / 2, P = r.p;
     let y0 = 0, y1 = 0, tot = 0;
     if (r.br) { y0 = gh(P[0][0], P[0][1]); y1 = gh(P[P.length - 1][0], P[P.length - 1][1]); for (let k = 1; k < P.length; k++) tot += Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]); }
     let prev = -1, run = 0, bprev = -1;
@@ -124,7 +120,23 @@ function buildRoads() {
   return tris;
 }
 // remove trees/bushes standing on a road ribbon (+ half width + 1.5 m), and trees standing in water
+let WM = null; const WR = 6144, WN = 1536;
+function buildWaterMask() {
+  const c = document.createElement('canvas'); c.width = c.height = WN; const g = c.getContext('2d'); g.fillStyle = '#fff';
+  for (const poly of data.water || []) {
+    g.beginPath();
+    for (const r of poly) for (let i = 0; i < r.length; i += 2) { const [x, z] = toWorld(r[i] / 1e5, r[i + 1] / 1e5), u = (x + WR) / (2 * WR) * WN, v = (z + WR) / (2 * WR) * WN; i ? g.lineTo(u, v) : g.moveTo(u, v); if (i === r.length - 2) g.closePath(); }
+    g.fill('evenodd');
+  }
+  const d = g.getImageData(0, 0, WN, WN).data; WM = new Uint8Array(WN * WN); for (let i = 0; i < WM.length; i++) WM[i] = d[i * 4] > 127 ? 1 : 0;
+}
+function inWater(x, z) {
+  if (Math.abs(x) < 2040 && Math.abs(z) < 2040 && gh(x, z) < 16.3) return true; // restored-pond bed in the core
+  if (!WM || Math.abs(x) >= WR || Math.abs(z) >= WR) return false;
+  return WM[Math.floor((z + WR) / (2 * WR) * WN) * WN + Math.floor((x + WR) / (2 * WR) * WN)] === 1;
+}
 function cullTreesOnRoads() {
+  buildWaterMask();
   const CELL = 64, grid = new Map();
   const add = (cx, cz, seg) => { const k = cx * 100003 + cz; let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(seg); };
   for (const r of R) {
@@ -151,7 +163,7 @@ function cullTreesOnRoads() {
       const o = i * 16, x = e[o + 12], y = e[o + 13], z = e[o + 14];
       if (e[o] === 0 && e[o + 5] === 0) continue;
       if (Math.abs(y - gh(x, z)) > 12) continue;
-      if (onRoad(x, z)) { e[o] = e[o + 1] = e[o + 2] = e[o + 4] = e[o + 5] = e[o + 6] = e[o + 8] = e[o + 9] = e[o + 10] = 0; ch = true; removed++; }
+      if (onRoad(x, z) || inWater(x, z)) { e[o] = e[o + 1] = e[o + 2] = e[o + 4] = e[o + 5] = e[o + 6] = e[o + 8] = e[o + 9] = e[o + 10] = 0; ch = true; removed++; }
     }
     if (ch) im.instanceMatrix.needsUpdate = true;
   }
@@ -209,8 +221,8 @@ AFRAME.registerSystem('w3d-streets', {
   tick(time, dt) {
     if (!window.W3D || !W3D.root || !window.W3D_READY) return;
     if (!data) { if (!loading) { loading = true;
-      Promise.all([fetch('/vr/w3d/streets.json?v=5').then(r => r.json()), fetch('/vr/w3d/geo.json?v=1').then(r => r.ok ? r.json() : null).catch(() => null)])
-        .then(([j, g]) => { geo = g && g.lat0 !== undefined ? makeGeo(g) : null; data = j; }).catch(e => console.warn('street labels unavailable', e)); } return; }
+      Promise.all([fetch('/vr/w3d/streets.json?v=6').then(r => r.json()), fetch('/vr/w3d/geo.json?v=1').then(r => r.json())])
+        .then(([j, g]) => { geo = g; data = j; }).catch(e => console.warn('street labels unavailable', e)); } return; }
     const cam = this.el.camera; if (!cam) return;
     if (!ready) { try { init(); } catch (e) { console.warn('street labels failed', e); data = null; loading = true; } return; }
     group.visible = !!W3D.active;
@@ -219,5 +231,4 @@ AFRAME.registerSystem('w3d-streets', {
     face(cam);
   }
 });
-function makeGeo(g) { return null; } // set when geo.json format is known
 })();
