@@ -738,14 +738,13 @@ function buildBank() {
   box(18, 29.6, 18, 976, y0, zc, M.relief, {T: 6});
   W3D.liftHall = {x: 961.5, y: y0 + 0.3, z: zc};
 }
-function sphinxes(list) { // sculpted sphinx (w3d/sphinx.js) shared by the whole avenue: one instanced mesh per material, simpler geometry on phones
-  const P = sphinxParts(LITE);
-  const mats = {sand: new THREE.MeshStandardMaterial({color: 0xb8915a, roughness: 0.85}), dark: new THREE.MeshStandardMaterial({color: 0x9c7b4f, roughness: 0.9}),
-    nem: new THREE.MeshStandardMaterial({map: P.stripe, roughness: 0.45, metalness: 0.25}), gold: M.gold, blue: new THREE.MeshStandardMaterial({map: P.stripe, roughness: 0.5}),
-    kohl: new THREE.MeshStandardMaterial({color: 0x3d2b1a, roughness: 0.7})};
-  const m4 = new THREE.Matrix4();
-  for (const k in mats) { const im = new THREE.InstancedMesh(P[k], mats[k], list.length); im.castShadow = !LITE; im.frustumCulled = false;
-    list.forEach(([x, y, z], i) => { m4.makeTranslation(x, y, z); im.setMatrixAt(i, m4); }); root.add(im); }
+function sphinxes(list) { // w3d/sphinx.js: scanned museum head + procedural lion body, one instanced mesh per part for the whole avenue, lighter on phones
+  const P = sphinxParts(LITE), m4 = new THREE.Matrix4();
+  const sand = new THREE.MeshStandardMaterial({color: 0xcda774, roughness: 0.82}), stone = new THREE.MeshStandardMaterial({color: 0xb38e5f, roughness: 0.9});
+  const inst = (geo, mat) => { const im = new THREE.InstancedMesh(geo, mat, list.length); im.castShadow = !LITE; im.receiveShadow = true; im.frustumCulled = false;
+    list.forEach(([x, y, z], i) => { m4.makeTranslation(x, y, z); im.setMatrixAt(i, m4); }); root.add(im); };
+  inst(P.sand, sand); inst(P.dark, stone);
+  sphinxHead(LITE, BASE).then(g => inst(g, new THREE.MeshStandardMaterial({color: 0xcda774, roughness: 0.82, vertexColors: true}))).catch(e => console.warn('sphinx head', e));
   for (const [x, y, z] of list) walls.push({x0: x - 2.5, x1: x + 2.5, z0: z - 1.25, z1: z + 1.25, y0: y, y1: y + 3.4});
 }
 function obelisk(x, y, z, h) {
