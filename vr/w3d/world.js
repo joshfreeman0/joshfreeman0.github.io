@@ -37,6 +37,7 @@ function blocked(x, z, y) {
 W3D.blocked = blocked;
 
 /* ---------- procedural textures ---------- */
+function hcanvas(S) { const c = canvas(S * 2, S * 2); c.getContext('2d').scale(2, 2); return c; } // 2048 px textures drawn in 1024 logical units
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 function noiseFill(g, w, h, base, amp, n) {
   g.fillStyle = base; g.fillRect(0, 0, w, h);
@@ -44,14 +45,14 @@ function noiseFill(g, w, h, base, amp, n) {
 }
 function tex(c, rep) { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 16; if (rep) t.repeat.set(rep, rep); return t; }
 function ashlarTex() { // freshly cut sandstone blocks, 4 m x 4 m tile
-  const c = canvas(1024, 1024), g = c.getContext('2d'); noiseFill(g, 1024, 1024, '#e6cf9f', 0.05, 30000);
+  const c = hcanvas(1024), g = c.getContext('2d'); noiseFill(g, 1024, 1024, '#e6cf9f', 0.05, 30000);
   g.strokeStyle = 'rgba(120,95,60,0.55)'; g.lineWidth = 2;
   for (let r = 0; r < 8; r++) { const y = r * 128; g.beginPath(); g.moveTo(0, y); g.lineTo(1024, y); g.stroke();
     const off = (r % 2) * 128; for (let x = off; x <= 1024; x += 256) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 128); g.stroke(); } }
   return tex(c);
 }
 function polishedTex(dark) { // honed granite / marble with gold inlay grid, 4 m tile
-  const c = canvas(1024, 1024), g = c.getContext('2d');
+  const c = hcanvas(1024), g = c.getContext('2d');
   noiseFill(g, 1024, 1024, dark ? '#2b2a2e' : '#efe9de', dark ? 0.12 : 0.05, 60000);
   g.globalAlpha = 0.25; g.strokeStyle = dark ? '#77706a' : '#c9bfae'; g.lineWidth = 1.5;
   for (let i = 0; i < 40; i++) { g.beginPath(); let x = Math.random() * 1024, y = Math.random() * 1024; g.moveTo(x, y); for (let k = 0; k < 8; k++) { x += (Math.random() - 0.3) * 90; y += (Math.random() - 0.5) * 60; g.lineTo(x, y); } g.stroke(); }
@@ -75,7 +76,7 @@ function officeFloorTex() { // single 20 m floor: white marble, gold-inlaid sun 
   const t = tex(c); return t;
 }
 function starCeilingTex() {
-  const S = 1024, c = canvas(S, S), g = c.getContext('2d'); g.fillStyle = '#14336e'; g.fillRect(0, 0, S, S);
+  const S = 1024, c = hcanvas(S), g = c.getContext('2d'); g.fillStyle = '#14336e'; g.fillRect(0, 0, S, S);
   g.fillStyle = '#e8c255';
   for (let y = 32; y < S; y += 64) for (let x = 32 + ((y / 64) % 2) * 32; x < S; x += 64) star(g, x, y, 14);
   g.strokeStyle = '#d4af37'; g.lineWidth = 10; g.strokeRect(5, 5, S - 10, S - 10);
@@ -83,7 +84,7 @@ function starCeilingTex() {
 }
 function star(g, x, y, r) { g.beginPath(); for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5 - Math.PI / 2, rr = i % 2 ? r * 0.4 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.closePath(); g.fill(); }
 function reliefTex() { // crisp, freshly painted hieroglyph relief registers (stylised, not real text)
-  const S = 1024, c = canvas(S, S), g = c.getContext('2d'); noiseFill(g, S, S, '#ecd8ab', 0.04, 20000);
+  const S = 1024, c = hcanvas(S), g = c.getContext('2d'); noiseFill(g, S, S, '#ecd8ab', 0.04, 20000);
   const col = ['#1f5fa8', '#b5342b', '#2e8b57', '#d9a520', '#222'];
   g.fillStyle = '#1f5fa8'; g.fillRect(0, 0, S, 26); g.fillStyle = '#d9a520'; g.fillRect(0, 26, S, 8); g.fillStyle = '#b5342b'; g.fillRect(0, S - 30, S, 30);
   for (let x = 0; x < S; x += 32) { g.fillStyle = ['#1f5fa8', '#2e8b57', '#b5342b'][(x / 32) % 3]; g.fillRect(x + 4, 36, 24, 14); }
@@ -104,6 +105,29 @@ function reed(g, c) { stroke(g, '#2e8b57'); g.beginPath(); g.moveTo(-3, 22); g.l
 function djed(g, c) { stroke(g, c); g.fillRect(-5, -20, 10, 42); g.strokeRect(-5, -20, 10, 42); for (let k = 0; k < 4; k++) g.fillRect(-12, -20 + k * 5, 24, 3); }
 function scarab(g, c) { stroke(g, '#2e8b57'); g.beginPath(); g.ellipse(0, 4, 12, 15, 0, 0, Math.PI * 2); g.fill(); g.stroke(); g.beginPath(); g.arc(0, -14, 6, 0, Math.PI * 2); g.fill(); g.stroke(); }
 function feather(g, c) { stroke(g, c); g.beginPath(); g.moveTo(0, 22); g.quadraticCurveTo(-10, -4, 0, -24); g.quadraticCurveTo(10, -4, 0, 22); g.fill(); g.stroke(); }
+function detailTex() { // grass/soil micro-detail (grey around 0.5), tiles every few metres
+  const S = 512, c = canvas(S, S), g = c.getContext('2d'), img = g.createImageData(S, S), A = new Float32Array(S * S), B = new Float32Array(S * S);
+  for (let i = 0; i < S * S; i++) { A[i] = Math.random(); B[i] = Math.random(); }
+  const blur = (a, r) => { const o = new Float32Array(S * S); for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { let s2 = 0; for (let k = -r; k <= r; k++) s2 += a[y * S + ((x + k + S) % S)]; o[y * S + x] = s2 / (2 * r + 1); }
+    const o2 = new Float32Array(S * S); for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { let s2 = 0; for (let k = -r; k <= r; k++) s2 += o[((y + k + S) % S) * S + x]; o2[y * S + x] = s2 / (2 * r + 1); } return o2; };
+  const A2 = blur(A, 1), B2 = blur(B, 6);
+  for (let i = 0; i < S * S; i++) { const a = 0.5 + (A2[i] - 0.5) * 2.2 + (A[i] - 0.5) * 0.25, b = 0.5 + (B2[i] - 0.5) * 5.0; img.data[i * 4] = Math.max(0, Math.min(255, a * 255)); img.data[i * 4 + 1] = Math.max(0, Math.min(255, b * 255)); img.data[i * 4 + 2] = 128; img.data[i * 4 + 3] = 255; }
+  g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 16; return t;
+}
+function cofferTex() { // round coffered dome: rings of recessed coffers with gold rosettes, lapis star oculus at the crown
+  const c = hcanvas(1024), g = c.getContext('2d'); noiseFill(g, 1024, 1024, '#e9d6ab', 0.04, 20000);
+  g.fillStyle = '#163a7a'; g.fillRect(0, 0, 1024, 150); g.fillStyle = '#e8c255'; for (let x = 16; x < 1024; x += 42) star(g, x, 40 + (x % 84 ? 0 : 50), 10), star(g, x + 21, 105, 8);
+  g.fillStyle = '#d4af37'; g.fillRect(0, 150, 1024, 14);
+  const rows = 6, cols = 16, y0 = 170, rh = (1000 - y0) / rows;
+  for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) {
+    const w = 1024 / cols, x = k * w + w * 0.1, y = y0 + r * rh + rh * 0.1, cw = w * 0.8, ch = rh * 0.8;
+    for (let st = 0; st < 3; st++) { const inset = st * Math.min(cw, ch) * 0.1; g.fillStyle = ['#bfa577', '#a88d60', '#8c7349'][st]; g.fillRect(x + inset, y + inset, cw - 2 * inset, ch - 2 * inset); }
+    g.fillStyle = '#1f4fa0'; const ix = x + cw * 0.3, iy = y + ch * 0.3; g.fillRect(ix, iy, cw * 0.4, ch * 0.4);
+    g.fillStyle = '#e2b53c'; g.beginPath(); for (let p = 0; p < 16; p++) { const a = p / 16 * Math.PI * 2, rr = p % 2 ? 4 : 10; g.lineTo(x + cw / 2 + Math.cos(a) * rr, y + ch / 2 + Math.sin(a) * rr * ch / cw); } g.closePath(); g.fill();
+  }
+  g.fillStyle = '#b5342b'; g.fillRect(0, 1000, 1024, 24);
+  return tex(c);
+}
 function rippleNormal() {
   const S = 256, c = canvas(S, S), g = c.getContext('2d'), img = g.createImageData(S, S);
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
@@ -193,7 +217,23 @@ function buildTerrain() {
   const p = geo.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, heights[i]);
   geo.computeVertexNormals();
   const t = new THREE.TextureLoader().load(BASE + 'ortho_v6.jpg?v=1'); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16;
-  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({map: t})); mesh.receiveShadow = true; mesh.name = 'terrain'; root.add(mesh);
+  // sharper ground near the compound and pond: 0.5 m/px USGS tile (x -324..1724, z -1249..799) + fine detail texture that fades in within ~200 m
+  const hi = new THREE.TextureLoader().load(BASE + 'ortho_hi.jpg?v=1'); hi.colorSpace = THREE.SRGBColorSpace; hi.anisotropy = 16;
+  const det = detailTex();
+  const tm = new THREE.MeshLambertMaterial({map: t});
+  tm.onBeforeCompile = sh => {
+    sh.uniforms.hiMap = {value: hi}; sh.uniforms.detMap = {value: det}; sh.uniforms.hiRect = {value: new THREE.Vector4(-324, -1249, 2048, 2048)};
+    sh.vertexShader = 'varying vec3 vWp;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvWp = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'uniform sampler2D hiMap; uniform sampler2D detMap; uniform vec4 hiRect; varying vec3 vWp;\n' + sh.fragmentShader.replace('#include <map_fragment>', [
+      'vec4 texelColor = texture2D(map, vMapUv);',
+      'vec2 hu = (vWp.xz - hiRect.xy) / hiRect.zw;',
+      'if (hu.x > 0.0 && hu.x < 1.0 && hu.y > 0.0 && hu.y < 1.0) { vec4 hc = texture2D(hiMap, vec2(hu.x, 1.0 - hu.y)); float e = min(min(hu.x, 1.0 - hu.x), min(hu.y, 1.0 - hu.y)); texelColor = mix(texelColor, hc, smoothstep(0.0, 0.03, e)); }',
+      'float dd = length(vWp - cameraPosition); float df = 1.0 - smoothstep(30.0, 220.0, dd);',
+      'float dtl = texture2D(detMap, vWp.xz / 2.5).r * 0.55 + texture2D(detMap, vWp.xz / 13.0).g * 0.45;',
+      'texelColor.rgb *= mix(1.0, 0.5 + dtl * 1.0, df);',
+      'diffuseColor *= texelColor;'].join('\n'));
+  };
+  const mesh = new THREE.Mesh(geo, tm); mesh.receiveShadow = true; mesh.name = 'terrain'; root.add(mesh);
   // skirt: wooded-green ground frame around the mapped square so there is never a void at the edge
   const gm = new THREE.MeshLambertMaterial({color: 0x46602f});
   for (const [w, d, x, z] of [[20000, 9000, 0, -HALF - 4500], [20000, 9000, 0, HALF + 4500], [9000, SIZE, -HALF - 4500, 0], [9000, SIZE, HALF + 4500, 0]]) {
@@ -234,6 +274,19 @@ function buildRailPortals() { // v6: railroad runs in a 1.67 km tunnel; portals 
 function buildBank() {
   const y0 = HQ.y, zc = HQ.z;
   // terrace / overlook over the pond (spawn)
+  { // round domed pavilion with a coffered ceiling over the spawn point
+    const R = 6.5, H = 7, dc = {x: 846, z: zc};
+    for (let i = 0; i < 8; i++) { const a = (i + 0.5) / 8 * Math.PI * 2; column(dc.x + Math.cos(a) * R, y0 + 0.1, dc.z + Math.sin(a) * R, H, 0.55); }
+    const ent = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.9, R + 0.9, 1.2, 96, 1, true), M.relief); ent.position.set(dc.x, y0 + 0.1 + H + 0.6, dc.z); ent.material = M.relief; root.add(ent);
+    const entIn = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.6, R - 0.6, 1.2, 96, 1, true), M.relief.clone()); entIn.material.side = THREE.BackSide; entIn.position.copy(ent.position); root.add(entIn);
+    const soffit = new THREE.Mesh(new THREE.RingGeometry(R - 0.6, R + 0.9, 96, 1), M.stone.clone()); soffit.material.side = THREE.DoubleSide; soffit.rotation.x = Math.PI / 2; soffit.position.set(dc.x, y0 + 0.1 + H, dc.z); root.add(soffit);
+    const lip = new THREE.Mesh(new THREE.RingGeometry(R - 0.6, R + 0.9, 96, 1), M.gold); lip.rotation.x = -Math.PI / 2; lip.position.set(dc.x, y0 + 0.1 + H + 1.2, dc.z); root.add(lip);
+    const inner = new THREE.Mesh(new THREE.SphereGeometry(R - 0.6, 96, 32, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({map: cofferTex(), roughness: 0.55, side: THREE.BackSide, envMap: W3D.env || null, envMapIntensity: 0.4}));
+    inner.position.set(dc.x, y0 + 0.1 + H + 1.2, dc.z); root.add(inner);
+    const outer = new THREE.Mesh(new THREE.SphereGeometry(R + 0.9, 96, 32, 0, Math.PI * 2, 0, Math.PI / 2), M.stone); outer.position.copy(inner.position); outer.castShadow = true; root.add(outer);
+    const fin = new THREE.Mesh(new THREE.SphereGeometry(0.6, 24, 16), M.gold); fin.position.set(dc.x, inner.position.y + R + 1.2, dc.z); root.add(fin);
+    const lamp = new THREE.PointLight(0xffe2b0, 0.5, 14); lamp.position.set(dc.x, y0 + 5, dc.z); root.add(lamp);
+  }
   box(16, 0.4, 56, 845, y0 - 0.1, zc, M.marble, {floor: true, collide: false, T: 4});
   box(0.8, 1.05, 56, 837.4, y0, zc, M.stone, {});            // parapet facing pond
   box(16, 1.05, 0.8, 845, y0, zc - 28, M.stone, {}); box(16, 1.05, 0.8, 845, y0, zc + 28, M.stone, {});
