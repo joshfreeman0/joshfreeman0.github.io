@@ -13,6 +13,7 @@
 <script src="w3d/world.js?v=9"></script>
 <script src="w3d/rooms.js?v=4"></script>
 <script src="w3d/bank.js?v=2"></script>
+<script src="w3d/showcase.js?v=1"></script>
 <script src="w3d/wildlife.js?v=2"></script>
 <script src="w3d/streets.js?v=5"></script>
 <script>
@@ -74,7 +75,8 @@ body{margin:0;font-family:system-ui,sans-serif}
     <a-plane class="btn" data-w="propulsion" position="0.84 0 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Propulsion hall" align="center" color="#111" width="1.9"></a-text></a-plane>
     <a-plane class="btn" data-w="ufo" position="1.68 0 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="UFO room" align="center" color="#111" width="1.9"></a-text></a-plane>
     <a-plane class="btn" data-w="pond" position="2.52 0 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Fly over pond" align="center" color="#111" width="1.9"></a-text></a-plane>
-    <a-plane class="btn" data-w="vault" position="-2.1 -0.4 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Bank vault" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-w="vault" position="-2.55 -0.4 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Bank vault" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-w="showcase" position="-1.7 -0.4 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Wampum showcase" align="center" color="#111" width="1.9"></a-text></a-plane>
     <a-plane class="btn" data-speed="1" position="-0.75 -0.4 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text class="speed-label" value="Speed: Slow" align="center" color="#111" width="1.9"></a-text></a-plane>
     <a-plane class="btn" data-reload="1" position="0.75 -0.4 0" width="1.4" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Reload world" align="center" color="#111" width="2.4"></a-text></a-plane>
     <a-plane class="btn" fly-toggle position="2.1 -0.4 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text id="flylabel" value="Fly: OFF" align="center" color="#111" width="1.9"></a-text></a-plane>
@@ -88,6 +90,7 @@ body{margin:0;font-family:system-ui,sans-serif}
   <button data-w="terrace" class="on">Bank terrace</button>
   <button data-w="hall">Banking hall</button>
   <button data-w="vault">Bank vault</button>
+  <button data-w="showcase">Wampum World showcase</button>
   <button data-w="office">Josh's office</button>
   <button data-w="conservatory">Conservatory</button>
   <button data-w="propulsion">Propulsion hall</button>
