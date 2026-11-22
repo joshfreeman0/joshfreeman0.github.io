@@ -41,6 +41,7 @@ function groundAt(x, z, y) {
   let g = terrainH(x, z);
   const P = W3D.water && W3D.water.pond; if (P && g < WATER - 0.2 && x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1) g = WATER - 0.2; // walk on the pond surface rather than its bed
   const t0 = g; let u = null; // floors flagged under:true are below the terrain (bank vault) and only count when you are below ground
+  if (PARK && Math.abs(x - PARK.P.cx) < PARK.P.ax + 60 && Math.abs(z - PARK.P.cz) < PARK.P.az + 60) { const s = PARK.surf(x, z); if (s !== null && s > g) g = s; }
   for (const f of floors) if (x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1 && f.y <= y + 0.65) { if (f.under) { if (y < t0 - 1 && (u === null || f.y > u)) u = f.y; } else if (f.y > g) g = f.y; }
   if (u !== null) g = u;
   return g;
@@ -325,16 +326,16 @@ W3D.build = function (scene3, sceneEl) {
   const need = r => { if (!r.ok) throw new Error(r.url.replace(/^.*\//, '').replace(/\?.*/, '') + ' HTTP ' + r.status); return r; };
   W3D.status('Loading terrain data 0/5...');
   return Promise.all([
-    fetch(BASE + 'terrain_t.u16?v=1').then(need).then(r => r.arrayBuffer()).then(step),
-    fetch(BASE + 'trees_t2.f32?v=1').then(need).then(r => r.arrayBuffer()).then(step),
-    fetch(BASE + 'water_t.json?v=2').then(need).then(r => r.json()).then(step),
+    fetch(BASE + 'terrain_t3.u16?v=1').then(need).then(r => r.arrayBuffer()).then(step),
+    fetch(BASE + 'trees_t4.f32?v=1').then(need).then(r => r.arrayBuffer()).then(step),
+    fetch(BASE + 'water_t.json?v=3').then(need).then(r => r.json()).then(step),
     fetch(BASE + 'ring_mid.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step),
     fetch(BASE + 'ring_far.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step)
   ]).then(([hb, tb, wj, rmid, rfar]) => {
     W3D.status('Building the world (terrain, bank, rooms)...');
     if (rmid) RINGS.mid.h = new Int16Array(rmid); if (rfar) RINGS.far.h = new Int16Array(rfar);
     const u = new Uint16Array(hb); heights = new Float32Array(u.length); for (let i = 0; i < u.length; i++) heights[i] = u[i] * 0.01 - 10;
-    W3D.water = wj; carveRail(wj.rail); buildTerrain(); buildWater(wj); buildRivers(wj); buildTrees(new Float32Array(tb)); buildRail(wj.rail); buildPark(wj.park);
+    W3D.water = wj; carveRail(wj.rail); parkSetup(wj.park); buildTerrain(); buildWater(wj); buildRivers(wj); buildFootbridge(wj.footbridge); buildTrees(new Float32Array(tb)); buildRail(wj.rail); buildPark(wj.park);
     buildBank(); buildOffice(); buildConservatory(); buildSigns();
     if (W3D.buildRooms) try { W3D.buildRooms(root); } catch (e) { console.warn('exhibit rooms failed', e); }
     if (W3D.buildBankPlus) try { W3D.buildBankPlus(root); } catch (e) { console.warn('bank upgrade failed', e); }
@@ -348,9 +349,9 @@ function buildTerrain() {
   const geo = new THREE.PlaneGeometry(SIZE, SIZE, N - 1, N - 1); geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, heights[i]);
   geo.computeVertexNormals();
-  const t = new THREE.TextureLoader().load(BASE + (LITE ? 'ortho_t_lite.jpg?v=2' : 'ortho_t.jpg?v=1')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = LITE ? 4 : 16;
+  const t = new THREE.TextureLoader().load(BASE + (LITE ? 'ortho_t_lite.jpg?v=3' : 'ortho_t.jpg?v=2')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = LITE ? 4 : 16;
   // sharper ground near the compound and pond: 0.5 m/px USGS tile (x -324..1724, z -1249..799) + fine detail texture that fades in within ~200 m
-  const hi = LITE ? t : new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=1'); hi.colorSpace = THREE.SRGBColorSpace; if (!LITE) hi.anisotropy = 16;   // lite: no 0.5 m tile (hiRect moved off the map)
+  const hi = LITE ? t : new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=2'); hi.colorSpace = THREE.SRGBColorSpace; if (!LITE) hi.anisotropy = 16;   // lite: no 0.5 m tile (hiRect moved off the map)
   const det = detailTex(), grs = grassTex();
   const tm = new THREE.MeshLambertMaterial({map: t});
   tm.onBeforeCompile = sh => {
@@ -403,7 +404,7 @@ function buildRings() {
 }
 function buildWater(J) { // Fowling Pond (restored) inside the real pond bed (OSM Pine Swamp); the soft mask gives a smooth natural shoreline
   const P = J.pond, x0 = P.x0, x1 = P.x1, z0 = P.z0, z1 = P.z1, w = x1 - x0, d = z1 - z0;
-  const am = new THREE.TextureLoader().load(BASE + 'pondmask_t.png?v=1'); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
+  const am = new THREE.TextureLoader().load(BASE + 'pondmask_t3.png?v=1'); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d, 8, 4), waterMat(am)); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, WATER, (z0 + z1) / 2); m.receiveShadow = true; root.add(m);
 }
 /* Smooth river banks: the 10.7 m terrain grid makes the waterline stair-step, so each side gets a thin ground-textured strip that
@@ -411,7 +412,7 @@ function buildWater(J) { // Fowling Pond (restored) inside the real pond bed (OS
 function riverBanks(R, hw) {
   const tm0 = W3D._terrainMat; if (!tm0) return;
   const bm = new THREE.MeshLambertMaterial({map: tm0.map}); bm.onBeforeCompile = tm0.onBeforeCompile;
-  const P = R.pts, L = R.lev, OFF = [hw - 2.5, hw + 1.5, hw + 6, hw + 15], NR = OFF.length;
+  const P = R.pts, L = R.lev, OFF = [hw - 2.5, hw + 1.5, hw + 6, hw + 15], NR = OFF.length, CV = W3D.water && W3D.water.culvert;
   for (const sd of [-1, 1]) {
     const pos = [], uv = [], idx = []; let k = 0;
     for (let i = 0; i < P.length - 1; i++) {
@@ -424,6 +425,7 @@ function riverBanks(R, hw) {
         for (let r = 0; r < NR; r++) {
           const px = x + nx * OFF[r], pz = z + nz * OFF[r], g = terrainH(px, pz);
           let y = r === 0 ? Math.min(g, w - 0.4) : r === NR - 1 ? g + 0.3 : lift ? Math.max(g + 0.3, w + (r === 1 ? 0.3 : 0.25 + (outer - w) * 0.35)) : g + 0.3; // 30 cm clear of the ground mesh: no depth fight
+          if (CV && Math.hypot(px - CV.x, pz - CV.z) < 24) y = Math.min(y, g - 0.4);   // the shore road crosses here on the culvert: no bank strip over the road
           pos.push(px, y, pz); uv.push((px + HALF) / SIZE, 1 - (pz + HALF) / SIZE);
         }
         if (k) for (let r = 0; r < NR - 1; r++) { const a = (k - 1) * NR + r, b = k * NR + r; if (sd < 0) idx.push(a, b, a + 1, a + 1, b, b + 1); else idx.push(a, a + 1, b, a + 1, b + 1, b); } // counter-clockwise from above on both sides
@@ -470,6 +472,11 @@ function buildRivers(J) {
       R.pts.forEach((p, i) => { if (keep[i]) { P.push(p); L.push(R.lev[i]); } }); riverBanks({pts: P, lev: L}, R.hw || 7); }
   }
   (J.taunton || []).forEach((P, i) => ribbon(P, J.taunton_lev[i], 30, rm, 'taunton-river'));
+  // Pine Swamp Brook runs straight under the shore road into the pond through a stone culvert (a headwall each side of the road)
+  if (J.culvert) { const C = J.culvert, ry = Math.atan2(C.nx, C.nz);
+    for (const sd of [-1, 1]) { const x = C.x + C.nx * 11 * sd, z = C.z + C.nz * 11 * sd, gy = terrainH(x, z), g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry + (sd > 0 ? 0 : Math.PI);
+      const w = new THREE.Mesh(new THREE.BoxGeometry(9, 2.6, 0.8), M.stone); w.position.y = Math.max(gy, 15.2) + 0.2; g.add(w);
+      const mo = new THREE.Mesh(new THREE.CircleGeometry(1.1, 12, 0, Math.PI), new THREE.MeshBasicMaterial({color: 0x0c0c0a})); mo.position.set(0, w.position.y - 1.05, 0.42); g.add(mo); root.add(g); } }
   // King's dam spillway headwall (the real road over it comes from the streets layer)
   const D = J.dam; if (D) { const face = new THREE.Mesh(new THREE.BoxGeometry(D.w * 2.4, 3.2, 1.2), M.stone); face.position.set(D.x, K.level - 0.6, D.z + 2); face.castShadow = true; root.add(face); }
 }
@@ -506,54 +513,99 @@ function carveRail(R) {
 }
 /* Concept: the Route 24 / I-495 interchange (real OSM position) dug under a park, with a great pyramid at its centre.
    The park lawn drapes over the ground (hiding the highway ribbons), each carriageway enters a cut-and-cover portal at the park edge. */
+/* Pyramid park at Route 24 / I-495 (clip 17): one lawn deck ~8 m above the land on a gentle best-fit plane, a 40 m grass berm down to the
+   ground all round, and the highways run UNDER it (cut-and-cover) - each carriageway leaves through a portal in a notch in the berm.
+   The footprint (fp: deck edge per angle) is pulled back off the local roads and the real pond west of the interchange.
+   The mid-ring heights are cut below the deck/berm before the ring mesh is built, so no ground pokes through the lawn. */
+let PARK = null;
+function parkSetup(P) {
+  if (!P || !P.fp || !RINGS.mid.h) return;
+  const L = RINGS.mid, n = L.n, S = 2 * L.R / (n - 1), h0 = L.h.slice(), TAU = Math.PI * 2, NA = P.fp.length, BERM = P.berm || 40;
+  const fAt = a => { const t = (((a % TAU) + TAU) % TAU) / TAU * NA, i = Math.floor(t) % NA, j = (i + 1) % NA, fr = t - Math.floor(t); return P.fp[i] * (1 - fr) + P.fp[j] * fr; };
+  const polar = (x, z) => { const u = (x - P.cx) / P.ax, v = (z - P.cz) / P.az; return [Math.atan2(v, u), Math.hypot(u, v)]; };
+  const g0 = (x, z) => { const fx = (x + L.R) / S, fz = (z + L.R) / S, ix = Math.min(n - 2, Math.floor(fx)), iz = Math.min(n - 2, Math.floor(fz)), tx = fx - ix, tz = fz - iz;
+    const a = h0[iz * n + ix], b = h0[iz * n + ix + 1], c = h0[(iz + 1) * n + ix], d = h0[(iz + 1) * n + ix + 1]; return (tx + tz <= 1 ? a + (b - a) * tx + (c - a) * tz : d + (c - d) * (1 - tx) + (b - d) * (1 - tz)) / 10; };
+  // least-squares plane over the ring vertices inside the deck
+  let s = [0, 0, 0, 0, 0, 0, 0, 0, 0], cnt = 0; const A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], bv = [0, 0, 0];
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const x = -L.R + i * S, z = -L.R + j * S, [a, r] = polar(x, z); if (r >= fAt(a)) continue;
+    const row = [1, x - P.cx, z - P.cz], y = h0[j * n + i] / 10; for (let p = 0; p < 3; p++) { bv[p] += row[p] * y; for (let q = 0; q < 3; q++) A[p][q] += row[p] * row[q]; } cnt++; }
+  const det3 = m => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+  const D0 = det3(A), C = [0, 1, 2].map(k => det3(A.map((r, p) => r.map((v, q) => q === k ? bv[p] : v))) / D0);
+  const deckY = (x, z) => C[0] + C[1] * (x - P.cx) + C[2] * (z - P.cz) + 8;
+  const re = a => Math.hypot(Math.cos(a) * P.ax, Math.sin(a) * P.az);
+  const notch = (x, z) => { for (const [px, pz, yaw] of P.portals) { const dx = -Math.sin(yaw), dz = -Math.cos(yaw), rx = x - px, rz = z - pz, along = -(rx * dx + rz * dz), lat = Math.abs(rx * dz - rz * dx);
+    if (along > -2 && along < BERM + 30 && lat < 11) return true; } return false; };
+  const edge = a => { const f = fAt(a); return [P.cx + Math.cos(a) * P.ax * f, P.cz + Math.sin(a) * P.az * f]; };
+  const out = a => { const e = edge(a), dx = e[0] - P.cx, dz = e[1] - P.cz, l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; };
+  // surface height (deck or berm) or null when outside / in a highway notch
+  const surf = (x, z, raw) => { const [a, r] = polar(x, z), fe = fAt(a); if (r <= fe) return deckY(x, z);
+    const d = (r - fe) * re(a); if (d >= BERM || (!raw && notch(x, z))) return null;
+    const e = edge(a), o = out(a), D = deckY(e[0], e[1]), G = g0(e[0] + o[0] * BERM, e[1] + o[1] * BERM), t = d / BERM; return G + (D - G) * (0.5 + 0.5 * Math.cos(Math.PI * t)); };
+  const inDeck = (x, z, m) => { const [a, r] = polar(x, z); return r < fAt(a) - (m || 0) / re(a); };
+  let cut = 0;
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const x = -L.R + i * S, z = -L.R + j * S; if (Math.abs(x - P.cx) > P.ax + BERM + 70 || Math.abs(z - P.cz) > P.az + BERM + 70) continue;
+    const sy = surf(x, z); if (sy === null) continue; const lim = Math.round((sy - (inDeck(x, z) ? 1.5 : 0.8)) * 10); if (L.h[j * n + i] > lim) { L.h[j * n + i] = lim; cut++; } }
+  PARK = {P, fAt, polar, deckY, surf, inDeck, notch, edge, out, re, BERM, cut, plane: C};
+}
 function buildPark(P) {
-  if (!P) return;
-  const NA = 48, NR = 14, pos = [], uv = [], idx = [], hAt = (x, z) => terrainH(x, z) + 0.9;
-  for (let r = 0; r <= NR; r++) for (let i = 0; i < NA; i++) { const f = r / NR, a = i / NA * Math.PI * 2, x = P.cx + Math.cos(a) * P.ax * f, z = P.cz + Math.sin(a) * P.az * f; pos.push(x, hAt(x, z), z); uv.push(x / 12, z / 12); }
-  for (let r = 0; r < NR; r++) for (let i = 0; i < NA; i++) { const a = r * NA + i, b = r * NA + (i + 1) % NA, c = a + NA, d = b + NA; idx.push(a, b, c, b, d, c); } // counter-clockwise seen from above
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
-  const nr = g.attributes.normal; for (let i = 0; i < nr.count; i++) if (nr.getY(i) < 0) nr.setXYZ(i, -nr.getX(i), -nr.getY(i), -nr.getZ(i));
+  if (!P || !PARK) return;
+  const K = PARK, TAU = Math.PI * 2, NB = 384, NR = 18, BS = 6;
   const gcv = canvas(256, 256), gg = gcv.getContext('2d'); noiseFill(gg, 256, 256, '#5e8c3c', 0.16, 9000); const gt = tex(gcv);
-  const lawn = new THREE.Mesh(g, new THREE.MeshLambertMaterial({map: gt})); lawn.material.side = THREE.FrontSide; lawn.receiveShadow = true; lawn.name = 'pyramid-park'; root.add(lawn);
-  // edge berm so the lawn meets the surrounding ground without a visible lip
-  { const bp = [], bi = []; for (let i = 0; i <= NA; i++) { const a = i / NA * Math.PI * 2, x = P.cx + Math.cos(a) * P.ax, z = P.cz + Math.sin(a) * P.az, x2 = P.cx + Math.cos(a) * (P.ax + 25), z2 = P.cz + Math.sin(a) * (P.az + 25);
-      bp.push(x, hAt(x, z), z, x2, terrainH(x2, z2) - 0.3, z2); if (i) bi.push(2 * i - 2, 2 * i, 2 * i - 1, 2 * i - 1, 2 * i, 2 * i + 1); }
-    const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(bp, 3)); bg.setIndex(bi); bg.computeVertexNormals(); const bn = bg.attributes.normal; for (let i = 0; i < bn.count; i++) if (bn.getY(i) < 0) bn.setXYZ(i, -bn.getX(i), -bn.getY(i), -bn.getZ(i)); root.add(new THREE.Mesh(bg, new THREE.MeshLambertMaterial({map: gt, side: THREE.DoubleSide}))); }
-  // gravel promenade rings + two crossing walks
-  const path = new THREE.MeshLambertMaterial({color: 0xd9cba4});
+  const lawnM = new THREE.MeshLambertMaterial({map: gt});
+  const mesh = (pos, uv, idx, name, mat) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+    const nr = g.attributes.normal; for (let i = 0; i < nr.count; i++) if (nr.getY(i) < 0) nr.setXYZ(i, -nr.getX(i), -nr.getY(i), -nr.getZ(i)); const m = new THREE.Mesh(g, mat); m.name = name; m.receiveShadow = true; root.add(m); return m; };
+  { // deck: polar grid out to the footprint edge (a plane, so every triangle is flat - no blobs)
+    const pos = [], uv = [], idx = [];
+    for (let r = 0; r <= NR; r++) for (let i = 0; i < NB; i++) { const a = i / NB * TAU, f = r / NR, e = K.edge(a), x = P.cx + (e[0] - P.cx) * f, z = P.cz + (e[1] - P.cz) * f; pos.push(x, K.deckY(x, z), z); uv.push(x / 12, z / 12); }
+    for (let r = 0; r < NR; r++) for (let i = 0; i < NB; i++) { const a = r * NB + i, b = r * NB + (i + 1) % NB, c = a + NB, d = b + NB; idx.push(a, b, c, b, d, c); }
+    const m = mesh(pos, uv, idx, 'pyramid-park', lawnM); m.material.side = THREE.DoubleSide; }
+  { // berm: deck edge down to the ground; in a highway notch it drops under the ground so the cutting is open
+    const pos = [], uv = [], idx = [];
+    for (let i = 0; i < NB; i++) { const a = i / NB * TAU, e = K.edge(a), o = K.out(a);
+      for (let k = 0; k <= BS; k++) { const d = k / BS * K.BERM, x = e[0] + o[0] * d, z = e[1] + o[1] * d; let y = K.surf(x, z, true); if (k && K.notch(x, z)) y = terrainH(x, z) - 1.5; if (k === BS) y = Math.min(y, terrainH(x, z) - 0.4); pos.push(x, y, z); uv.push(x / 12, z / 12); } }
+    for (let i = 0; i < NB; i++) for (let k = 0; k < BS; k++) { const a = i * (BS + 1) + k, b = ((i + 1) % NB) * (BS + 1) + k; idx.push(a, b, a + 1, b, b + 1, a + 1); }   // wound to face up
+    mesh(pos, uv, idx, 'park-berm', new THREE.MeshLambertMaterial({map: gt, side: THREE.DoubleSide})); }
+  // cut-and-cover portals in the deck edge, one per carriageway, with retaining walls along the open cutting
+  const dark = new THREE.MeshBasicMaterial({color: 0x0a0a0a, side: THREE.DoubleSide});
+  for (const [x, z, a] of P.portals) { const gy = terrainH(x, z), D = K.deckY(x, z), hh = Math.max(4, D - gy + 1.2), g2 = new THREE.Group(); g2.position.set(x, gy, z); g2.rotation.y = a;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(22, hh, 2.5), M.stone); wall.position.set(0, hh / 2 - 1, 1.25); wall.castShadow = true; g2.add(wall);
+    const mouth = new THREE.Mesh(new THREE.PlaneGeometry(15, Math.min(6.6, hh - 1.8)), dark); mouth.position.set(0, Math.min(6.6, hh - 1.8) / 2, 2.6); g2.add(mouth);
+    for (const sx of [-1, 1]) { const wg = new THREE.BufferGeometry(), Lw = K.BERM + 4, w = 0.6, top0 = hh - 1, pts = [];
+      for (const [zz, yy] of [[2.5, top0], [2.5 + Lw, -0.5]]) for (const xx of [-w, w]) pts.push([sx * 11 + xx, yy, zz], [sx * 11 + xx, -1.5, zz]);
+      const v = [], I = [0, 1, 4, 1, 5, 4, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 3, 7, 5, 0, 2, 1, 1, 2, 3, 4, 5, 6, 5, 7, 6]; pts.forEach(p => v.push(...p));
+      wg.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); wg.setIndex(I); wg.computeVertexNormals(); const wm = new THREE.Mesh(wg, M.stone); wm.material.side = THREE.DoubleSide; g2.add(wm); }
+    root.add(g2); }
+  // gravel promenade rings + two crossing walks, on the deck
+  const path = new THREE.MeshLambertMaterial({color: 0xd9cba4, side: THREE.DoubleSide});
   const ribbonOn = (pts, w) => { const pp = [], ii = []; let k = 0; for (let i = 0; i < pts.length; i++) { const [x, z] = pts[i], [nx, nz] = pts[Math.min(pts.length - 1, i + 1)], [px, pz] = pts[Math.max(0, i - 1)]; let tx = nx - px, tz = nz - pz; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
-      for (const sd of [-1, 1]) { const qx = x - tz * w / 2 * sd, qz = z + tx * w / 2 * sd; pp.push(qx, hAt(qx, qz) + 0.12, qz); } if (k) ii.push(2 * k - 2, 2 * k - 1, 2 * k, 2 * k - 1, 2 * k + 1, 2 * k); k++; }
-    const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(pp, 3)); rg.setIndex(ii); rg.computeVertexNormals(); const m = new THREE.Mesh(rg, path); m.material.side = THREE.DoubleSide; root.add(m); };
-  for (const f of [0.42, 0.8]) { const ring = []; for (let i = 0; i <= 96; i++) { const a = i / 96 * Math.PI * 2; ring.push([P.cx + Math.cos(a) * P.ax * f, P.cz + Math.sin(a) * P.az * f]); } ribbonOn(ring, 6); }
-  for (const a of [0.6, 2.2]) { const line = []; for (let i = -40; i <= 40; i++) { const f = i / 40 * 0.97; line.push([P.cx + Math.cos(a) * P.ax * f, P.cz + Math.sin(a) * P.az * f]); } ribbonOn(line, 5); }
-  // the pyramid: 230 m base, 146 m tall like Khufu's, smooth white limestone casing and a gold capstone (a handful of triangles)
-  const [px, pz] = P.pyr, B = 115, Ht = 146, cap = 9; let y0 = 1e9; for (const [dx, dz] of [[-B, -B], [B, -B], [-B, B], [B, B], [0, 0]]) y0 = Math.min(y0, terrainH(px + dx, pz + dz)); y0 -= 2;
+      for (const sd of [-1, 1]) { const qx = x - tz * w / 2 * sd, qz = z + tx * w / 2 * sd; pp.push(qx, K.deckY(qx, qz) + 0.3, qz); } if (k) ii.push(2 * k - 2, 2 * k - 1, 2 * k, 2 * k - 1, 2 * k + 1, 2 * k); k++; }
+    const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(pp, 3)); rg.setIndex(ii); rg.computeVertexNormals(); root.add(new THREE.Mesh(rg, path)); };
+  for (const f of [0.42, 0.8]) { const ring = []; for (let i = 0; i <= 192; i++) { const a = i / 192 * TAU, e = K.edge(a); ring.push([P.cx + (e[0] - P.cx) * f, P.cz + (e[1] - P.cz) * f]); } ribbonOn(ring, 6); }
+  for (const a of [0.6, 2.2]) { const line = []; const e1 = K.edge(a), e2 = K.edge(a + Math.PI); for (let i = 0; i <= 80; i++) { const t = 0.03 + 0.94 * i / 80; line.push([e2[0] + (e1[0] - e2[0]) * t, e2[1] + (e1[1] - e2[1]) * t]); } ribbonOn(line, 5); }
+  // the pyramid: 230 m base, 146 m tall like Khufu's, white limestone casing, gold capstone that continues the faces to the apex
+  const [px, pz] = P.pyr, B = 115, Ht = 146, cap = 9; let y0 = 1e9; for (const [dx, dz] of [[-B, -B], [B, -B], [-B, B], [B, B]]) y0 = Math.min(y0, K.deckY(px + dx, pz + dz)); y0 -= 0.3;
   const c = canvas(512, 512), gc = c.getContext('2d'); noiseFill(gc, 512, 512, '#cdbb94', 0.07, 30000); gc.strokeStyle = 'rgba(150,130,95,0.25)'; for (let y = 0; y < 512; y += 16) { gc.beginPath(); gc.moveTo(0, y); gc.lineTo(512, y); gc.stroke(); }
   const lt = tex(c); lt.repeat.set(10, 10);
   const capB = B * cap / Ht, pg = new THREE.CylinderGeometry(capB * Math.SQRT2, B * Math.SQRT2, Ht - cap, 4, 1, true); pg.rotateY(Math.PI / 4); pg.translate(0, (Ht - cap) / 2, 0);
   const pyr = new THREE.Mesh(pg, new THREE.MeshStandardMaterial({map: lt, roughness: 0.85, flatShading: true, envMapIntensity: 0.4})); pyr.position.set(px, y0, pz); pyr.castShadow = true; pyr.receiveShadow = true; pyr.name = 'pyramid'; root.add(pyr);
-  const cg = new THREE.ConeGeometry(capB * Math.SQRT2, cap, 4, 1, false);   // gold capstone continues the same slope to the apex cg.rotateY(Math.PI / 4); cg.translate(0, cap / 2, 0);
-  const capM = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({color: 0xd4a640, metalness: 1, roughness: 0.25, envMap: W3D.env || null, flatShading: true})); capM.position.set(px, y0 + Ht - cap, pz); root.add(capM);
+  const cg = new THREE.ConeGeometry(capB * Math.SQRT2, cap, 4, 1, false); cg.rotateY(Math.PI / 4); cg.translate(0, cap / 2, 0);   // square pyramidion, same slope as the faces
+  const capM = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({color: 0xd4a640, metalness: 1, roughness: 0.25, envMap: W3D.env || null, flatShading: true})); capM.position.set(px, y0 + Ht - cap, pz); capM.name = 'pyramid-cap'; root.add(capM);
   walls.push({x0: px - B * 0.8, x1: px + B * 0.8, z0: pz - B * 0.8, z1: pz + B * 0.8, y0: y0, y1: y0 + Ht * 0.2});
-  // cut-and-cover portals where each carriageway dives under the park
-  for (const [x, z, a] of P.portals) { const gy = terrainH(x, z), g2 = new THREE.Group(); g2.position.set(x, gy, z); g2.rotation.y = a;
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(17, 9, 2.5), M.stone); wall.position.set(0, 2.5, 1.5); g2.add(wall);
-    const mouth = new THREE.Mesh(new THREE.PlaneGeometry(14, 6.4), new THREE.MeshBasicMaterial({color: 0x0a0a0a})); mouth.position.set(0, 3.2, 0.2); mouth.rotation.y = Math.PI; g2.add(mouth);
-    root.add(g2); }
-  // park trees: instanced rings and groves (shared lean tree geometry)
+  // park trees: groves on the deck (shared lean tree geometry)
   const pts = []; let sd = 7; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
-  for (let i = 0; i < 520; i++) { const a = rnd() * Math.PI * 2, f = 0.25 + 0.72 * Math.sqrt(rnd()), x = P.cx + Math.cos(a) * P.ax * f, z = P.cz + Math.sin(a) * P.az * f;
-    if (Math.max(Math.abs(x - px), Math.abs(z - pz)) < B + 25) continue; if (Math.abs(f - 0.42) < 0.02 || Math.abs(f - 0.8) < 0.02) continue; pts.push([x, hAt(x, z) - 0.9, z, 0.9 + rnd() * 0.5]); }
+  for (let i = 0; i < 620; i++) { const a = rnd() * TAU, f = 0.2 + 0.74 * Math.sqrt(rnd()), e = K.edge(a), x = P.cx + (e[0] - P.cx) * f, z = P.cz + (e[1] - P.cz) * f;
+    if (Math.max(Math.abs(x - px), Math.abs(z - pz)) < B + 25) continue; if (Math.abs(f - 0.42) < 0.02 || Math.abs(f - 0.8) < 0.02) continue; pts.push([x, K.deckY(x, z), z, 0.9 + rnd() * 0.5]); }
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3();
   const tg = new THREE.CylinderGeometry(0.25, 0.35, 4, 5, 1, true); tg.translate(0, 2, 0); const crg = new THREE.IcosahedronGeometry(3.8, 0); crg.scale(1, 0.85, 1); crg.translate(0, 6.5, 0);
   for (const [geo, mat] of [[tg, M.trunk], [crg, new THREE.MeshLambertMaterial({color: 0x5d8a34, flatShading: true})]]) { const im = new THREE.InstancedMesh(geo, mat, pts.length);
     pts.forEach((t, i) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * 2.4); sv.set(t[3], t[3], t[3]); pv.set(t[0], t[1] - 0.3, t[2]); m4.compose(pv, q, sv); im.setMatrixAt(i, m4); }); root.add(im); }
-  W3D.parkInfo = {x: px, z: pz, y: y0, trees: pts.length};
+  W3D.parkInfo = {x: px, z: pz, y: y0, trees: pts.length, cut: K.cut, plane: K.plane.map(v => +v.toFixed(4))};
 }
-/* The highways are "underground" in the park: once the streets layer has built its ribbons / bridge decks / labels, drop the pieces inside the park. */
+W3D.parkSurf = (x, z) => PARK ? PARK.surf(x, z) : null;
+/* The highways are underground in the park: once the streets layer has built its ribbons / bridge decks / labels, drop the pieces over the deck. */
 function clipStreetsToPark() {
-  const P = W3D.water && W3D.water.park; if (!P || !W3D.root) return false;
-  const inside = (x, z) => ((x - P.cx) / (P.ax - 4)) ** 2 + ((z - P.cz) / (P.az - 4)) ** 2 < 1; let found = false;
+  if (!PARK || !W3D.root) return false;
+  const inside = (x, z) => PARK.inDeck(x, z, 2); let found = false;
   W3D.root.traverse(o => {
     if (o.isMesh && (o.name === 'road-ribbons' || o.name === 'bridge-decks') && !o.userData.parkClipped) { found = true; o.userData.parkClipped = 1;
       const g = o.geometry, p = g.attributes.position, ix = g.index; if (!ix) return; const a = ix.array, keep = [];
@@ -566,6 +618,32 @@ function clipStreetsToPark() {
 }
 W3D.clipStreetsToPark = clipStreetsToPark;
 { let tries = 0; const iv = setInterval(() => { if (window.W3D_READY && (clipStreetsToPark() || ++tries > 120)) { if (tries <= 120) setTimeout(clipStreetsToPark, 3000); clearInterval(iv); } }, 1000); }
+/* Timber footbridge from behind Town Hall (558 South Main St) across the river to the field: gentle arch, railings, walkable deck */
+function buildFootbridge(F) {
+  if (!F) return;
+  const [ax, az] = F.a, [bx, bz] = F.b, L = Math.hypot(bx - ax, bz - az), tx = (bx - ax) / L, tz = (bz - az) / L, W = F.w || 3, NS = Math.ceil(L / 2), yaw = Math.atan2(tx, tz);
+  const yA = terrainH(ax, az) + 0.25, yB = terrainH(bx, bz) + 0.25, rise = F.rise || 1.8, yAt = t => yA + (yB - yA) * t + rise * Math.sin(Math.PI * t);
+  const wood = new THREE.MeshLambertMaterial({color: 0x8a6a45}), dark = new THREE.MeshLambertMaterial({color: 0x5e4630});
+  const deck = new THREE.InstancedMesh(new THREE.BoxGeometry(W, 0.22, L / NS + 0.05), wood, NS), rail = new THREE.InstancedMesh(new THREE.BoxGeometry(0.12, 0.12, L / NS + 0.05), dark, NS * 2), post = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 1.1, 0.14), dark, (NS + 1) * 2);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+  let y0 = 1e9, y1 = -1e9;
+  for (let i = 0; i < NS; i++) { const t0 = i / NS, t1 = (i + 1) / NS, tm = (t0 + t1) / 2, ya = yAt(t0), yb = yAt(t1), ym = (ya + yb) / 2, x = ax + tx * L * tm, z = az + tz * L * tm;
+    e.set(-Math.atan2(yb - ya, L / NS), yaw, 0, 'YXZ'); q.setFromEuler(e); p.set(x, ym - 0.11, z); m4.compose(p, q, one); deck.setMatrixAt(i, m4);
+    for (const sd of [0, 1]) { const ox = -tz * (W / 2 - 0.1) * (sd ? 1 : -1), oz = tx * (W / 2 - 0.1) * (sd ? 1 : -1); p.set(x + ox, ym + 1.0, z + oz); m4.compose(p, q, one); rail.setMatrixAt(i * 2 + sd, m4); }
+    const xa = ax + tx * L * t0, za = az + tz * L * t0, xb = ax + tx * L * t1, zb = az + tz * L * t1, hw = W / 2;
+    floors.push({x0: Math.min(xa, xb) - Math.abs(tz) * hw - 0.05, x1: Math.max(xa, xb) + Math.abs(tz) * hw + 0.05, z0: Math.min(za, zb) - Math.abs(tx) * hw - 0.05, z1: Math.max(za, zb) + Math.abs(tx) * hw + 0.05, y: Math.max(ya, yb)});
+    y0 = Math.min(y0, ya); y1 = Math.max(y1, yb, ya); }
+  for (let i = 0; i <= NS; i++) { const t = i / NS, x = ax + tx * L * t, z = az + tz * L * t, y = yAt(t);
+    for (const sd of [0, 1]) { const ox = -tz * (W / 2 - 0.1) * (sd ? 1 : -1), oz = tx * (W / 2 - 0.1) * (sd ? 1 : -1); p.set(x + ox, y + 0.5, z + oz); m4.compose(p, new THREE.Quaternion(), one); post.setMatrixAt(i * 2 + sd, m4); } }
+  [deck, rail, post].forEach(m => { m.castShadow = true; m.receiveShadow = true; root.add(m); }); deck.name = 'footbridge';
+  // railings block walking off the sides (thin walls along each edge, the full length)
+  for (const sd of [-1, 1]) { const ox = -tz * (W / 2 + 0.05) * sd, oz = tx * (W / 2 + 0.05) * sd;
+    walls.push({x0: Math.min(ax, bx) + ox - (Math.abs(tz) > 0.5 ? 0.1 : 0) + (Math.abs(tx) > 0.5 ? 1.5 : 0), x1: Math.max(ax, bx) + ox + (Math.abs(tz) > 0.5 ? 0.1 : 0) - (Math.abs(tx) > 0.5 ? 1.5 : 0),
+      z0: Math.min(az, bz) + oz - (Math.abs(tx) > 0.5 ? 0.1 : 0) + (Math.abs(tz) > 0.5 ? 1.5 : 0), z1: Math.max(az, bz) + oz + (Math.abs(tx) > 0.5 ? 0.1 : 0) - (Math.abs(tz) > 0.5 ? 1.5 : 0), y0: y0 - 0.3, y1: y1 + 1.2}); }
+  // stone abutments at each end
+  for (const [x, z, y] of [[ax, az, yA], [bx, bz, yB]]) { const s = new THREE.Mesh(new THREE.BoxGeometry(W + 1.2, 1.2, 2.2), M.stone); s.position.set(x, y - 0.7, z); s.rotation.y = yaw; root.add(s); }
+  W3D.footbridge = {a: F.a, b: F.b, yA, yB, top: yAt(0.5)};
+}
 function buildRail(R) { // real alignment (OSM: old rail line / South Coast Rail route); it passes under the restored pond in a tunnel with a portal at each shore
   if (!R) return;
   const [pN, pS] = R.portals;

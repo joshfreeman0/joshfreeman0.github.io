@@ -25,6 +25,7 @@ function tex(name) {
 const RW = [5, 6.5, 8, 10];
 function toWorld(lat, lon) { return [(lon - geo.lon0) * geo.kx, (geo.lat0 - lat) * geo.ky]; } // geo.json frame: +x east, +z south
 function gh(x, z) { return W3D.terrainH(x, z); }
+function underPond(x, z) { const P = W3D.water && W3D.water.pond; return !!P && x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 && gh(x, z) < 13.5; }
 const EXT = () => 6140;
 function roadTex() {
   const c = document.createElement('canvas'); c.width = 64; c.height = 8; const g = c.getContext('2d');
@@ -54,10 +55,11 @@ function project() {
       const a = P[i], b = P[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = br ? 1 : Math.max(1, Math.ceil(L / STEP));
       for (let k = (i ? 1 : 0); k <= n; k++) D.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
     }
-    // split where outside the world or deep underwater (non-bridge)
+    // split where outside the world or under the restored pond (non-bridge). Low valley ground (the Forge / Taunton river towns sit at 4-9 m) is NOT water,
+    // so roads there stay continuous (an old 'gh > 9' test cut them into dashes)
     let cur = [];
     const flush = () => { if (cur.length > 1) R.push({cls, nm, br, p: cur}); cur = []; };
-    for (const p of D) { if (Math.abs(p[0]) < E && Math.abs(p[1]) < E && (br || gh(p[0], p[1]) > 9)) cur.push(p); else flush(); }
+    for (const p of D) { if (Math.abs(p[0]) < E && Math.abs(p[1]) < E && (br || !underPond(p[0], p[1]))) cur.push(p); else flush(); }
     flush();
   }
   // labels sit on the drawn ribbons only (not bridges), every ~200 m, one per street per 130 m
@@ -90,7 +92,10 @@ function buildRoads() {
       if (k) run += Math.hypot(x - P[k - 1][0], z - P[k - 1][1]);
       let yl, yr;
       if (r.br) { const y = Math.max(y0 + (y1 - y0) * (tot ? run / tot : 0), 0) + 0.7 + LIFT; yl = yr = y; }
-      else { yl = gh(x + px, z + pz) + LIFT; yr = gh(x - px, z - pz) + LIFT; }
+      else { // never below the ground anywhere across the carriageway or 5 m either way along it (a 10 m terrain grid otherwise pokes through and the road looks broken)
+        const hs = (ox, oz) => Math.max(gh(x + ox, z + oz), gh(x + ox + dx * 5, z + oz + dz * 5), gh(x + ox - dx * 5, z + oz - dz * 5));
+        const hc = hs(0, 0); yl = Math.max(hs(px, pz), hc - 0.3) + LIFT; yr = Math.max(hs(-px, -pz), hc - 0.3) + LIFT;
+        const C = W3D.water && W3D.water.culvert; if (C && Math.hypot(x - C.x, z - C.z) < 18) { yl = Math.max(yl, 17.3 + LIFT); yr = Math.max(yr, 17.3 + LIFT); } }
       const i0 = pos.length / 3; pos.push(x + px, yl, z + pz, x - px, yr, z - pz); uv.push(0, 0, 1, 0);
       if (prev >= 0) idx.push(prev, prev + 1, i0, i0, prev + 1, i0 + 1);
       prev = i0;
@@ -131,7 +136,7 @@ function buildWaterMask() {
   const d = g.getImageData(0, 0, WN, WN).data; WM = new Uint8Array(WN * WN); for (let i = 0; i < WM.length; i++) WM[i] = d[i * 4] > 127 ? 1 : 0;
 }
 function inWater(x, z) {
-  if (Math.abs(x) < 2040 && Math.abs(z) < 2040 && gh(x, z) < 16.3) return true; // restored-pond bed in the core
+  { const P = W3D.water && W3D.water.pond; if (P && x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 && gh(x, z) < 16.3) return true; } // restored-pond bed (low valley ground elsewhere keeps its trees)
   if (!WM || Math.abs(x) >= WR || Math.abs(z) >= WR) return false;
   return WM[Math.floor((z + WR) / (2 * WR) * WN) * WN + Math.floor((x + WR) / (2 * WR) * WN)] === 1;
 }
@@ -221,7 +226,7 @@ AFRAME.registerSystem('w3d-streets', {
   tick(time, dt) {
     if (!window.W3D || !W3D.root || !window.W3D_READY) return;
     if (!data) { if (!loading) { loading = true;
-      Promise.all([fetch('/vr/w3d/streets.json?v=6').then(r => r.json()), fetch('/vr/w3d/geo.json?v=1').then(r => r.json())])
+      Promise.all([fetch('/vr/w3d/streets.json?v=7').then(r => r.json()), fetch('/vr/w3d/geo.json?v=1').then(r => r.json())])
         .then(([j, g]) => { geo = g; data = j; }).catch(e => console.warn('street labels unavailable', e)); } return; }
     const cam = this.el.camera; if (!cam) return;
     if (!ready) { try { init(); } catch (e) { console.warn('street labels failed', e); data = null; loading = true; } return; }
