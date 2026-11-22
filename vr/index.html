@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/vr/icon-192.png">
 <meta name="theme-color" content="#c9a24a">
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script src="locomotion.js?v=11"></script>
+<script src="locomotion.js?v=12"></script>
 <script src="hd.js?v=3"></script>
 <script src="w3d/world.js?v=3"></script>
 <script src="w3d/rooms.js?v=1"></script>
@@ -76,13 +76,14 @@ body{margin:0;font-family:system-ui,sans-serif}
     <a-plane class="btn" data-t="greenhouse" position="1.0 -0.62 0" width="0.9" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Conserv. 360" align="center" color="#111" width="2"></a-text></a-plane>
     <a-plane class="btn" data-t="office" position="2.0 -0.62 0" width="0.9" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Office 360" align="center" color="#111" width="2"></a-text></a-plane>
     <a-plane class="btn" data-back="1" position="-0.75 -1.0 0" width="1.4" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Back to 3D world" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-speed="1" position="-2.3 -1.0 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text class="speed-label" value="Speed: Slow" align="center" color="#111" width="1.9"></a-text></a-plane>
     <a-plane class="btn" data-reload="1" position="0.75 -1.0 0" width="1.4" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Reload world" align="center" color="#111" width="2.4"></a-text></a-plane>
   </a-entity>
 </a-scene>
 <button id="uitog">Show menu</button>
 <div id="load">Building Josh's 3D world (USGS terrain + imagery)...</div>
 <div id="ui">
-  <div class="tools"><button id="hidebtn">Hide menu</button><button id="helpbtn">Help / credits</button></div>
+  <div class="tools"><button id="hidebtn">Hide menu</button><button id="helpbtn">Help / credits</button><button id="speedbtn" data-speed="1" class="speed-label">Speed: Slow</button></div>
   <div class="grp"><span class="sec">3D world:</span>
   <button data-w="terrace" class="on">Bank terrace</button>
   <button data-w="hall">Banking hall</button>
@@ -108,7 +109,7 @@ function worldLimits(on){
   if (on) { JFVR.flyRadius = 2100; JFVR.flyMaxY = 600; JFVR.groundAt = W3D.groundAt; }
   else { JFVR.flyRadius = 400; JFVR.flyMaxY = 400; JFVR.groundAt = null; }
 }
-function bringMenu(){ if (bar.object3D.visible && JFVR.placeInFront) setTimeout(() => JFVR.placeInFront(bar, 2.2, -1.0), 50); }
+function bringMenu(){ if (bar.object3D.visible && JFVR.placeInFront) setTimeout(() => JFVR.placeInFront(bar, 2.4, 0.4), 50); }
 function goWorld(spot){
   if (!W3D.root) return;
   mode = 'world'; W3D.active = true; W3D.root.visible = true; worldLimits(true);
@@ -130,11 +131,13 @@ function wire(el){
     if (el.dataset.w) goWorld(el.dataset.w);
     else if (el.dataset.t) show(el.dataset.t);
     else if (el.dataset.back) goWorld('terrace');
+    else if (el.dataset.speed) JFVR.cycleSpeed();
     else if (el.dataset.reload) { const u = new URL(location.href); u.searchParams.set('r', Date.now()); location.replace(u.toString()); }
   });
 }
 document.querySelectorAll('#ui button, #vrbar .btn').forEach(wire);
-scn.addEventListener('enter-vr', () => { bar.setAttribute('visible', true); setTimeout(() => JFVR.placeInFront && JFVR.placeInFront(bar, 2.2, -1.0), 300); });
+document.querySelectorAll('.speed-label').forEach(e => e.tagName === 'A-TEXT' ? e.setAttribute('value', JFVR.speedLabel()) : (e.textContent = JFVR.speedLabel()));
+scn.addEventListener('enter-vr', () => { bar.setAttribute('visible', true); setTimeout(() => JFVR.placeInFront && JFVR.placeInFront(bar, 2.4, 0.4), 300); });
 scn.addEventListener('exit-vr', () => bar.setAttribute('visible', false));
 function start(){
   W3D.build(scn.object3D, scn).then(() => { document.querySelector('#load').remove(); goWorld('terrace'); window.W3D_READY = true; })

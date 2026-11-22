@@ -22,7 +22,7 @@ AFRAME.registerComponent('thumbstick-move', {
       const q = cam.object3D.getWorldQuaternion(new THREE.Quaternion());
       const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q), r = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
       const mag = Math.min(1, Math.hypot(x, y) || Math.abs(up));
-      const p = rig.object3D.position, s = (40 + Math.max(p.y, 0) * 1.0) * (boost ? 15 : 1) * (0.3 + 0.7 * mag) * dt / 1000;
+      const p = rig.object3D.position, s = (40 + Math.max(p.y, 0) * 1.0) * (boost ? 15 : 1) * (0.3 + 0.7 * mag) * JFVR.speedMul() * dt / 1000;
       p.addScaledVector(f, -y * s).addScaledVector(r, x * s);
       if (Math.abs(up) >= 0.2) p.y += -up * s;
       p.y = Math.min(Math.max(p.y, JFVR.groundAt ? JFVR.groundAt(p.x, p.z, p.y) + 0.3 : 0), JFVR.flyMaxY || 400);
@@ -35,7 +35,7 @@ AFRAME.registerComponent('thumbstick-move', {
     const yaw = new THREE.Euler().setFromQuaternion(cam.object3D.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y;
     const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
     const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-    const step = this.data.speed * dt / 1000;
+    const step = this.data.speed * Math.max(0.4, JFVR.speedMul()) * dt / 1000;
     rig.object3D.position.addScaledVector(fwd, -y * step).addScaledVector(right, x * step);
   }
 });
@@ -144,4 +144,15 @@ JFVR.placeInFront = function (m, dist, dy) {
   const yaw = new THREE.Euler().setFromQuaternion(cam.object3D.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y;
   m.object3D.position.set(pos.x - Math.sin(yaw) * dist, pos.y + dy, pos.z - Math.cos(yaw) * dist);
   m.object3D.rotation.set(THREE.MathUtils.degToRad(-8), yaw, 0, 'YXZ');
+};
+
+// movement speed setting (menu Speed button cycles it; remembered on this device)
+JFVR.SPEEDS = [['Very slow', 0.1], ['Slow', 0.25], ['Medium', 0.5], ['Fast', 1]];
+JFVR.speedIdx = (function () { const v = parseInt(localStorage.getItem('jfvr_speed'), 10); return isNaN(v) ? 1 : Math.min(Math.max(v, 0), 3); })();
+JFVR.speedMul = function () { return JFVR.SPEEDS[JFVR.speedIdx][1]; };
+JFVR.speedLabel = function () { return 'Speed: ' + JFVR.SPEEDS[JFVR.speedIdx][0]; };
+JFVR.cycleSpeed = function () {
+  JFVR.speedIdx = (JFVR.speedIdx + 1) % JFVR.SPEEDS.length; localStorage.setItem('jfvr_speed', JFVR.speedIdx);
+  document.querySelectorAll('.speed-label').forEach(e => e.tagName === 'A-TEXT' ? e.setAttribute('value', JFVR.speedLabel()) : (e.textContent = JFVR.speedLabel()));
+  JFVR.hud && JFVR.hud(JFVR.speedLabel());
 };
