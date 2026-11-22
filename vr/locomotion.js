@@ -115,11 +115,11 @@ AFRAME.registerComponent('menu-toggle', {
       const cp = cam.object3D.getWorldPosition(new THREE.Vector3()), bp = bar.object3D.getWorldPosition(new THREE.Vector3());
       const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.object3D.getWorldQuaternion(new THREE.Quaternion()));
       const to = bp.clone().sub(cp); const far = to.length() > 4 || to.normalize().dot(dir) < 0.5;
-      if (far) { JFVR.placeInFront(bar, 2.2, -1.0); JFVR.hud('Menu moved to you'); return; }
+      if (far) { JFVR.placeInFront(bar, 2.4, 0.4); JFVR.hud('Menu moved to you'); return; }
     }
     els.forEach(m => {
       m.setAttribute('visible', show); m.object3D.visible = show;
-      if (show && m.id === 'vrbar') JFVR.placeInFront(m, 2.2, -1.0);
+      if (show && m.id === 'vrbar') JFVR.placeInFront(m, 2.4, 0.4);
       [m, ...m.querySelectorAll('*')].forEach(c => {
         if (show) { if (c.dataset.cls) { c.classList.add(c.dataset.cls); delete c.dataset.cls; } }
         else ['btn', 'world'].forEach(k => { if (c.classList && c.classList.contains(k)) { c.dataset.cls = k; c.classList.remove(k); } });
@@ -143,5 +143,5 @@ JFVR.placeInFront = function (m, dist, dy) {
   const pos = cam.object3D.getWorldPosition(new THREE.Vector3());
   const yaw = new THREE.Euler().setFromQuaternion(cam.object3D.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y;
   m.object3D.position.set(pos.x - Math.sin(yaw) * dist, pos.y + dy, pos.z - Math.cos(yaw) * dist);
-  m.object3D.rotation.set(THREE.MathUtils.degToRad(-25), yaw, 0, 'YXZ');
+  m.object3D.rotation.set(THREE.MathUtils.degToRad(-8), yaw, 0, 'YXZ');
 };
