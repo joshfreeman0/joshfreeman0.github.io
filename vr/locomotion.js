@@ -12,18 +12,23 @@ AFRAME.registerComponent('thumbstick-move', {
     const rig = this.data.rig, cam = rig && rig.querySelector('[camera]');
     if (!rig || !cam || !dt) return;
     let {x, y} = this.axes;
+    const gp = JFVR.leftPad && JFVR.leftPad(this.el);
+    if (gp && gp.axes && gp.axes.length >= 4 && (Math.abs(gp.axes[2]) > 0.15 || Math.abs(gp.axes[3]) > 0.15)) { x = gp.axes[2]; y = gp.axes[3]; }
     if (Math.abs(x) < 0.15) x = 0; if (Math.abs(y) < 0.15) y = 0;
     const fly = window.JFVR && JFVR.fly, up = (window.JFVR && JFVR.upAxis) || 0;
+    const boost = gp && ((gp.buttons[0] && gp.buttons[0].value > 0.5) || (gp.buttons[1] && gp.buttons[1].value > 0.5));
     if (fly) {
       if (!x && !y && Math.abs(up) < 0.2) return;
       const q = cam.object3D.getWorldQuaternion(new THREE.Quaternion());
       const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q), r = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
-      const p = rig.object3D.position, s = (8 + Math.max(p.y, 0) * 0.5) * dt / 1000;
+      const mag = Math.min(1, Math.hypot(x, y) || Math.abs(up));
+      const p = rig.object3D.position, s = (12 + Math.max(p.y, 0) * 0.5) * (boost ? 8 : 1) * (0.3 + 0.7 * mag) * dt / 1000;
       p.addScaledVector(f, -y * s).addScaledVector(r, x * s);
       if (Math.abs(up) >= 0.2) p.y += -up * s;
-      p.y = Math.min(Math.max(p.y, 0), 500);
+      p.y = Math.min(Math.max(p.y, 0), 400);
+      const hr = Math.hypot(p.x, p.z); if (hr > 400) { p.x *= 400 / hr; p.z *= 400 / hr; }
       JFVR._alt = (JFVR._alt || 0) + dt;
-      if (JFVR._alt > 500) { JFVR._alt = 0; JFVR.hud('Flying - height ' + Math.round(p.y) + ' m'); }
+      if (JFVR._alt > 500) { JFVR._alt = 0; JFVR.hud((boost ? 'BOOST - ' : 'Flying - ') + 'height ' + Math.round(p.y) + ' m'); }
       return;
     }
     if (!x && !y) return;
@@ -85,7 +90,8 @@ AFRAME.registerComponent('menu-toggle', {
     const t = () => this.toggle();
     ['thumbstickdown', 'thumbstickclick'].forEach(ev => this.el.addEventListener(ev, t));
   },
-  pad: function () {
+  pad: function () { return JFVR.leftPad(this.el); },
+  _unused: function () {
     const tc = this.el.components['tracked-controls'];
     if (tc && tc.controller && tc.controller.gamepad) return tc.controller.gamepad;
     const s = this.el.sceneEl.renderer && this.el.sceneEl.renderer.xr && this.el.sceneEl.renderer.xr.getSession && this.el.sceneEl.renderer.xr.getSession();
@@ -105,6 +111,7 @@ AFRAME.registerComponent('menu-toggle', {
     const show = !els[0].object3D.visible;
     els.forEach(m => {
       m.setAttribute('visible', show); m.object3D.visible = show;
+      if (show && m.id === 'vrbar') JFVR.placeInFront(m, 2.2, -1.0);
       [m, ...m.querySelectorAll('*')].forEach(c => {
         if (show) { if (c.dataset.cls) { c.classList.add(c.dataset.cls); delete c.dataset.cls; } }
         else ['btn', 'world'].forEach(k => { if (c.classList && c.classList.contains(k)) { c.dataset.cls = k; c.classList.remove(k); } });
@@ -114,3 +121,19 @@ AFRAME.registerComponent('menu-toggle', {
     JFVR.hud && JFVR.hud(show ? 'Menu shown' : 'Menu hidden - press left stick to show');
   }
 });
+
+JFVR.leftPad = function (el) {
+  const tc = el && el.components && el.components['tracked-controls'];
+  if (tc && tc.controller && tc.controller.gamepad && (!tc.controller.handedness || tc.controller.handedness === 'left')) return tc.controller.gamepad;
+  const sc = document.querySelector('a-scene'), xr = sc && sc.renderer && sc.renderer.xr, ses = xr && xr.getSession && xr.getSession();
+  if (ses) for (const src of ses.inputSources) if (src.handedness === 'left' && src.gamepad) return src.gamepad;
+  return null;
+};
+/* Put an entity in front of where the user is now looking (dist m ahead, dy m relative to eye height). */
+JFVR.placeInFront = function (m, dist, dy) {
+  const cam = document.querySelector('[camera]'); if (!cam) return;
+  const pos = cam.object3D.getWorldPosition(new THREE.Vector3());
+  const yaw = new THREE.Euler().setFromQuaternion(cam.object3D.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y;
+  m.object3D.position.set(pos.x - Math.sin(yaw) * dist, pos.y + dy, pos.z - Math.cos(yaw) * dist);
+  m.object3D.rotation.set(THREE.MathUtils.degToRad(-25), yaw, 0, 'YXZ');
+};
