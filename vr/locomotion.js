@@ -94,6 +94,7 @@ AFRAME.registerComponent('menu-toggle', {
           else ['btn', 'world'].forEach(k => { if (c.classList && c.classList.contains(k)) { c.dataset.cls = k; c.classList.remove(k); } });
         });
       });
+      document.querySelectorAll('[raycaster]').forEach(r => r.components.raycaster && r.components.raycaster.refreshObjects());
       JFVR.hud && JFVR.hud(show ? 'Menu shown' : 'Menu hidden (press left stick to show)');
     });
   }
