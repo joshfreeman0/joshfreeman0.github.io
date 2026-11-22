@@ -201,6 +201,7 @@ W3D.build = function (scene3, sceneEl) {
   if (W3D.env) for (const k in M) if (M[k].isMeshStandardMaterial) M[k].envMap = W3D.env, M[k].envMapIntensity = 0.55;
   M.officeFloor.envMapIntensity = M.granite.envMapIntensity = 0.8; M.marble.envMapIntensity = 0.45; M.marble.color.setHex(0xc9bfae); M.marble.roughness = 0.22; M.officeFloor.color.setHex(0xd6d0c4);
   W3D.M = M;
+  W3D.lib = {box: box, floorOnly: floorOnly, canvas: canvas, tex: tex, starCeilingTex: starCeilingTex, HQ: HQ, walls: walls, floors: floors};
   return Promise.all([
     fetch(BASE + 'terrain.u16').then(r => r.arrayBuffer()),
     fetch(BASE + 'trees.f32').then(r => r.arrayBuffer())
@@ -208,6 +209,7 @@ W3D.build = function (scene3, sceneEl) {
     const u = new Uint16Array(hb); heights = new Float32Array(u.length); for (let i = 0; i < u.length; i++) heights[i] = u[i] * 0.01 - 10;
     buildTerrain(); buildWater(); buildTrees(new Float32Array(tb)); buildRailPortals();
     buildBank(); buildOffice(); buildConservatory(); buildSigns();
+    if (W3D.buildRooms) try { W3D.buildRooms(root); } catch (e) { console.warn('exhibit rooms failed', e); }
     if (W3D.buildWildlife) W3D.buildWildlife(root);
     root.traverse(o => { if (o.isMesh && o.material && o.material.isMeshStandardMaterial) o.material.needsUpdate = true; });
   });
@@ -319,7 +321,10 @@ function buildBank() {
   // hypostyle hall
   const hx0 = 925, hx1 = 965, hz = 20, H = 16;
   box(40, 0.3, 40, 945, y0, zc, M.granite, {floor: true, collide: false});
-  box(40, H, 1.5, 945, y0, zc - hz, M.relief, {T: 8}); box(40, H, 1.5, 945, y0, zc + hz, M.relief, {T: 8});
+  // north wall has two 4 m doorways (x 931-935 and 955-959) into the exhibit rooms (see rooms.js)
+  box(6, H, 1.5, 928, y0, zc - hz, M.relief, {T: 8}); box(20, H, 1.5, 945, y0, zc - hz, M.relief, {T: 8}); box(6, H, 1.5, 962, y0, zc - hz, M.relief, {T: 8});
+  for (const dx of [933, 957]) box(4, H - 5, 1.5, dx, y0 + 5, zc - hz, M.relief, {collide: false, T: 8});
+  box(40, H, 1.5, 945, y0, zc + hz, M.relief, {T: 8});
   box(1.5, H, 40, hx1, y0, zc, M.relief, {T: 8});
   box(1.5, H, 17, hx0, y0, zc - 11.5, M.relief, {T: 8}); box(1.5, H, 17, hx0, y0, zc + 11.5, M.relief, {T: 8}); // door gap 6 m
   box(1.5, H - 10, 6, hx0, y0 + 10, zc, M.relief, {collide: false});
@@ -486,7 +491,7 @@ W3D.spots = {
 const keys = {};
 document.addEventListener('keydown', e => { keys[e.code] = true; }); document.addEventListener('keyup', e => { keys[e.code] = false; });
 AFRAME.registerComponent('w3d-keys', { tick: function (t, dt) { if (!W3D.active || !JFVR.fly || !dt) return; const p = this.el.object3D.position, s = 30 * dt / 1000; if (keys.Space) p.y += s; if (keys.ShiftLeft || keys.ShiftRight) p.y -= s; if (W3D.waterNormal) {} } });
-AFRAME.registerComponent('w3d-anim', { tick: function (t, dt) { if (W3D.waterNormal) { W3D.waterNormal.offset.x = t * 0.00002; W3D.waterNormal.offset.y = t * 0.000013; } if (W3D.tickWildlife && W3D.active) W3D.tickWildlife(t, dt); } });
+AFRAME.registerComponent('w3d-anim', { tick: function (t, dt) { if (W3D.waterNormal) { W3D.waterNormal.offset.x = t * 0.00002; W3D.waterNormal.offset.y = t * 0.000013; } if (W3D.tickWildlife && W3D.active) W3D.tickWildlife(t, dt); if (W3D.tickRooms && W3D.active) W3D.tickRooms(t, dt); } });
 // lifts between hall and office
 AFRAME.registerComponent('w3d-lift', { schema: {to: {type: 'string'}}, init: function () { this.el.addEventListener('click', () => { if (this.data.to === 'office') W3D.spots.office(); else W3D.teleportTo(958, HQ.y + 0.3, HQ.z, -90); JFVR.hud && JFVR.hud(this.data.to === 'office' ? "Josh's office - top floor" : 'Banking hall'); }); } });
 })();
