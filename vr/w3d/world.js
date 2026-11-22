@@ -26,7 +26,9 @@ W3D.terrainH = terrainH;
 function groundAt(x, z, y) {
   let g = terrainH(x, z);
   if (g < WATER - 0.2) g = WATER - 0.2; // walk on the pond surface rather than its bed
-  for (const f of floors) if (x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1 && f.y <= y + 0.65 && f.y > g) g = f.y;
+  const t0 = g; let u = null; // floors flagged under:true are below the terrain (bank vault) and only count when you are below ground
+  for (const f of floors) if (x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1 && f.y <= y + 0.65) { if (f.under) { if (y < t0 - 1 && (u === null || f.y > u)) u = f.y; } else if (f.y > g) g = f.y; }
+  if (u !== null) g = u;
   return g;
 }
 W3D.groundAt = groundAt;
@@ -210,6 +212,7 @@ W3D.build = function (scene3, sceneEl) {
     buildTerrain(); buildWater(); buildTrees(new Float32Array(tb)); buildRailPortals();
     buildBank(); buildOffice(); buildConservatory(); buildSigns();
     if (W3D.buildRooms) try { W3D.buildRooms(root); } catch (e) { console.warn('exhibit rooms failed', e); }
+    if (W3D.buildBankPlus) try { W3D.buildBankPlus(root); } catch (e) { console.warn('bank upgrade failed', e); }
     if (W3D.buildWildlife) W3D.buildWildlife(root);
     root.traverse(o => { if (o.isMesh && o.material && o.material.isMeshStandardMaterial) o.material.needsUpdate = true; });
   });
