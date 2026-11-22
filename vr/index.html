@@ -8,9 +8,9 @@
 <link rel="apple-touch-icon" href="/vr/icon-192.png">
 <meta name="theme-color" content="#c9a24a">
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script src="locomotion.js?v=12"></script>
+<script src="locomotion.js?v=13"></script>
 <script src="hd.js?v=3"></script>
-<script src="w3d/world.js?v=7"></script>
+<script src="w3d/world.js?v=8"></script>
 <script src="w3d/rooms.js?v=4"></script>
 <script src="w3d/bank.js?v=2"></script>
 <script src="w3d/wildlife.js?v=2"></script>
@@ -49,11 +49,11 @@ body{margin:0;font-family:system-ui,sans-serif}
 #note{font-size:12px;opacity:.85;margin-top:4px}
 #ui .tools button{background:#333;color:#ffe9a8;font-size:13px;padding:6px 10px}
 </style></head><body>
-<a-scene vr-mode-ui="enabled: true" light="defaultLightsEnabled: false" renderer="antialias: true; colorManagement: true; highRefreshRate: false; foveationLevel: 0; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160; precision: high" hd-renderer="scale: 1.2" w3d-anim>
+<a-scene vr-mode-ui="enabled: true" light="defaultLightsEnabled: false" renderer="antialias: true; colorManagement: true; highRefreshRate: false; foveationLevel: 1; logarithmicDepthBuffer: true; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160; precision: high" hd-renderer="scale: 1.0" w3d-anim>
   <a-entity id="sky" visible="false"></a-entity>
   <a-entity id="rig" wasd-controls="acceleration: 25" w3d-physics w3d-keys>
     <a-entity id="flydisk" position="0 6 0" rotation="90 0 0"><a-plane class="btn" fly-toggle width="1.6" height="0.42" material="src:url(/vr/winged-sun-stone.jpg);side:double;shader:flat"></a-plane><a-text id="flylabel" value="Fly: OFF" align="center" position="0 -0.4 0" width="1.6" color="#ffe9a8" side="double"></a-text></a-entity>
-    <a-entity camera="near: 0.1; far: 9000" look-controls touch-pitch wasd-controls="enabled:false" position="0 1.6 0">
+    <a-entity camera="near: 0.1; far: 30000" look-controls touch-pitch wasd-controls="enabled:false" position="0 1.6 0">
     <a-entity cursor="fuse:false; rayOrigin:mouse" raycaster="objects:.btn; far: 60"></a-entity>
   </a-entity>
   <a-entity laser-controls="hand:right" snap-turn w3d-teleport raycaster="objects:.btn; far: 60"></a-entity>
@@ -100,7 +100,7 @@ const scn = document.querySelector('a-scene'), rig = document.querySelector('#ri
 let mode = 'world';
 function mark(sel, key){ document.querySelectorAll('#ui button').forEach(b => b.classList.toggle('on', b.matches(sel) && (b.dataset.w===key || b.dataset.t===key))); }
 function worldLimits(on){
-  if (on) { JFVR.flyRadius = 2100; JFVR.flyMaxY = 600; JFVR.groundAt = W3D.groundAt; }
+  if (on) { JFVR.flyRadius = 11000; JFVR.flyMaxY = 600; JFVR.groundAt = W3D.groundAt; }
   else { JFVR.flyRadius = 400; JFVR.flyMaxY = 400; JFVR.groundAt = null; }
 }
 function bringMenu(){ if (bar.object3D.visible && JFVR.placeInFront) setTimeout(() => JFVR.placeInFront(bar, 2.4, 0.4), 50); }

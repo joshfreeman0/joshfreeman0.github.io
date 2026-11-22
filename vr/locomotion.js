@@ -23,7 +23,12 @@ AFRAME.registerComponent('thumbstick-move', {
       const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q), r = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
       const mag = Math.min(1, Math.hypot(x, y) || Math.abs(up));
       const p = rig.object3D.position, s = (40 + Math.max(p.y, 0) * 1.0) * (boost ? 15 : 1) * (0.3 + 0.7 * mag) * JFVR.speedMul() * dt / 1000;
-      p.addScaledVector(f, -y * s).addScaledVector(r, x * s);
+      /* horizontal part of the stick always moves you at full speed along the ground plane (so forward/back still works at the height ceiling
+         or when looking straight down); only the pitch part of 'forward' changes height */
+      const rh = new THREE.Vector3(r.x, 0, r.z); if (rh.lengthSq() < 1e-6) rh.set(1, 0, 0); rh.normalize();
+      const fh = new THREE.Vector3(rh.z, 0, -rh.x);
+      p.addScaledVector(fh, -y * s).addScaledVector(rh, x * s);
+      p.y += -y * s * f.y;
       if (Math.abs(up) >= 0.2) p.y += -up * s;
       p.y = Math.min(Math.max(p.y, JFVR.groundAt ? JFVR.groundAt(p.x, p.z, p.y) + 0.3 : 0), JFVR.flyMaxY || 400);
       const R = JFVR.flyRadius || 400, hr = Math.hypot(p.x, p.z); if (hr > R) { p.x *= R / hr; p.z *= R / hr; }
@@ -88,7 +93,7 @@ AFRAME.registerComponent('menu-toggle', {
   init: function () {
     this.last = 0; this.wasDown = false;
     const t = () => this.toggle();
-    ['thumbstickdown', 'thumbstickclick'].forEach(ev => this.el.addEventListener(ev, t));
+    ['thumbstickdown', 'thumbstickclick', 'ybuttondown', 'menudown'].forEach(ev => this.el.addEventListener(ev, t));
   },
   pad: function () { return JFVR.leftPad(this.el); },
   _unused: function () {
@@ -100,7 +105,7 @@ AFRAME.registerComponent('menu-toggle', {
   },
   tick: function () {
     const g = this.pad(); if (!g || !g.buttons[3]) return;
-    const down = g.buttons[3].pressed;
+    const down = g.buttons[3].pressed || !!(g.buttons[5] && g.buttons[5].pressed);   // left stick click or Y
     if (down && !this.wasDown) this.toggle();
     this.wasDown = down;
   },
@@ -126,7 +131,7 @@ AFRAME.registerComponent('menu-toggle', {
       });
     });
     document.querySelectorAll('[raycaster]').forEach(r => r.components.raycaster && r.components.raycaster.refreshObjects());
-    JFVR.hud && JFVR.hud(show ? 'Menu shown' : 'Menu hidden - press left stick to show');
+    JFVR.hud && JFVR.hud(show ? 'Menu shown' : 'Menu hidden - press left stick or Y to show');
   }
 });
 
