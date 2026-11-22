@@ -11,7 +11,7 @@ AFRAME.registerComponent('hd-renderer', {
       const r = this.el.renderer; if (!r) return;
       try { r.xr.setFramebufferScaleFactor(this.data.scale); } catch (e) {}
       try { r.xr.setFoveation(0); } catch (e) {}
-      r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      r.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.JFVR_LITE ? 1.25 : 2));   // lite (phones): smaller framebuffer
     };
     if (this.el.renderer) apply(); else this.el.addEventListener('renderstart', apply);
     this.el.addEventListener('enter-vr', () => { try { this.el.renderer.xr.setFoveation(0); } catch (e) {} });

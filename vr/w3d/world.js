@@ -5,6 +5,9 @@
 (function () {
 const W3D = window.W3D = {};
 const BASE = '/vr/w3d/';
+/* Lite tier (phones/tablets, <=4 GB devices; never the Quest): see JFVR_LITE in index.html. Smaller photos, no 0.5 m tile,
+   40% of the trees, 1024 px cap on every texture, smaller shadow map - keeps iPhone Safari under its WebGL memory limit. */
+const LITE = W3D.lite = !!window.JFVR_LITE;
 const N = 385, SIZE = 4096, HALF = 2048, WATER = 16.5;
 const HQ = {x: 920, y: 34, z: -380};
 let heights = null;
@@ -12,7 +15,7 @@ const floors = [];   // {x0,x1,z0,z1,y}
 const walls = [];    // {x0,x1,z0,z1,y0,y1}
 W3D.floors = floors; W3D.walls = walls;
 
-const RINGS = {mid: {n: 193, R: 6144, img: 'ring_mid.jpg?v=1', name: 'ring-mid', h: null}, far: {n: 129, R: 16384, img: 'ring_far.jpg?v=1', name: 'ring-far', h: null}};
+const RINGS = {mid: {n: 193, R: 6144, img: LITE ? 'ring_mid_lite.jpg?v=1' : 'ring_mid.jpg?v=1', name: 'ring-mid', h: null}, far: {n: 129, R: 16384, img: LITE ? 'ring_far_lite.jpg?v=1' : 'ring_far.jpg?v=1', name: 'ring-far', h: null}};
 function ringH(x, z) {
   for (const L of [RINGS.mid, RINGS.far]) {
     if (!L.h || Math.abs(x) > L.R || Math.abs(z) > L.R) continue;
@@ -50,7 +53,7 @@ function blocked(x, z, y) {
 W3D.blocked = blocked;
 
 /* ---------- procedural textures ---------- */
-function hcanvas(S) { const c = canvas(S * 2, S * 2); c.getContext('2d').scale(2, 2); return c; } // 2048 px textures drawn in 1024 logical units
+function hcanvas(S) { const k = LITE ? 1 : 2; const c = canvas(S * k, S * k); c.getContext('2d').scale(k, k); return c; } // 2048 px textures drawn in 1024 logical units
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 function noiseFill(g, w, h, base, amp, n) {
   g.fillStyle = base; g.fillRect(0, 0, w, h);
@@ -74,7 +77,7 @@ function polishedTex(dark) { // honed granite / marble with gold inlay grid, 4 m
   return tex(c);
 }
 function officeFloorTex() { // single 20 m floor: white marble, gold-inlaid sun disk + lotus border
-  const S = 2048, c = canvas(S, S), g = c.getContext('2d'); noiseFill(g, S, S, '#f2eee6', 0.04, 120000);
+  const S = 2048, c = LITE ? canvas(1024, 1024) : canvas(S, S), g = c.getContext('2d'); if (LITE) g.scale(0.5, 0.5); noiseFill(g, S, S, '#f2eee6', 0.04, LITE ? 60000 : 120000);
   g.globalAlpha = 0.18; g.strokeStyle = '#b9b0a2';
   for (let i = 0; i < 60; i++) { g.beginPath(); let x = Math.random() * S, y = Math.random() * S; g.moveTo(x, y); for (let k = 0; k < 10; k++) { x += (Math.random() - 0.3) * 150; y += (Math.random() - 0.5) * 100; g.lineTo(x, y); } g.stroke(); }
   g.globalAlpha = 1; g.strokeStyle = '#d4af37'; g.fillStyle = '#d4af37';
@@ -167,9 +170,10 @@ function rippleNormal() { // tileable noise height field -> normal map (no strip
    world space (so overlapping water meshes match exactly), sky reflection with Fresnel from the PBR env map. */
 function waterMat(alphaMap, river) {
   // river: dark tea-brown/olive like the real Forge River in the aerial photo, semi-transparent so the photographed riverbed shows through
-  const mat = new THREE.MeshStandardMaterial({color: river ? 0x2f3a2c : 0x1d2e2a, roughness: river ? 0.1 : 0.22, metalness: 0.0, alphaMap: alphaMap || null, alphaTest: alphaMap ? 0.5 : 0,
+  // pond and river are the same water: one dark olive-brown colour and the same soft sheen (no cyan sky mirror)
+  const mat = new THREE.MeshStandardMaterial({color: 0x2f3a2c, roughness: 0.16, metalness: 0.0, alphaMap: alphaMap || null, alphaTest: alphaMap ? 0.5 : 0,
     transparent: !!river, opacity: river ? 0.78 : 1, depthWrite: !river});
-  if (W3D.env) { mat.envMap = W3D.env; mat.envMapIntensity = river ? 0.9 : 0.5; } // pond: dark, low sheen like the real lakes in the photo (was a bright cyan sky mirror)
+  if (W3D.env) { mat.envMap = W3D.env; mat.envMapIntensity = 0.6; } // pond: dark, low sheen like the real lakes in the photo (was a bright cyan sky mirror)
   if (!W3D.waterU) W3D.waterU = {wN: {value: rippleNormal()}, wT: {value: 0}};
   mat.onBeforeCompile = sh => {
     sh.uniforms.wN = W3D.waterU.wN; sh.uniforms.wT = W3D.waterU.wT;
@@ -255,6 +259,27 @@ function column(x, y, z, h, r, parent) { // papyrus column with open bell capita
 }
 
 /* ---------- build ---------- */
+W3D.status = msg => { const d = document.querySelector('#load'); if (d && !d.dataset.failed) d.firstChild ? (d.firstChild.textContent = msg) : (d.textContent = msg); };
+/* Image loading progress ("Loading imagery 3/7...") and failures, for every TextureLoader image (THREE.DefaultLoadingManager). */
+window.W3D_LOADING = true;
+THREE.DefaultLoadingManager.onProgress = (url, done, total) => { window.W3D_LOADING = done < total; if (!window.W3D_READY) W3D.status('Loading imagery ' + done + '/' + total + '...'); else if (W3D.onImagery) W3D.onImagery(done, total); };
+THREE.DefaultLoadingManager.onLoad = () => { window.W3D_LOADING = false; if (W3D.onImagery) W3D.onImagery(1, 1); };
+THREE.DefaultLoadingManager.onError = url => { console.error('image failed: ' + url); if (/ortho|ring_|tex\//.test(url) && window.JFVR_fail) window.JFVR_fail('An image did not load (' + url.replace(/^.*\//, '').replace(/\?.*/, '') + ').'); };
+/* Lite tier: cap every texture at 1024 px (canvas art and photos; the aerial photos already come as lite files) and anisotropy 4. */
+function liteShrink(img, cap) { const w = img && (img.naturalWidth || img.width), h = img && (img.naturalHeight || img.height), m = Math.max(w || 0, h || 0); if (!m || m <= cap) return null;
+  const k = cap / m, c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c; }
+W3D.liteShrink = liteShrink;
+function liteTex(t, cap) { cap = cap || 1024; if (!t || !t.isTexture || t.userData.lite) return; t.userData.lite = 1; t.anisotropy = Math.min(t.anisotropy || 1, 4);
+  const im = t.image; if (!im || t.isCubeTexture || t.isDataTexture || t.isRenderTargetTexture || Array.isArray(im)) return;
+  if (im.src && /ortho_|ring_/.test(im.src)) return;
+  let c = _shrunk.get(im); if (!c) { c = liteShrink(im, cap); if (c) { _shrunk.set(im, c); if (im.tagName === 'CANVAS') { im.width = 1; im.height = 1; } } }   // free the big canvas (iOS caps total canvas memory)
+  if (c) { t.image = c; t.needsUpdate = true; } }
+const _shrunk = new WeakMap();
+W3D.liteTex = liteTex;
+function liteTextures(obj) { obj.traverse(o => { for (const m of o.material ? [].concat(o.material) : []) for (const k in m) if (m[k] && m[k].isTexture) liteTex(m[k], (k === 'map' || k === 'emissiveMap') && m[k].wrapS !== THREE.RepeatWrapping ? 1024 : 512); }); }   // signs/text 1024 px, tiling art and normal/roughness maps 512 px   // colour 1024 px, normal/roughness 512 px
+W3D.liteTextures = liteTextures;
+if (LITE) { const ld = THREE.TextureLoader.prototype.load; THREE.TextureLoader.prototype.load = function (url, onLoad, onProgress, onError) {
+  return ld.call(this, url, t => { if (!/ortho_|ring_/.test(url)) { const c = liteShrink(t.image, /_nrm|_rgh/.test(url) ? 512 : 1024); if (c) { t.image = c; t.needsUpdate = true; } } t.anisotropy = Math.min(t.anisotropy || 1, 4); t.userData.lite = 1; if (onLoad) onLoad(t); }, onProgress, onError); }; }
 W3D.build = function (scene3, sceneEl) {
   root = new THREE.Group(); root.name = 'w3d'; scene3.add(root); W3D.root = root;
   const renderer = sceneEl.renderer;
@@ -269,7 +294,7 @@ W3D.build = function (scene3, sceneEl) {
   W3D.fog = new THREE.Fog(0xcfdde8, 2000, 8200); W3D.bg = new THREE.Color(0xcfdde8); // anything past the far plane shows haze, never black
   const hemi = new THREE.HemisphereLight(0xe3ecff, 0x5b6440, 0.85); root.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff0d8, 1.55); sun.position.set(HQ.x - 260, HQ.y + 360, HQ.z + 210); sun.target.position.set(HQ.x + 20, HQ.y, HQ.z - 10);
-  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -130; sc.right = 130; sc.top = 130; sc.bottom = -130; sc.near = 50; sc.far = 900; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.05;
+  sun.castShadow = true; sun.shadow.mapSize.set(LITE ? 1024 : 2048, LITE ? 1024 : 2048); const sc = sun.shadow.camera; sc.left = -130; sc.right = 130; sc.top = 130; sc.bottom = -130; sc.near = 50; sc.far = 900; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.05;
   root.add(sun); root.add(sun.target);
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true; // sun is fixed: redraw shadows ~6x/s, not every frame
   // materials
@@ -296,13 +321,17 @@ W3D.build = function (scene3, sceneEl) {
   M.officeFloor.envMapIntensity = M.granite.envMapIntensity = 0.8; M.marble.envMapIntensity = 0.45; M.marble.color.setHex(0xc9bfae); M.marble.roughness = 0.22; M.officeFloor.color.setHex(0xd6d0c4);
   W3D.M = M;
   W3D.lib = {box: box, floorOnly: floorOnly, canvas: canvas, tex: tex, starCeilingTex: starCeilingTex, HQ: HQ, walls: walls, floors: floors};
+  let nd = 0; const step = x => { W3D.status('Loading terrain data ' + (++nd) + '/5...'); return x; };
+  const need = r => { if (!r.ok) throw new Error(r.url.replace(/^.*\//, '').replace(/\?.*/, '') + ' HTTP ' + r.status); return r; };
+  W3D.status('Loading terrain data 0/5...');
   return Promise.all([
-    fetch(BASE + 'terrain_t.u16?v=1').then(r => r.arrayBuffer()),
-    fetch(BASE + 'trees_t2.f32?v=1').then(r => r.arrayBuffer()),
-    fetch(BASE + 'water_t.json?v=2').then(r => r.json()),
-    fetch(BASE + 'ring_mid.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),
-    fetch(BASE + 'ring_far.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null)
+    fetch(BASE + 'terrain_t.u16?v=1').then(need).then(r => r.arrayBuffer()).then(step),
+    fetch(BASE + 'trees_t2.f32?v=1').then(need).then(r => r.arrayBuffer()).then(step),
+    fetch(BASE + 'water_t.json?v=2').then(need).then(r => r.json()).then(step),
+    fetch(BASE + 'ring_mid.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step),
+    fetch(BASE + 'ring_far.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step)
   ]).then(([hb, tb, wj, rmid, rfar]) => {
+    W3D.status('Building the world (terrain, bank, rooms)...');
     if (rmid) RINGS.mid.h = new Int16Array(rmid); if (rfar) RINGS.far.h = new Int16Array(rfar);
     const u = new Uint16Array(hb); heights = new Float32Array(u.length); for (let i = 0; i < u.length; i++) heights[i] = u[i] * 0.01 - 10;
     W3D.water = wj; carveRail(wj.rail); buildTerrain(); buildWater(wj); buildRivers(wj); buildTrees(new Float32Array(tb)); buildRail(wj.rail); buildPark(wj.park);
@@ -312,19 +341,20 @@ W3D.build = function (scene3, sceneEl) {
     if (W3D.buildWildlife) W3D.buildWildlife(root);
     try { deFight(root, HQ.x, HQ.z, 320); deFight(root, HQ.x, HQ.z, 320); } catch (e) { console.warn('deFight failed', e); }
     root.traverse(o => { if (o.isMesh && o.material && o.material.isMeshStandardMaterial) o.material.needsUpdate = true; });
+    if (LITE) liteTextures(root);
   });
 };
 function buildTerrain() {
   const geo = new THREE.PlaneGeometry(SIZE, SIZE, N - 1, N - 1); geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, heights[i]);
   geo.computeVertexNormals();
-  const t = new THREE.TextureLoader().load(BASE + 'ortho_t.jpg?v=1'); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16;
+  const t = new THREE.TextureLoader().load(BASE + (LITE ? 'ortho_t_lite.jpg?v=2' : 'ortho_t.jpg?v=1')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = LITE ? 4 : 16;
   // sharper ground near the compound and pond: 0.5 m/px USGS tile (x -324..1724, z -1249..799) + fine detail texture that fades in within ~200 m
-  const hi = new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=1'); hi.colorSpace = THREE.SRGBColorSpace; hi.anisotropy = 16;
+  const hi = LITE ? t : new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=1'); hi.colorSpace = THREE.SRGBColorSpace; if (!LITE) hi.anisotropy = 16;   // lite: no 0.5 m tile (hiRect moved off the map)
   const det = detailTex(), grs = grassTex();
   const tm = new THREE.MeshLambertMaterial({map: t});
   tm.onBeforeCompile = sh => {
-    sh.uniforms.hiMap = {value: hi}; sh.uniforms.detMap = {value: det}; sh.uniforms.grsMap = {value: grs}; sh.uniforms.hiRect = {value: new THREE.Vector4(-324, -1249, 2048, 2048)};
+    sh.uniforms.hiMap = {value: hi}; sh.uniforms.detMap = {value: det}; sh.uniforms.grsMap = {value: grs}; sh.uniforms.hiRect = {value: LITE ? new THREE.Vector4(1e7, 1e7, 1, 1) : new THREE.Vector4(-324, -1249, 2048, 2048)};
     sh.vertexShader = 'varying vec3 vWp;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvWp = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = 'uniform sampler2D hiMap; uniform sampler2D detMap; uniform sampler2D grsMap; uniform vec4 hiRect; varying vec3 vWp;\n' + sh.fragmentShader.replace('#include <map_fragment>', [
       'vec4 texelColor = texture2D(map, vMapUv);',
@@ -340,7 +370,7 @@ function buildTerrain() {
       'diffuseColor *= texelColor;'].join('\n'));
   };
   const mesh = new THREE.Mesh(geo, tm); mesh.receiveShadow = true; mesh.name = 'terrain'; root.add(mesh);
-  W3D._terrainMat = tm;
+  W3D._terrainMat = tm; W3D._extraTex = [hi, det, grs];
   buildRings();
 }
 /* Surroundings in the same true frame (geo.json): a mid ring to +-6.1 km (64 m grid, ~3 m photo) and a far ring to +-16.4 km
@@ -430,7 +460,10 @@ function buildRivers(J) {
   const kg = new THREE.ShapeGeometry(sh); kg.rotateX(-Math.PI / 2);
   const kp = new THREE.Mesh(kg, waterMat()); kp.position.y = K.level; kp.receiveShadow = true; kp.name = 'kings-pond'; root.add(kp);
   const rm = waterMat(null, true); rm.side = THREE.DoubleSide;
+  const P0 = J.pond, inPond = (x, z) => P0 && x > P0.x0 && x < P0.x1 && z > P0.z0 && z < P0.z1;
   for (const R of J.rivers) { // ribbon edges tuck under the smoothed banks
+    // where a river reaches the pond at pond level, sink it 15 cm under the (opaque) pond surface so the two never z-fight (blink)
+    R.lev = R.lev.map((l, i) => inPond(R.pts[i][0], R.pts[i][1]) && l < WATER + 0.3 ? Math.min(l, WATER - 0.15) : l);
     ribbon(R.pts, R.lev, R.hw || 7, rm, R.name);
     const inCore = R.pts.filter(([x, z]) => Math.abs(x) < HALF - 30 && Math.abs(z) < HALF - 30);
     if (inCore.length > 1) { const keep = R.pts.map(([x, z]) => Math.abs(x) < HALF - 30 && Math.abs(z) < HALF - 30), P = [], L = [];
@@ -442,7 +475,7 @@ function buildRivers(J) {
 }
 function buildTrees(a) {
   const n = a.length / 4; const con = [], dec = [];
-  for (let i = 0; i < n; i++) { const x = a[i * 4], z = a[i * 4 + 1], s = a[i * 4 + 2], k = a[i * 4 + 3]; const y = terrainH(x, z); if (y < -5) continue; (k < 0.5 ? con : dec).push([x, y, z, s]); }
+  for (let i = 0; i < n; i++) { if (LITE && i % 5 > 1) continue; const x = a[i * 4], z = a[i * 4 + 1], s = a[i * 4 + 2], k = a[i * 4 + 3]; const y = terrainH(x, z); if (y < -5) continue; (k < 0.5 ? con : dec).push([x, y, z, s]); }
   const mk = (geo, mat, list, yOff, sy, colors) => {
     const im = new THREE.InstancedMesh(geo, mat, list.length); const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), col = new THREE.Color();
     list.forEach((t, i) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (i * 2.39996) % 6.283); sv.set(t[3], t[3] * sy, t[3]); pv.set(t[0], t[1] - 0.35 + yOff * t[3], t[2]);   // sunk slightly so no tree base ever hovers on slopes m4.compose(pv, q, sv); im.setMatrixAt(i, m4);

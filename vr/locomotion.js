@@ -14,8 +14,9 @@ AFRAME.registerComponent('thumbstick-move', {
     let {x, y} = this.axes;
     const gp = JFVR.leftPad && JFVR.leftPad(this.el);
     if (gp && gp.axes && gp.axes.length >= 4 && (Math.abs(gp.axes[2]) > 0.15 || Math.abs(gp.axes[3]) > 0.15)) { x = gp.axes[2]; y = gp.axes[3]; }
+    const ta = JFVR.touchAxes; if (ta && (Math.abs(ta.x) > 0.05 || Math.abs(ta.y) > 0.05) && !x && !y) { x = ta.x; y = ta.y; }   // phone joystick
     if (Math.abs(x) < 0.15) x = 0; if (Math.abs(y) < 0.15) y = 0;
-    const fly = window.JFVR && JFVR.fly, up = (window.JFVR && JFVR.upAxis) || 0;
+    const fly = window.JFVR && JFVR.fly, up = (window.JFVR && (JFVR.touchUp || JFVR.upAxis)) || 0;
     const boost = gp && ((gp.buttons[0] && gp.buttons[0].value > 0.5) || (gp.buttons[1] && gp.buttons[1].value > 0.5));
     if (fly) {
       if (!x && !y && Math.abs(up) < 0.2) return;
@@ -161,3 +162,42 @@ JFVR.cycleSpeed = function () {
   document.querySelectorAll('.speed-label').forEach(e => e.tagName === 'A-TEXT' ? e.setAttribute('value', JFVR.speedLabel()) : (e.textContent = JFVR.speedLabel()));
   JFVR.hud && JFVR.hud(JFVR.speedLabel());
 };
+
+/* Phone/tablet touch controls (not headsets): a joystick bottom-left walks (or flies) relative to where you face, at JFVR.speedMul;
+   dragging anywhere else still looks around. Up/down buttons appear while flying. The rig moves exactly like the Quest left stick,
+   so walls, floors, lifts and the fly ceiling all still apply (w3d-physics). */
+(function () {
+  const ua = navigator.userAgent || '', touch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  if (!touch || /OculusBrowser|Quest|Pico/i.test(ua)) return;
+  JFVR.touchAxes = {x: 0, y: 0}; JFVR.touchUp = 0;
+  const css = document.createElement('style');
+  css.textContent = '#tjoy{position:fixed;left:18px;width:128px;height:128px;border-radius:50%;background:rgba(0,0,0,.28);border:2px solid rgba(255,215,0,.75);z-index:12;touch-action:none;user-select:none;-webkit-user-select:none}' +
+    '#tjoy i{position:absolute;left:39px;top:39px;width:50px;height:50px;border-radius:50%;background:rgba(255,215,0,.85);box-shadow:0 0 6px #000;pointer-events:none}' +
+    '#tfly{position:fixed;right:14px;z-index:12;display:flex;flex-direction:column;gap:10px;touch-action:none;user-select:none;-webkit-user-select:none}' +
+    '#tfly button{width:62px;height:52px;border-radius:12px;border:0;background:rgba(255,215,0,.88);color:#111;font:700 15px system-ui,sans-serif;touch-action:none}' +
+    '#tfly .ud{display:none}#tfly.on .ud{display:block}.vrmode #tjoy,.vrmode #tfly{display:none}';
+  document.head.appendChild(css);
+  const mk = () => {
+    const j = document.createElement('div'); j.id = 'tjoy'; j.innerHTML = '<i></i>'; document.body.appendChild(j); const knob = j.firstChild;
+    const f = document.createElement('div'); f.id = 'tfly';
+    f.innerHTML = '<button class="ud" data-u="-1">Up</button><button class="ud" data-u="1">Down</button><button class="ft">Fly</button>'; document.body.appendChild(f);
+    let id = null, cx = 0, cy = 0; const R = 50;
+    const set = (dx, dy) => { const m = Math.hypot(dx, dy), k = m > R ? R / m : 1; dx *= k; dy *= k; knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; JFVR.touchAxes.x = dx / R; JFVR.touchAxes.y = dy / R; };
+    j.addEventListener('pointerdown', e => { id = e.pointerId; const r = j.getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2; j.setPointerCapture(id); set(e.clientX - cx, e.clientY - cy); e.preventDefault(); e.stopPropagation(); });
+    j.addEventListener('pointermove', e => { if (e.pointerId !== id) return; set(e.clientX - cx, e.clientY - cy); e.preventDefault(); e.stopPropagation(); });
+    const end = e => { if (e.pointerId !== id) return; id = null; set(0, 0); };
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => j.addEventListener(ev, end));
+    f.querySelectorAll('.ud').forEach(b => {
+      const on = e => { JFVR.touchUp = +b.dataset.u; b.setPointerCapture && b.setPointerCapture(e.pointerId); e.preventDefault(); e.stopPropagation(); }, off = () => { JFVR.touchUp = 0; };
+      b.addEventListener('pointerdown', on); ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => b.addEventListener(ev, off));
+    });
+    f.querySelector('.ft').addEventListener('click', () => { if (JFVR.toggleFly) JFVR.toggleFly(); else JFVR.fly = !JFVR.fly; const l = document.querySelector('#flylabel'); if (l) l.setAttribute('value', 'Fly: ' + (JFVR.fly ? 'ON' : 'OFF')); });
+    // keep both above the bottom menu, show Up/Down only while flying, hide in VR
+    setInterval(() => {
+      const ui = document.getElementById('ui'), h = ui && ui.style.display !== 'none' ? ui.offsetHeight : 0, b = (h + 16) + 'px';
+      j.style.bottom = b; f.style.bottom = b; f.classList.toggle('on', !!JFVR.fly); if (!JFVR.fly) JFVR.touchUp = 0;
+      const sc = document.querySelector('a-scene'); document.body.classList.toggle('vrmode', !!(sc && sc.is && sc.is('vr-mode')));
+    }, 300);
+  };
+  if (document.body) mk(); else document.addEventListener('DOMContentLoaded', mk);
+})();

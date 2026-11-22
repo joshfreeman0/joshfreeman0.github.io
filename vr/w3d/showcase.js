@@ -3,7 +3,7 @@
    Products/texts/prices/links come from w3d/showcase/showcase.json (images are 512 px JPEG). Concept display; the shop is wampumworld.com. */
 (function () {
 const BASE = '/vr/w3d/showcase/', R = {x0: 880, x1: 924.5, z0: -394, z1: -366, y: 24, top: 33.6, zc: -380};
-let L, M, root, G = null, items = null, loaded = false, frames = 0;
+let L, M, root, G = null, items = null, loaded = false, frames = 0, gen = 0;
 const SP = 2.95, SPINE = {x0: 884, x1: 913.5, z: -380, t: 0.5};
 
 const cv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
@@ -101,19 +101,27 @@ function buildGallery(rootIn) {
 }
 function load() {
   if (loaded) return; loaded = true;
+  const my = gen;
   fetch(BASE + 'showcase.json?v=1').then(r => r.json()).then(j => {
     items = j.items; W3D.showcaseItems = items.length;
     items.slice(0, slots.length).forEach((it, i) => {
-      const s = slots[i]; s.pl.material.map = ctex(plaqueCanvas(it)); s.pl.material.color.set(0xffffff); s.pl.material.needsUpdate = true;
-      new THREE.TextureLoader().load(BASE + it.image + '?v=1', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; s.img.material.map = t; s.img.material.color.set(0xffffff); s.img.material.needsUpdate = true; });
+      if (my !== gen) return; const s = slots[i]; s.pl.material.map = ctex(plaqueCanvas(it)); s.pl.material.color.set(0xffffff); s.pl.material.needsUpdate = true;
+      new THREE.TextureLoader().load(BASE + it.image + '?v=1', t => { if (my !== gen) { t.dispose(); return; } t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = W3D.lite ? 4 : 8; s.img.material.map = t; s.img.material.color.set(0xffffff); s.img.material.needsUpdate = true; });
     });
   }).catch(e => { loaded = false; console.warn('showcase load failed', e); });
 }
+/* Lite tier (phones): free the 40 photos + plaques from GPU and memory when you leave the gallery; they reload when you come back. */
+function unload() {
+  if (!loaded) return; loaded = false;
+  for (const sl of slots) for (const m of [sl.img.material, sl.pl.material]) if (m.map) { m.map.dispose(); m.map = null; m.color.set(m === sl.img.material ? 0xd9ccb0 : 0xf1e5c8); m.needsUpdate = true; }
+  gen++;
+}
+W3D.showcaseUnload = unload;
 const inside = p => p.y < 33.5 && p.x > R.x0 - 2 && p.x < R.x1 + 2 && p.z > R.z0 - 2 && p.z < R.z1 + 2;
 AFRAME.registerComponent('showcase-tick', { tick: function () {
   if (!W3D.active || !G || ++frames % 3) return;
   const cam = W3D._cam || (W3D._cam = document.querySelector('[camera]')); if (!cam) return;
-  const ins = inside(cam.object3D.getWorldPosition(W3D._sv || (W3D._sv = new THREE.Vector3()))); if (ins) load(); if (G.visible !== ins) G.visible = ins;
+  const ins = inside(cam.object3D.getWorldPosition(W3D._sv || (W3D._sv = new THREE.Vector3()))); if (ins) load(); if (G.visible !== ins) { G.visible = ins; if (!ins && W3D.lite) unload(); }
 } });
 const prev = W3D.buildBankPlus;
 W3D.buildBankPlus = function (r) { if (prev) prev(r); try { buildGallery(r); } catch (e) { console.warn('showcase build failed', e); } };

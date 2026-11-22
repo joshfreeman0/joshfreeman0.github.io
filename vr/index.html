@@ -16,12 +16,23 @@
   S.fragmentShader = S.fragmentShader.replace('in vec2 vUV;', 'in vec2 vUV;\nin float vFragDepth;\nuniform float logDepthBufFC;').replace('void main() {', 'void main() {\n  gl_FragDepth = log2(vFragDepth) * logDepthBufFC * 0.5 - 0.0002;');
 })();
 </script>
-<script src="locomotion.js?v=13"></script>
-<script src="hd.js?v=3"></script>
-<script src="w3d/world.js?v=12"></script>
+<script>
+/* Lite tier for phones/tablets (iOS Safari has a tight WebGL memory limit): iOS/Android, iPadOS, or navigator.deviceMemory <= 4.
+   The Quest browser is never lite. ?lite=1 forces it on, ?full=1 forces it off. */
+window.JFVR_LITE = (function () {
+  const q = location.search, ua = navigator.userAgent || '';
+  if (/[?&]lite=1/.test(q)) return true; if (/[?&]full=1/.test(q)) return false;
+  if (/OculusBrowser|Quest|Pico/i.test(ua)) return false;
+  if (/iPhone|iPad|iPod|Android/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return true;
+  return !!(navigator.deviceMemory && navigator.deviceMemory <= 4);
+})();
+</script>
+<script src="locomotion.js?v=14"></script>
+<script src="hd.js?v=4"></script>
+<script src="w3d/world.js?v=13"></script>
 <script src="w3d/rooms.js?v=4"></script>
 <script src="w3d/bank.js?v=4"></script>
-<script src="w3d/showcase.js?v=1"></script>
+<script src="w3d/showcase.js?v=2"></script>
 <script src="w3d/wildlife.js?v=3"></script>
 <script src="w3d/streets.js?v=6"></script>
 <script>
@@ -54,7 +65,10 @@ body{margin:0;font-family:system-ui,sans-serif}
 #note{display:none}#ui.help #note{display:block}
 #ui button.on{background:#fff}
 #ui .sec{font-size:12px;opacity:.8;margin:0 6px}
-#load{position:fixed;top:40%;left:0;right:0;text-align:center;color:#ffe9a8;font-size:20px;z-index:5;text-shadow:0 0 6px #000}
+#load{position:fixed;top:40%;left:0;right:0;text-align:center;color:#ffe9a8;font-size:20px;z-index:5;text-shadow:0 0 6px #000;padding:0 16px}
+#load.bg{top:8px;font-size:14px;pointer-events:none}
+#load.fail{top:30%;background:rgba(0,0,0,.8);padding:18px;z-index:30;pointer-events:auto}
+#load.fail button{font-size:17px;margin:10px 6px 0;padding:10px 16px;border-radius:10px;border:0;background:#FFD700;color:#111}
 #note{font-size:12px;opacity:.85;margin-top:4px}
 #ui .tools button{background:#333;color:#ffe9a8;font-size:13px;padding:6px 10px}
 </style></head><body>
@@ -147,9 +161,30 @@ document.querySelectorAll('#ui button, #vrbar .btn').forEach(wire);
 document.querySelectorAll('.speed-label').forEach(e => e.tagName === 'A-TEXT' ? e.setAttribute('value', JFVR.speedLabel()) : (e.textContent = JFVR.speedLabel()));
 scn.addEventListener('enter-vr', () => { setTimeout(() => JFVR.hud && JFVR.hud('Press the left stick or Y for the menu'), 1500); }); // menu stays hidden until asked for
 scn.addEventListener('exit-vr', () => bar.setAttribute('visible', false));
+/* Clear failure message with Try again (and, on the full tier, a lighter version) instead of hanging on the loading text. */
+window.JFVR_fail = function (why) {
+  if (window.JFVR_failed) return; window.JFVR_failed = true;
+  let d = document.querySelector('#load'); if (!d) { d = document.createElement('div'); d.id = 'load'; document.body.appendChild(d); }
+  d.dataset.failed = 1; d.className = 'fail';
+  const u = new URL(location.href); u.searchParams.set('r', Date.now()); const again = u.toString(); u.searchParams.set('lite', '1'); u.searchParams.delete('full');
+  d.innerHTML = '';
+  const p = document.createElement('div'); p.textContent = why; d.appendChild(p);
+  const b = document.createElement('button'); b.textContent = 'Try again'; b.onclick = () => location.replace(again); d.appendChild(b);
+  if (!window.JFVR_LITE) { const l = document.createElement('button'); l.textContent = 'Try the lighter version'; l.onclick = () => location.replace(u.toString()); d.appendChild(l); }
+};
+function watchGL(){
+  const cv = scn.canvas; if (!cv) return;
+  cv.addEventListener('webglcontextlost', e => { e.preventDefault(); window.JFVR_fail('The 3D view stopped because this device ran out of graphics memory (WebGL context lost).'); });
+}
+if (scn.canvas) watchGL(); else scn.addEventListener('render-target-loaded', watchGL);
+setTimeout(() => { if (!window.W3D_READY) window.JFVR_fail('The 3D world is taking too long to load (over 3 minutes). Check the connection and try again.'); }, 180000);
 function start(){
-  W3D.build(scn.object3D, scn).then(() => { document.querySelector('#load').remove(); goWorld('terrace'); window.W3D_READY = true; })
-    .catch(e => { const d = document.querySelector('#load'); d.innerHTML = 'The 3D world did not load (' + e + '). <button onclick="location.reload()">Try again</button>'; console.error(e); });
+  W3D.onImagery = (done, total) => { const d = document.querySelector('#load'); if (!d || d.dataset.failed) return; if (done >= total) d.remove(); else d.textContent = 'Loading imagery ' + done + '/' + total + '...'; };
+  W3D.build(scn.object3D, scn).then(() => {
+      if (window.JFVR_failed) return;
+      const d = document.querySelector('#load'); if (d) { if (window.W3D_LOADING) { d.className = 'bg'; d.textContent = 'Loading imagery...'; } else d.remove(); }
+      goWorld('terrace'); window.W3D_READY = true; })
+    .catch(e => { console.error(e); window.JFVR_fail('The 3D world did not load (' + (e && e.message || e) + ').'); });
 }
 if (scn.hasLoaded) start(); else scn.addEventListener('loaded', start);
 </script>
