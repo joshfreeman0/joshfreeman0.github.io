@@ -3,6 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Bank of the United States (3rd edition) – 360 concept tour</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="../locomotion.js"></script>
 <style>
 body{margin:0;font-family:system-ui,sans-serif}
 #ui{position:fixed;left:0;right:0;bottom:0;z-index:10;padding:10px;background:rgba(0,0,0,.65);color:#fff;text-align:center}
@@ -19,11 +20,15 @@ body{margin:0;font-family:system-ui,sans-serif}
     <img id="greenhouse" src="pano_greenhouse.jpg" crossorigin="anonymous">
   </a-assets>
   <a-sky id="sky" src="#terrace" rotation="0 -90 0"></a-sky>
-  <a-entity camera look-controls position="0 1.6 0">
+  <a-entity id="rig" wasd-controls="acceleration: 25">
+    <a-entity camera look-controls wasd-controls="enabled:false" position="0 1.6 0">
     <a-entity cursor="fuse:false; rayOrigin:mouse" raycaster="objects:.btn"></a-entity>
   </a-entity>
-  <a-entity laser-controls="hand:right" raycaster="objects:.btn"></a-entity>
-  <a-entity laser-controls="hand:left" raycaster="objects:.btn"></a-entity>
+  <a-entity laser-controls="hand:right" snap-turn raycaster="objects:.btn"></a-entity>
+  <a-entity laser-controls="hand:left" thumbstick-move raycaster="objects:.btn"></a-entity>
+  </a-entity>
+  <a-circle radius="40" rotation="-90 0 0" color="#7a6a45" opacity="0.35" transparent="true"></a-circle>
+  <a-entity id="markers"><a-cylinder position="8.0 1 0.0" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="5.7 1 5.7" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="0.0 1 8.0" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="-5.7 1 5.7" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="-8.0 1 0.0" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="-5.7 1 -5.7" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="-0.0 1 -8.0" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="5.7 1 -5.7" radius="0.25" height="2" color="#d8c79a"></a-cylinder></a-entity>
   <a-entity id="vrbar" position="0 0.6 -2.2" rotation="-25 0 0">
     <a-plane class="btn" data-t="terrace" position="-1.0 0 0" width="0.9" height="0.28" color="#c9a24a"><a-text value="Hilltop terrace" align="center" color="#111" width="2"></a-text></a-plane>
     <a-plane class="btn" data-t="grounds" position="0 0 0" width="0.9" height="0.28" color="#c9a24a"><a-text value="Grounds" align="center" color="#111" width="2"></a-text></a-plane>

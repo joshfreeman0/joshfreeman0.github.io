@@ -4,6 +4,7 @@
 <title>Josh Freeman's VR World</title>
 <meta name="description" content="Explore Josh Freeman's growing virtual world in 360. Works on Meta Quest, desktop and phone.">
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="locomotion.js"></script>
 <style>
 body{margin:0;font-family:Georgia,serif;color:#fff}
 #intro{position:fixed;top:0;left:0;right:0;z-index:10;padding:14px 18px;background:linear-gradient(rgba(0,0,0,.75),rgba(0,0,0,0));text-align:center;pointer-events:none}
@@ -17,9 +18,13 @@ body{margin:0;font-family:Georgia,serif;color:#fff}
 <a-scene vr-mode-ui="enabled: true">
   <a-assets><img id="lobby" src="bank3/pano_terrace.jpg" crossorigin="anonymous"></a-assets>
   <a-sky src="#lobby" rotation="0 -90 0"></a-sky>
-  <a-entity camera look-controls position="0 1.6 0"><a-entity cursor="rayOrigin:mouse" raycaster="objects:.world"></a-entity></a-entity>
-  <a-entity laser-controls="hand:right" raycaster="objects:.world"></a-entity>
-  <a-entity laser-controls="hand:left" raycaster="objects:.world"></a-entity>
+  <a-entity id="rig" wasd-controls="acceleration: 25">
+    <a-entity camera look-controls wasd-controls="enabled:false" position="0 1.6 0"><a-entity cursor="rayOrigin:mouse" raycaster="objects:.world"></a-entity></a-entity>
+  <a-entity laser-controls="hand:right" snap-turn raycaster="objects:.world"></a-entity>
+  <a-entity laser-controls="hand:left" thumbstick-move raycaster="objects:.world"></a-entity>
+  </a-entity>
+  <a-circle radius="40" rotation="-90 0 0" color="#7a6a45" opacity="0.35" transparent="true"></a-circle>
+  <a-entity id="markers"><a-cylinder position="8.0 1 0.0" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="5.7 1 5.7" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="0.0 1 8.0" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="-5.7 1 5.7" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="-8.0 1 0.0" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="-5.7 1 -5.7" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="-0.0 1 -8.0" radius="0.25" height="2" color="#d8c79a"></a-cylinder><a-cylinder position="5.7 1 -5.7" radius="0.25" height="2" color="#d8c79a"></a-cylinder></a-entity>
   <a-text value="Josh Freeman's VR World" position="0 2.7 -3" align="center" width="8" color="#fff"></a-text>
   <a-text value="Explore the world as it is built" position="0 2.35 -3" align="center" width="5" color="#e8d9a8"></a-text>
   <a-plane class="world" id="w-bank3" position="0 1.6 -3" width="3.6" height="0.85" color="#c9a24a">
