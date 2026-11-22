@@ -32,3 +32,32 @@ AFRAME.registerComponent('snap-turn', {
     });
   }
 });
+
+/* Fly mode: look up, point at the gold sun disk, pull trigger (or click) to toggle. */
+window.JFVR = window.JFVR || {fly: false};
+AFRAME.registerComponent('fly-toggle', {
+  init: function () {
+    this.el.addEventListener('click', () => {
+      JFVR.fly = !JFVR.fly;
+      const l = document.querySelector('#flylabel'); if (l) l.setAttribute('value', 'Fly mode: ' + (JFVR.fly ? 'ON' : 'OFF'));
+      this.el.setAttribute('color', JFVR.fly ? '#66ddff' : '#ffcc33');
+      const rig = document.querySelector('#rig'); if (!JFVR.fly && rig) rig.object3D.position.y = 0;
+    });
+  }
+});
+document.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') { const d = document.querySelector('.fly-toggle'); d && d.emit('click'); } });
+/* patch thumbstick-move to include pitch when flying */
+(function () {
+  const C = AFRAME.components['thumbstick-move'].Component.prototype, orig = C.tick;
+  C.tick = function (t, dt) {
+    if (!JFVR.fly) return orig.call(this, t, dt);
+    const rig = this.data.rig, cam = rig && rig.querySelector('[camera]');
+    if (!rig || !cam || !dt) return;
+    let {x, y} = this.axes; if (Math.abs(x) < 0.15) x = 0; if (Math.abs(y) < 0.15) y = 0; if (!x && !y) return;
+    const q = cam.object3D.getWorldQuaternion(new THREE.Quaternion());
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(q), right = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+    const step = (6 + rig.object3D.position.y * 0.5) * dt / 1000;
+    const p = rig.object3D.position; p.addScaledVector(fwd, -y * step).addScaledVector(right, x * step);
+    p.y = Math.min(Math.max(p.y, 0), 500);
+  };
+})();
