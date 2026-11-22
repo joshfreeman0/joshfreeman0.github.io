@@ -25,8 +25,8 @@ AFRAME.registerComponent('thumbstick-move', {
       const p = rig.object3D.position, s = (40 + Math.max(p.y, 0) * 1.0) * (boost ? 15 : 1) * (0.3 + 0.7 * mag) * dt / 1000;
       p.addScaledVector(f, -y * s).addScaledVector(r, x * s);
       if (Math.abs(up) >= 0.2) p.y += -up * s;
-      p.y = Math.min(Math.max(p.y, 0), 400);
-      const hr = Math.hypot(p.x, p.z); if (hr > 400) { p.x *= 400 / hr; p.z *= 400 / hr; }
+      p.y = Math.min(Math.max(p.y, JFVR.groundAt ? JFVR.groundAt(p.x, p.z, p.y) + 0.3 : 0), JFVR.flyMaxY || 400);
+      const R = JFVR.flyRadius || 400, hr = Math.hypot(p.x, p.z); if (hr > R) { p.x *= R / hr; p.z *= R / hr; }
       JFVR._alt = (JFVR._alt || 0) + dt;
       if (JFVR._alt > 500) { JFVR._alt = 0; JFVR.hud((boost ? 'BOOST - ' : 'Flying - ') + 'height ' + Math.round(p.y) + ' m'); }
       return;
@@ -61,7 +61,7 @@ AFRAME.registerComponent('fly-toggle', {
       JFVR.fly = !JFVR.fly;
       const l = document.querySelector('#flylabel'); if (l) l.setAttribute('value', 'Fly: ' + (JFVR.fly ? 'ON' : 'OFF'));
       JFVR.hud('Fly mode ' + (JFVR.fly ? 'ON - push left stick to fly' : 'OFF'));
-      const rig = document.querySelector('#rig'); if (!JFVR.fly && rig) rig.object3D.position.y = 0;
+      const rig = document.querySelector('#rig'); if (!JFVR.fly && rig && !JFVR.groundAt) rig.object3D.position.y = 0;
     };
     JFVR.toggleFly = toggle;
     el.addEventListener('click', toggle);
