@@ -68,13 +68,13 @@ W3D.buildWildlife = function (root) {
   const C = {x: 920, z: -380};
   const spawn = (fn, n, r, rmin) => { for (let i = 0; i < n; i++) { const a = fn(i); let p; do { p = randomNear(C.x, C.z, r); } while (Math.hypot(p[0] - C.x, p[1] - C.z) < (rmin || 0) && Math.random() < 0.95);
     a.g.position.set(p[0], W3D.terrainH(p[0], p[1]), p[1]); a.home = {x: p[0], z: p[1]}; a.target = randomNear(p[0], p[1], 40); a.wait = Math.random() * 4; a.phase = Math.random() * 10; root.add(a.g); animals.push(a); } };
-  spawn(i => deer(i % 3 === 0), 12, 260, 95);
-  spawn(() => turkey(), 14, 220, 95);
-  spawn(() => skunk(), 4, 200, 100);
-  spawn(() => opossum(), 4, 200, 100);
-  for (let i = 0; i < 3; i++) { const h = hawk(); h.c = {x: C.x - 120 + i * 90, z: C.z + (i - 1) * 80}; h.r = 60 + i * 25; h.alt = 70 + i * 18; h.w = 0.12 + i * 0.03; h.phase = i * 2; root.add(h.g); animals.push(h); }
+  spawn(i => deer(i % 3 === 0), 4, 300, 110); // fewer animals (Josh: 'every once in a while an animal is fine')
+  spawn(() => turkey(), 4, 260, 110);
+  spawn(() => skunk(), 1, 220, 110);
+  spawn(() => opossum(), 1, 220, 110);
+  for (let i = 0; i < 1; i++) { const h = hawk(); h.c = {x: C.x - 120 + i * 90, z: C.z + (i - 1) * 80}; h.r = 60 + i * 25; h.alt = 70 + i * 18; h.w = 0.12 + i * 0.03; h.phase = i * 2; root.add(h.g); animals.push(h); }
   // owls perched on tree crowns near the compound (top of the nearest instanced crowns isn't tracked, so perch on posts of oak-like height)
-  for (let i = 0; i < 5; i++) { const o = owl(); const p = randomNear(C.x, C.z, 200); const y = W3D.terrainH(p[0], p[1]);
+  for (let i = 0; i < 2; i++) { const o = owl(); const p = randomNear(C.x, C.z, 200); const y = W3D.terrainH(p[0], p[1]);
     const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.4, 6), new THREE.MeshLambertMaterial({color: 0x5a4330})); branch.rotation.z = Math.PI / 2; branch.position.set(p[0], y + 6.4, p[1]);
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.4, 9, 7), new THREE.MeshLambertMaterial({color: 0x5a4330})); trunk.position.set(p[0] + 0.7, y + 4.5, p[1]);
     const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(3.2, 1), new THREE.MeshLambertMaterial({color: 0x4b6f2c, flatShading: true})); crown.position.set(p[0] + 0.7, y + 11.5, p[1]);

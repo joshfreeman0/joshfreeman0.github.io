@@ -167,9 +167,9 @@ function rippleNormal() { // tileable noise height field -> normal map (no strip
    world space (so overlapping water meshes match exactly), sky reflection with Fresnel from the PBR env map. */
 function waterMat(alphaMap, river) {
   // river: dark tea-brown/olive like the real Forge River in the aerial photo, semi-transparent so the photographed riverbed shows through
-  const mat = new THREE.MeshStandardMaterial({color: river ? 0x2f3a2c : 0x1f3f3c, roughness: river ? 0.1 : 0.07, metalness: 0.0, alphaMap: alphaMap || null, alphaTest: alphaMap ? 0.5 : 0,
+  const mat = new THREE.MeshStandardMaterial({color: river ? 0x2f3a2c : 0x1d2e2a, roughness: river ? 0.1 : 0.22, metalness: 0.0, alphaMap: alphaMap || null, alphaTest: alphaMap ? 0.5 : 0,
     transparent: !!river, opacity: river ? 0.78 : 1, depthWrite: !river});
-  if (W3D.env) { mat.envMap = W3D.env; mat.envMapIntensity = river ? 0.9 : 1.0; }
+  if (W3D.env) { mat.envMap = W3D.env; mat.envMapIntensity = river ? 0.9 : 0.5; } // pond: dark, low sheen like the real lakes in the photo (was a bright cyan sky mirror)
   if (!W3D.waterU) W3D.waterU = {wN: {value: rippleNormal()}, wT: {value: 0}};
   mat.onBeforeCompile = sh => {
     sh.uniforms.wN = W3D.waterU.wN; sh.uniforms.wT = W3D.waterU.wT;
@@ -223,6 +223,12 @@ function deFight(root, cx, cz, rad) {
 }
 
 /* ---------- geometry helpers ---------- */
+function planarUV(m, T) { // UVs from world position (per face's dominant axis) so carved registers run continuously across neighbouring boxes
+  const g = m.geometry, p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv, o = m.position;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i) + o.x, y = p.getY(i) + o.y, z = p.getZ(i) + o.z, ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+    if (ay >= ax && ay >= az) uv.setXY(i, x / T, z / T); else if (ax >= az) uv.setXY(i, (n.getX(i) > 0 ? -z : z) / T, y / T); else uv.setXY(i, (n.getZ(i) > 0 ? x : -x) / T, y / T); }
+  uv.needsUpdate = true; return m;
+}
 function worldUV(geo, w, h, d, T) { // box UVs in metres/T so textures keep real scale
   const uv = geo.attributes.uv, sizes = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
   for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setXY(i, uv.getX(i) * sizes[f][0] / T, uv.getY(i) * sizes[f][1] / T); }
@@ -292,14 +298,14 @@ W3D.build = function (scene3, sceneEl) {
   W3D.lib = {box: box, floorOnly: floorOnly, canvas: canvas, tex: tex, starCeilingTex: starCeilingTex, HQ: HQ, walls: walls, floors: floors};
   return Promise.all([
     fetch(BASE + 'terrain_t.u16?v=1').then(r => r.arrayBuffer()),
-    fetch(BASE + 'trees_t.f32?v=1').then(r => r.arrayBuffer()),
-    fetch(BASE + 'water_t.json?v=1').then(r => r.json()),
+    fetch(BASE + 'trees_t2.f32?v=1').then(r => r.arrayBuffer()),
+    fetch(BASE + 'water_t.json?v=2').then(r => r.json()),
     fetch(BASE + 'ring_mid.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),
     fetch(BASE + 'ring_far.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null)
   ]).then(([hb, tb, wj, rmid, rfar]) => {
     if (rmid) RINGS.mid.h = new Int16Array(rmid); if (rfar) RINGS.far.h = new Int16Array(rfar);
     const u = new Uint16Array(hb); heights = new Float32Array(u.length); for (let i = 0; i < u.length; i++) heights[i] = u[i] * 0.01 - 10;
-    W3D.water = wj; buildTerrain(); buildWater(wj); buildRivers(wj); buildTrees(new Float32Array(tb)); buildRail(wj.rail);
+    W3D.water = wj; carveRail(wj.rail); buildTerrain(); buildWater(wj); buildRivers(wj); buildTrees(new Float32Array(tb)); buildRail(wj.rail); buildPark(wj.park);
     buildBank(); buildOffice(); buildConservatory(); buildSigns();
     if (W3D.buildRooms) try { W3D.buildRooms(root); } catch (e) { console.warn('exhibit rooms failed', e); }
     if (W3D.buildBankPlus) try { W3D.buildBankPlus(root); } catch (e) { console.warn('bank upgrade failed', e); }
@@ -450,15 +456,93 @@ function buildTrees(a) {
   const crownG = new THREE.IcosahedronGeometry(3.8, 0); crownG.scale(1, 0.85, 1); crownG.translate(0, 6.5, 0);
   mk(crownG, new THREE.MeshLambertMaterial({color: 0xffffff, flatShading: true}), dec, 0, 1, ['#4e7a2e', '#5d8a34', '#3f6b2a', '#6b8f3a']);
 }
+/* The real line passes under King Philip St (north) and E Britannia St (south) about 300 m back from the pond; it runs in a cutting
+   down to a tunnel portal just short of each road, then in tunnel under the road and the restored pond. Carves the core height grid. */
+function carveRail(R) {
+  if (!R || !R.portals || !heights) return; R.h0 = [];
+  const Lc = R.cutLen || 150, D = R.cutDepth || 7.5;
+  for (const [px, pz, a] of R.portals) {
+    const h0 = terrainH(px, pz); R.h0.push(h0);
+    const ux = -Math.sin(a), uz = -Math.cos(a);   // away from the pond, up the approach
+    for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) {
+      const x = -HALF + ix * SIZE / (N - 1), z = -HALF + iz * SIZE / (N - 1), dx = x - px, dz = z - pz, t = dx * ux + dz * uz, d = Math.abs(dx * uz - dz * ux);
+      if (t < -6 || t > Lc || d > 30) continue;
+      const floor = h0 - D * (1 - Math.max(0, t) / Lc), k = iz * N + ix; heights[k] = Math.min(heights[k], floor + Math.max(0, d - 5) * 0.9);
+    }
+  }
+}
+/* Concept: the Route 24 / I-495 interchange (real OSM position) dug under a park, with a great pyramid at its centre.
+   The park lawn drapes over the ground (hiding the highway ribbons), each carriageway enters a cut-and-cover portal at the park edge. */
+function buildPark(P) {
+  if (!P) return;
+  const NA = 48, NR = 14, pos = [], uv = [], idx = [], hAt = (x, z) => terrainH(x, z) + 0.9;
+  for (let r = 0; r <= NR; r++) for (let i = 0; i < NA; i++) { const f = r / NR, a = i / NA * Math.PI * 2, x = P.cx + Math.cos(a) * P.ax * f, z = P.cz + Math.sin(a) * P.az * f; pos.push(x, hAt(x, z), z); uv.push(x / 12, z / 12); }
+  for (let r = 0; r < NR; r++) for (let i = 0; i < NA; i++) { const a = r * NA + i, b = r * NA + (i + 1) % NA, c = a + NA, d = b + NA; idx.push(a, b, c, b, d, c); } // counter-clockwise seen from above
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+  const nr = g.attributes.normal; for (let i = 0; i < nr.count; i++) if (nr.getY(i) < 0) nr.setXYZ(i, -nr.getX(i), -nr.getY(i), -nr.getZ(i));
+  const gcv = canvas(256, 256), gg = gcv.getContext('2d'); noiseFill(gg, 256, 256, '#5e8c3c', 0.16, 9000); const gt = tex(gcv);
+  const lawn = new THREE.Mesh(g, new THREE.MeshLambertMaterial({map: gt})); lawn.material.side = THREE.FrontSide; lawn.receiveShadow = true; lawn.name = 'pyramid-park'; root.add(lawn);
+  // edge berm so the lawn meets the surrounding ground without a visible lip
+  { const bp = [], bi = []; for (let i = 0; i <= NA; i++) { const a = i / NA * Math.PI * 2, x = P.cx + Math.cos(a) * P.ax, z = P.cz + Math.sin(a) * P.az, x2 = P.cx + Math.cos(a) * (P.ax + 25), z2 = P.cz + Math.sin(a) * (P.az + 25);
+      bp.push(x, hAt(x, z), z, x2, terrainH(x2, z2) - 0.3, z2); if (i) bi.push(2 * i - 2, 2 * i, 2 * i - 1, 2 * i - 1, 2 * i, 2 * i + 1); }
+    const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(bp, 3)); bg.setIndex(bi); bg.computeVertexNormals(); const bn = bg.attributes.normal; for (let i = 0; i < bn.count; i++) if (bn.getY(i) < 0) bn.setXYZ(i, -bn.getX(i), -bn.getY(i), -bn.getZ(i)); root.add(new THREE.Mesh(bg, new THREE.MeshLambertMaterial({map: gt, side: THREE.DoubleSide}))); }
+  // gravel promenade rings + two crossing walks
+  const path = new THREE.MeshLambertMaterial({color: 0xd9cba4});
+  const ribbonOn = (pts, w) => { const pp = [], ii = []; let k = 0; for (let i = 0; i < pts.length; i++) { const [x, z] = pts[i], [nx, nz] = pts[Math.min(pts.length - 1, i + 1)], [px, pz] = pts[Math.max(0, i - 1)]; let tx = nx - px, tz = nz - pz; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+      for (const sd of [-1, 1]) { const qx = x - tz * w / 2 * sd, qz = z + tx * w / 2 * sd; pp.push(qx, hAt(qx, qz) + 0.12, qz); } if (k) ii.push(2 * k - 2, 2 * k - 1, 2 * k, 2 * k - 1, 2 * k + 1, 2 * k); k++; }
+    const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(pp, 3)); rg.setIndex(ii); rg.computeVertexNormals(); const m = new THREE.Mesh(rg, path); m.material.side = THREE.DoubleSide; root.add(m); };
+  for (const f of [0.42, 0.8]) { const ring = []; for (let i = 0; i <= 96; i++) { const a = i / 96 * Math.PI * 2; ring.push([P.cx + Math.cos(a) * P.ax * f, P.cz + Math.sin(a) * P.az * f]); } ribbonOn(ring, 6); }
+  for (const a of [0.6, 2.2]) { const line = []; for (let i = -40; i <= 40; i++) { const f = i / 40 * 0.97; line.push([P.cx + Math.cos(a) * P.ax * f, P.cz + Math.sin(a) * P.az * f]); } ribbonOn(line, 5); }
+  // the pyramid: 230 m base, 146 m tall like Khufu's, smooth white limestone casing and a gold capstone (a handful of triangles)
+  const [px, pz] = P.pyr, B = 115, Ht = 146, cap = 9; let y0 = 1e9; for (const [dx, dz] of [[-B, -B], [B, -B], [-B, B], [B, B], [0, 0]]) y0 = Math.min(y0, terrainH(px + dx, pz + dz)); y0 -= 2;
+  const c = canvas(512, 512), gc = c.getContext('2d'); noiseFill(gc, 512, 512, '#cdbb94', 0.07, 30000); gc.strokeStyle = 'rgba(150,130,95,0.25)'; for (let y = 0; y < 512; y += 16) { gc.beginPath(); gc.moveTo(0, y); gc.lineTo(512, y); gc.stroke(); }
+  const lt = tex(c); lt.repeat.set(10, 10);
+  const capB = B * cap / Ht, pg = new THREE.CylinderGeometry(capB * Math.SQRT2, B * Math.SQRT2, Ht - cap, 4, 1, true); pg.rotateY(Math.PI / 4); pg.translate(0, (Ht - cap) / 2, 0);
+  const pyr = new THREE.Mesh(pg, new THREE.MeshStandardMaterial({map: lt, roughness: 0.85, flatShading: true, envMapIntensity: 0.4})); pyr.position.set(px, y0, pz); pyr.castShadow = true; pyr.receiveShadow = true; pyr.name = 'pyramid'; root.add(pyr);
+  const cg = new THREE.ConeGeometry(capB * Math.SQRT2, cap, 4, 1, false);   // gold capstone continues the same slope to the apex cg.rotateY(Math.PI / 4); cg.translate(0, cap / 2, 0);
+  const capM = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({color: 0xd4a640, metalness: 1, roughness: 0.25, envMap: W3D.env || null, flatShading: true})); capM.position.set(px, y0 + Ht - cap, pz); root.add(capM);
+  walls.push({x0: px - B * 0.8, x1: px + B * 0.8, z0: pz - B * 0.8, z1: pz + B * 0.8, y0: y0, y1: y0 + Ht * 0.2});
+  // cut-and-cover portals where each carriageway dives under the park
+  for (const [x, z, a] of P.portals) { const gy = terrainH(x, z), g2 = new THREE.Group(); g2.position.set(x, gy, z); g2.rotation.y = a;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(17, 9, 2.5), M.stone); wall.position.set(0, 2.5, 1.5); g2.add(wall);
+    const mouth = new THREE.Mesh(new THREE.PlaneGeometry(14, 6.4), new THREE.MeshBasicMaterial({color: 0x0a0a0a})); mouth.position.set(0, 3.2, 0.2); mouth.rotation.y = Math.PI; g2.add(mouth);
+    root.add(g2); }
+  // park trees: instanced rings and groves (shared lean tree geometry)
+  const pts = []; let sd = 7; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 520; i++) { const a = rnd() * Math.PI * 2, f = 0.25 + 0.72 * Math.sqrt(rnd()), x = P.cx + Math.cos(a) * P.ax * f, z = P.cz + Math.sin(a) * P.az * f;
+    if (Math.max(Math.abs(x - px), Math.abs(z - pz)) < B + 25) continue; if (Math.abs(f - 0.42) < 0.02 || Math.abs(f - 0.8) < 0.02) continue; pts.push([x, hAt(x, z) - 0.9, z, 0.9 + rnd() * 0.5]); }
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3();
+  const tg = new THREE.CylinderGeometry(0.25, 0.35, 4, 5, 1, true); tg.translate(0, 2, 0); const crg = new THREE.IcosahedronGeometry(3.8, 0); crg.scale(1, 0.85, 1); crg.translate(0, 6.5, 0);
+  for (const [geo, mat] of [[tg, M.trunk], [crg, new THREE.MeshLambertMaterial({color: 0x5d8a34, flatShading: true})]]) { const im = new THREE.InstancedMesh(geo, mat, pts.length);
+    pts.forEach((t, i) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * 2.4); sv.set(t[3], t[3], t[3]); pv.set(t[0], t[1] - 0.3, t[2]); m4.compose(pv, q, sv); im.setMatrixAt(i, m4); }); root.add(im); }
+  W3D.parkInfo = {x: px, z: pz, y: y0, trees: pts.length};
+}
+/* The highways are "underground" in the park: once the streets layer has built its ribbons / bridge decks / labels, drop the pieces inside the park. */
+function clipStreetsToPark() {
+  const P = W3D.water && W3D.water.park; if (!P || !W3D.root) return false;
+  const inside = (x, z) => ((x - P.cx) / (P.ax - 4)) ** 2 + ((z - P.cz) / (P.az - 4)) ** 2 < 1; let found = false;
+  W3D.root.traverse(o => {
+    if (o.isMesh && (o.name === 'road-ribbons' || o.name === 'bridge-decks') && !o.userData.parkClipped) { found = true; o.userData.parkClipped = 1;
+      const g = o.geometry, p = g.attributes.position, ix = g.index; if (!ix) return; const a = ix.array, keep = [];
+      for (let i = 0; i < a.length; i += 3) { const cx = (p.getX(a[i]) + p.getX(a[i + 1]) + p.getX(a[i + 2])) / 3, cz = (p.getZ(a[i]) + p.getZ(a[i + 1]) + p.getZ(a[i + 2])) / 3; if (!inside(cx, cz)) keep.push(a[i], a[i + 1], a[i + 2]); }
+      if (keep.length < a.length) g.setIndex(keep);
+    }
+    if (o.parent && o.parent.name === 'street-labels' && inside(o.position.x, o.position.z)) o.visible = false;
+  });
+  return found;
+}
+W3D.clipStreetsToPark = clipStreetsToPark;
+{ let tries = 0; const iv = setInterval(() => { if (window.W3D_READY && (clipStreetsToPark() || ++tries > 120)) { if (tries <= 120) setTimeout(clipStreetsToPark, 3000); clearInterval(iv); } }, 1000); }
 function buildRail(R) { // real alignment (OSM: old rail line / South Coast Rail route); it passes under the restored pond in a tunnel with a portal at each shore
   if (!R) return;
   const [pN, pS] = R.portals;
-  for (const [x, z, a] of R.portals) { // a = heading from the portal toward the pond
-    const y = terrainH(x, z), g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = a;
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(12, 7.5, 2.4), M.stone); wall.position.set(0, 1.6, 1.2); wall.castShadow = true; g.add(wall);
-    const arch = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 6), new THREE.MeshBasicMaterial({color: 0x0b0b0b})); arch.position.set(0, 1.0, -0.02); arch.rotation.y = Math.PI; g.add(arch);
+  R.portals.forEach(([x, z, a], i) => { // a = heading from the portal toward the pond; the portal sits in a cutting just short of the road above it
+    const yF = terrainH(x, z), yT = Math.max(yF + 7, (R.h0 && R.h0[i]) || yF + 7.5) + 0.6, hh = yT - yF + 1.2, g = new THREE.Group(); g.position.set(x, yF, z); g.rotation.y = a;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(16, hh, 3), M.stone); wall.position.set(0, yT - yF - hh / 2 + 0.2, 1.5); wall.castShadow = true; wall.receiveShadow = true; g.add(wall);
+    const arch = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 6), new THREE.MeshBasicMaterial({color: 0x0b0b0b})); arch.position.set(0, 3.0, -0.03); arch.rotation.y = Math.PI; g.add(arch);
+    for (const sx of [-1, 1]) { const wing = new THREE.Mesh(new THREE.BoxGeometry(1.2, hh, 22), M.stone); wing.position.set(sx * 7.4, yT - yF - hh / 2 + 0.2, -10); g.add(wing); } // retaining walls along the cutting
     root.add(g);
-  }
+  });
   // ballast bed + two rails following the ground, outside the tunnel only
   const P = R.pts, segs = [[]];
   for (const p of P) { const inT = p[1] > pN[1] + 2 && p[1] < pS[1] - 2; if (inT) { if (segs[segs.length - 1].length) segs.push([]); } else segs[segs.length - 1].push(p); }
@@ -501,11 +585,11 @@ function buildBank() {
   // pylon (two battered towers + gateway)
   for (const s of [-1, 1]) {
     const zt = zc + s * 17;
-    box(7, 22, 26, 896, y0, zt, M.relief, {batter: 0.9, batterZ: 1.6, T: 6});
+    planarUV(box(7, 22, 26, 896, y0, zt, M.relief, {batter: 0.9, batterZ: 1.6, T: 6}), 6);
     box(8, 1.2, 27.5, 896, y0 + 22, zt, M.stone, {collide: false});     // cavetto cornice (simplified)
     box(0.3, 14, 1.5, 892.3, y0 + 0.5, zt - s * 3, M.gold, {collide: false}); // flagpole mast (gilded)
   }
-  box(6.4, 3, 12, 896, y0 + 14, zc, M.relief, {collide: false});    // lintel over gate (12 deep so it beds into both battered towers - no gaps)
+  planarUV(box(6.4, 3, 12, 896, y0 + 14, zc, M.relief, {collide: false}), 6);    // lintel over gate (12 deep so it beds into both battered towers - no gaps); same world-aligned carving as the towers
   const disk = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.3, 32), M.gold); disk.rotation.z = Math.PI / 2; disk.position.set(892.3, y0 + 15.5, zc); root.add(disk);
   for (const s of [-1, 1]) { const wing = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.7, 3.2), new THREE.MeshStandardMaterial({color: 0x1f5fa8, roughness: 0.4})); wing.position.set(892.35, y0 + 15.6, zc + s * 2.6); root.add(wing); }
   floorOnly(8, 9, 896, y0 + 0.2, zc);
@@ -683,6 +767,7 @@ W3D.spots = {
   hall: () => W3D.teleportTo(930, HQ.y + 0.3, HQ.z, -90),
   office: () => W3D.teleportTo(972, HQ.y + 30, HQ.z + 2, 90),
   conservatory: () => W3D.teleportTo(912, HQ.y + 0.3, HQ.z + 28.2, 180),
+  pyramid: () => { const P = W3D.water && W3D.water.park; if (!P) return; JFVR.fly = true; const l = document.querySelector('#flylabel'); if (l) l.setAttribute('value', 'Fly: ON'); JFVR.hud && JFVR.hud('Pyramid park - Route 24 / I-495 (concept)'); W3D.teleportTo(P.pyr[0] - 520, terrainH(P.pyr[0] - 520, P.pyr[1]) + 90, P.pyr[1] + 40, -90); },
   pond: () => { JFVR.fly = true; JFVR.hud && JFVR.hud('Fly mode ON - over Fowling Pond'); const l = document.querySelector('#flylabel'); if (l) l.setAttribute('value', 'Fly: ON'); W3D.teleportTo(300, 140, -250, 90); }
 };
 // desktop: Space / Shift = up / down while flying

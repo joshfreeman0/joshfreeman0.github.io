@@ -164,10 +164,10 @@ function rod(a, b, r, mat, parent, rep) { // cylinder between two points
 }
 function friezeStrip(len, h, x, y, z, ry, mat) { const geo = new THREE.PlaneGeometry(len, h); scaleUV(geo, len / 8, 1); const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; m.receiveShadow = true; (P || root).add(m); return m; }
 function wingedSun(w, x, y, z, ry, env) { // the carved winged sun disk (vr/winged-sun-stone.jpg) as a stone plaque with a relief normal map
-  const t = new THREE.TextureLoader().load('/vr/winged-sun-stone.jpg', tx => { const nm = lumNormal(tx.image, 1024, 256, 6); nm.repeat.copy(tx.repeat); nm.offset.copy(tx.offset); mat.normalMap = nm; mat.needsUpdate = true; });
-  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16; t.repeat.set(1, 0.82); t.offset.set(0, 0);   // crop the black strip at the top of the photo
+  const t = new THREE.TextureLoader().load('/vr/winged-sun-sym.jpg?v=1', tx => { const nm = lumNormal(tx.image, 1024, 256, 6); nm.repeat.copy(tx.repeat); nm.offset.copy(tx.offset); mat.normalMap = nm; mat.needsUpdate = true; });
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16; // symmetric about the disk: the photo's left half (disk, cobra, wing) mirrored, so disk, cobras and wings sit evenly over the door axis
   const mat = new THREE.MeshStandardMaterial({map: t, roughness: 0.78, envMap: env || envOut, envMapIntensity: 0.4});
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 213 / 980), mat); m.position.set(x, y, z); m.rotation.y = ry; m.receiveShadow = true; (P || root).add(m); return m;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 209 / 1213), mat); m.position.set(x, y, z); m.rotation.y = ry; m.receiveShadow = true; (P || root).add(m); return m;
 }
 function fixStoneUVs() { // boxes built without metric UVs (sphinx parts) showed squeezed tiny blocks: rescale to metres / 4
   root.traverse(o => { if (!o.isMesh || o.material !== M.stone || o.geometry.type !== 'BoxGeometry' || o.geometry.userData.bankUV) return; const uv = o.geometry.attributes.uv; let mx = 0; for (let i = 0; i < uv.count; i++) mx = Math.max(mx, uv.getX(i), uv.getY(i)); if (mx > 1.0001) return;
@@ -196,7 +196,19 @@ function buildExterior() {
   // gilded bronze gate leaves standing open in the pylon passage
   const dc = doorCanvas(); const dmat = std({map: ctex(dc.map, true), normalMap: rectNormal(dc.h, 256, 768, 3), metalness: 1, roughness: 0.32, envMapIntensity: 1.1});
   const leaf = (w, h, x, y, z) => { const g = new THREE.BoxGeometry(w, h, 0.2); const m = mesh(g, dmat, x, y + h / 2, z, null, {cast: true}); return m; };
-  for (const s of [-1, 1]) { const m = leaf(4.2, 13.4, 895.4, y0 + 0.2, zc + s * 3.75); }
+  // working gate: two leaves hung on stone jamb posts in the pylon passage; they swing open when you come near (or click them)
+  W3D.gateDoors = [];
+  for (const s of [-1, 1]) {
+    vbox(1.2, 14, 1.3, 893.6, y0, zc + s * 4.45, M.stone, {collide: false, shadow: true, T: 2});   // jamb post: fills the battered towers' gap
+    const piv = new THREE.Group(); piv.position.set(893.6, y0 + 0.25, zc + s * 3.8); (P || root).add(piv);
+    const lf = new THREE.Mesh(new THREE.BoxGeometry(0.32, 13.4, 3.78), dmat); lf.position.set(0, 6.7, -s * 1.89); lf.castShadow = true; lf.receiveShadow = true; piv.add(lf);
+    for (const hy of [1.5, 6.7, 11.9]) { const hb = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.8, 10), M.gold); hb.position.set(0, hy, 0); piv.add(hb); } // hinge barrels
+    W3D.gateDoors.push({piv: piv, s: s, a: 0});
+  }
+  { const hit = document.createElement('a-box'); hit.setAttribute('class', 'btn'); hit.setAttribute('position', `893.6 ${y0 + 7} ${zc}`); hit.setAttribute('width', 0.6); hit.setAttribute('height', 13.4); hit.setAttribute('depth', 7.6);
+    hit.setAttribute('material', 'shader: flat; opacity: 0; transparent: true; depthWrite: false');
+    hit.addEventListener('click', () => { W3D.gateManual = !W3D.gateOpenNow; W3D.gateManualT = performance.now(); });
+    document.querySelector('a-scene').appendChild(hit); }
   // banking hall: cornice + torus rolls + carved frieze + base course + steps and open gilded doors at the west door
   const hx0 = 924.25, hx1 = 965.75, hz0 = zc - 20.75, hz1 = zc + 20.75, ht = y0 + 16;
   cornice(hx0, hx1, hz0, hz1, ht - 1.3, 2.2, 1.0, corn);
@@ -435,7 +447,13 @@ W3D.buildBankPlus = function (rootIn) {
   W3D.bankBuildMs = Math.round(performance.now() - t0);
 };
 W3D.tickBank = function (t) { // the vault is only drawn when you are below ground near it (saves ~120k triangles everywhere else)
-  const cam = W3D._cam || (W3D._cam = document.querySelector('[camera]')); if (!cam || !vaultG) return; const p = cam.object3D.getWorldPosition(W3D._bv || (W3D._bv = new THREE.Vector3()));
+  const cam = W3D._cam || (W3D._cam = document.querySelector('[camera]')); if (!cam) return; const p = cam.object3D.getWorldPosition(W3D._bv || (W3D._bv = new THREE.Vector3()));
+  if (W3D.gateDoors) { // gate leaves: open when you are within ~14 m of the gate, close when you leave; a click overrides for 20 s
+    const near = Math.hypot(p.x - 894, p.z - L.HQ.z) < 14 && p.y < L.HQ.y + 16; let open = near;
+    if (W3D.gateManualT && performance.now() - W3D.gateManualT < 20000) open = W3D.gateManual; W3D.gateOpenNow = open;
+    for (const d of W3D.gateDoors) { const tgt = open ? -d.s * 1.5 : 0; d.a += Math.max(-0.035, Math.min(0.035, tgt - d.a)); d.piv.rotation.y = d.a; }
+  }
+  if (!vaultG) return;
   const inside = p.y < 33.5 && p.x > 920 && p.x < 985 && p.z > -405 && p.z < -355; if (++frames > 3) vaultG.visible = inside; if (inside) for (const f of anim) f(t);
 };
 AFRAME.registerComponent('bank-lift', { schema: {to: {type: 'string'}}, init: function () { this.el.addEventListener('click', () => { if (this.data.to === 'vault') { W3D.spots.vault(); JFVR.hud && JFVR.hud("Bank vault - Josh's account"); } else { W3D.teleportTo(942.6, L ? L.HQ.y + 0.3 : 34.3, -380, -90); JFVR.hud && JFVR.hud('Banking hall'); } }); } });
