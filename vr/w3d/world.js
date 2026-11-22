@@ -334,7 +334,7 @@ function buildBank() {
   box(41.5, 1.2, 15, 945, y0 + H, zc - 13, M.stone, {collide: false}); box(41.5, 1.2, 15, 945, y0 + H, zc + 13, M.stone, {collide: false});
   for (const s of [-1, 1]) box(40, 4, 0.6, 945, y0 + H, zc + s * 5.6, M.stone, {collide: false}); // clerestory
   box(41.5, 1.2, 12, 945, y0 + H + 4, zc, M.stone, {collide: false});
-  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), M.ceiling); ceil.rotation.x = Math.PI / 2; ceil.position.set(945, y0 + H - 0.02, zc); M.ceiling.map.repeat.set(5, 5); root.add(ceil);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), M.ceiling); ceil.rotation.x = Math.PI / 2; ceil.position.set(945, y0 + H - 0.08, zc); M.ceiling.map.repeat.set(5, 5); root.add(ceil);
   for (let i = 0; i < 6; i++) { const x = 930 + i * 6; for (const dz of [-15, -9.5, 9.5, 15]) column(x, y0 + 0.3, zc + dz, H, 1.0); for (const dz of [-3.6, 3.6]) column(x, y0 + 0.3, zc + dz, H + 4, 1.25); }
   // hall lighting (warm)
   const pl = new THREE.PointLight(0xffd9a0, 1.2, 60); pl.position.set(945, y0 + 12, zc); root.add(pl);
@@ -363,7 +363,7 @@ function buildOffice() { // top floor of the tower: polished modern-Egyptian, fu
   const x = 976, z = HQ.z, fy = HQ.y + 30, S = 18, Hh = 6;
   const f = new THREE.Mesh(worldUV(new THREE.BoxGeometry(S, 0.4, S), S, 0.4, S, S), M.officeFloor); f.position.set(x, fy - 0.2, z); f.receiveShadow = true; root.add(f);
   floorOnly(S, S, x, fy, z);
-  const ce = new THREE.Mesh(new THREE.PlaneGeometry(S, S), new THREE.MeshStandardMaterial({map: starCeilingTex(), roughness: 0.6})); ce.rotation.x = Math.PI / 2; ce.position.set(x, fy + Hh, z); root.add(ce);
+  const ce = new THREE.Mesh(new THREE.PlaneGeometry(S, S), new THREE.MeshStandardMaterial({map: starCeilingTex(), roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2})); ce.rotation.x = Math.PI / 2; ce.position.set(x, fy + Hh - 0.08, z); /* below the roof slab: no flicker */ root.add(ce);
   box(S + 1, 0.8, S + 1, x, fy + Hh, z, M.stone, {collide: false});
   box(S + 2, 0.6, S + 2, x, fy + Hh + 0.8, z, M.stone, {collide: false});
   // walls: each side = 4 stone piers + sill + lintel, 5 windows 2.6 m wide

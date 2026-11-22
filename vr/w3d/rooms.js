@@ -153,7 +153,7 @@ function pedestal(x, z, kind, ry) {
 function shell(r, wallMat, ceilMat) {
   const cx = (r.x0 + r.x1) / 2, w = r.x1 - r.x0, cz = (Z0 + Z1) / 2, d = Z0 - Z1;
   L.box(w, 0.3, d, cx, y0, cz, M.granite, {floor: true, collide: false, T: 4});
-  const ce = new THREE.Mesh(new THREE.PlaneGeometry(w, d), ceilMat); ce.rotation.x = Math.PI / 2; ce.position.set(cx, fy + HR - 0.32, cz); ce.receiveShadow = true; root.add(ce);
+  const ce = new THREE.Mesh(new THREE.PlaneGeometry(w, d), ceilMat); ce.rotation.x = Math.PI / 2; ce.position.set(cx, fy + HR - 0.4, cz); ce.receiveShadow = true; root.add(ce);
   if (wallMat) { // interior lining on the three exhibit walls
     const lin = (W, x, z, ry) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(W, HR - 0.3), wallMat); p.position.set(x, fy + (HR - 0.3) / 2, z); p.rotation.y = ry; p.receiveShadow = true; root.add(p); };
     lin(d, r.x0 + 0.01, cz, Math.PI / 2); lin(d, r.x1 - 0.01, cz, -Math.PI / 2); lin(w, cx, Z1 + 0.01, 0);
