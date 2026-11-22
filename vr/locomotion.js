@@ -77,22 +77,40 @@ JFVR.hud = function (msg) {
   clearTimeout(JFVR._h); JFVR._h = setTimeout(() => t.setAttribute('visible', false), 2500);
 };
 document.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') { JFVR.toggleFly && JFVR.toggleFly(); } });
-/* Press the LEFT thumbstick in to hide/show the menu rectangles. */
+/* Press the LEFT thumbstick in to hide/show the menu rectangles.
+   Listens for the controller event AND reads the gamepad button directly every frame. */
 AFRAME.registerComponent('menu-toggle', {
   init: function () {
-    this.el.addEventListener('thumbstickdown', () => {
-      const els = document.querySelectorAll('#vrbar, #w-bank3, .vr-menu');
-      if (!els.length) return;
-      const show = !els[0].getAttribute('visible');
-      els.forEach(m => {
-        m.setAttribute('visible', show);
-        [m, ...m.querySelectorAll('*')].forEach(c => {
-          if (show) { if (c.dataset.cls) { c.classList.add(c.dataset.cls); delete c.dataset.cls; } }
-          else ['btn', 'world'].forEach(k => { if (c.classList && c.classList.contains(k)) { c.dataset.cls = k; c.classList.remove(k); } });
-        });
+    this.last = 0; this.wasDown = false;
+    const t = () => this.toggle();
+    ['thumbstickdown', 'thumbstickclick'].forEach(ev => this.el.addEventListener(ev, t));
+  },
+  pad: function () {
+    const tc = this.el.components['tracked-controls'];
+    if (tc && tc.controller && tc.controller.gamepad) return tc.controller.gamepad;
+    const s = this.el.sceneEl.renderer && this.el.sceneEl.renderer.xr && this.el.sceneEl.renderer.xr.getSession && this.el.sceneEl.renderer.xr.getSession();
+    if (s) for (const src of s.inputSources) if (src.handedness === 'left' && src.gamepad) return src.gamepad;
+    return null;
+  },
+  tick: function () {
+    const g = this.pad(); if (!g || !g.buttons[3]) return;
+    const down = g.buttons[3].pressed;
+    if (down && !this.wasDown) this.toggle();
+    this.wasDown = down;
+  },
+  toggle: function () {
+    const now = performance.now(); if (now - this.last < 350) return; this.last = now;
+    const els = document.querySelectorAll('#vrbar, #w-bank3, .vr-menu');
+    if (!els.length) return;
+    const show = !els[0].object3D.visible;
+    els.forEach(m => {
+      m.setAttribute('visible', show); m.object3D.visible = show;
+      [m, ...m.querySelectorAll('*')].forEach(c => {
+        if (show) { if (c.dataset.cls) { c.classList.add(c.dataset.cls); delete c.dataset.cls; } }
+        else ['btn', 'world'].forEach(k => { if (c.classList && c.classList.contains(k)) { c.dataset.cls = k; c.classList.remove(k); } });
       });
-      document.querySelectorAll('[raycaster]').forEach(r => r.components.raycaster && r.components.raycaster.refreshObjects());
-      JFVR.hud && JFVR.hud(show ? 'Menu shown' : 'Menu hidden (press left stick to show)');
     });
+    document.querySelectorAll('[raycaster]').forEach(r => r.components.raycaster && r.components.raycaster.refreshObjects());
+    JFVR.hud && JFVR.hud(show ? 'Menu shown' : 'Menu hidden - press left stick to show');
   }
 });
