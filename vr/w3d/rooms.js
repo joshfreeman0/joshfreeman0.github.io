@@ -173,7 +173,7 @@ W3D.buildRooms = function (rootIn) {
   const pSlots = [[pr.x0, -406, 1], [pr.x0, -413.5, 1], [pr.x0, -421, 1], [pr.x1, -406, -1], [pr.x1, -413.5, -1], [pr.x1, -421, -1], ['N', pc.cx - 6.2], ['N', pc.cx + 6.2]];
   P.panels.forEach((p, i) => { const s = pSlots[i]; if (!s) return; const cv = panelCanvas(p);
     if (s[0] === 'N') panel(cv, 3.6, 1.8, s[1], fy + 2.0, Z1 + 0.06, 0);
-    else { panel(cv, 3.6, 1.8, s[0] + s[2] * 0.06, fy + 2.0, s[1], s[2] * Math.PI / 2); if (p.model) pedestal(s[0] + s[2] * 2.3, s[1], p.model, s[2] * Math.PI / 2); } });
+    else { panel(cv, 3.6, 1.8, s[0] + s[2] * 0.06, fy + 2.0, s[1], s[2] * Math.PI / 2); if (p.model) pedestal(s[0] + s[2] * 1.5, s[1] + 3.75, p.model, s[2] * Math.PI / 2); /* beside the panel, in the gap, so the text stays readable */ } });
   panel(titleCanvas(P.title, P.subtitle), 7, 1.75, pc.cx, fy + 6.5, Z1 + 0.06, 0);
   panel(plaqueCanvas(P.plaque), 3.0, 1.5, pc.cx, fy + 1.8, Z1 + 0.06, 0);
   // centre piece: the model of any north-wall exhibit (the warp concept) at 1.6x on a round plinth
