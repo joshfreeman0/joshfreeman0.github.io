@@ -13,6 +13,19 @@ AFRAME.registerComponent('thumbstick-move', {
     if (!rig || !cam || !dt) return;
     let {x, y} = this.axes;
     if (Math.abs(x) < 0.15) x = 0; if (Math.abs(y) < 0.15) y = 0;
+    const fly = window.JFVR && JFVR.fly, up = (window.JFVR && JFVR.upAxis) || 0;
+    if (fly) {
+      if (!x && !y && Math.abs(up) < 0.2) return;
+      const q = cam.object3D.getWorldQuaternion(new THREE.Quaternion());
+      const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q), r = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+      const p = rig.object3D.position, s = (8 + Math.max(p.y, 0) * 0.5) * dt / 1000;
+      p.addScaledVector(f, -y * s).addScaledVector(r, x * s);
+      if (Math.abs(up) >= 0.2) p.y += -up * s;
+      p.y = Math.min(Math.max(p.y, 0), 500);
+      JFVR._alt = (JFVR._alt || 0) + dt;
+      if (JFVR._alt > 500) { JFVR._alt = 0; JFVR.hud('Flying - height ' + Math.round(p.y) + ' m'); }
+      return;
+    }
     if (!x && !y) return;
     const yaw = new THREE.Euler().setFromQuaternion(cam.object3D.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y;
     const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
@@ -26,7 +39,7 @@ AFRAME.registerComponent('snap-turn', {
   init: function () {
     this.ready = true;
     this.el.addEventListener('thumbstickmoved', e => {
-      const x = e.detail.x;
+      const x = e.detail.x; if (window.JFVR) JFVR.upAxis = e.detail.y;
       if (this.ready && Math.abs(x) > 0.7) { this.data.rig.object3D.rotation.y -= Math.sign(x) * THREE.MathUtils.degToRad(this.data.angle); this.ready = false; }
       if (Math.abs(x) < 0.3) this.ready = true;
     });
@@ -64,22 +77,6 @@ JFVR.hud = function (msg) {
   clearTimeout(JFVR._h); JFVR._h = setTimeout(() => t.setAttribute('visible', false), 2500);
 };
 document.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') { JFVR.toggleFly && JFVR.toggleFly(); } });
-/* patch thumbstick-move to include pitch when flying */
-(function () {
-  const C = AFRAME.components['thumbstick-move'].Component.prototype, orig = C.tick;
-  C.tick = function (t, dt) {
-    if (!JFVR.fly) return orig.call(this, t, dt);
-    const rig = this.data.rig, cam = rig && rig.querySelector('[camera]');
-    if (!rig || !cam || !dt) return;
-    let {x, y} = this.axes; if (Math.abs(x) < 0.15) x = 0; if (Math.abs(y) < 0.15) y = 0; if (!x && !y) return;
-    const q = cam.object3D.getWorldQuaternion(new THREE.Quaternion());
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(q), right = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
-    const step = (6 + rig.object3D.position.y * 0.5) * dt / 1000;
-    const p = rig.object3D.position; p.addScaledVector(fwd, -y * step).addScaledVector(right, x * step);
-    p.y = Math.min(Math.max(p.y, 0), 500);
-  };
-})();
-
 /* Press the LEFT thumbstick in to hide/show the menu rectangles. */
 AFRAME.registerComponent('menu-toggle', {
   init: function () {
