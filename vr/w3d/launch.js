@@ -5,11 +5,11 @@
    - Launch pad (centre = Josh's map pin, 41.95546 N, -70.9520194 W = world 9617, -2976.9): octagonal concrete pad, painted landing
      circle / chevrons / name, flame trench + deflector, edge lights, service tower + umbilical arm and a full-size copy of the
      nuclear thermal rocket from the Propulsion hall.
-   - Pulling the right trigger (or click / tap) on that rocket boards it and flies a ~38 s scripted Earth -> Mars trip, built on demand and
-     disposed afterwards; on touchdown it fades out, ends the WebXR session and opens Red Planet Lounge at its landing pad.
+   - Pulling the right trigger (or click / tap) on that rocket boards it and flies a ~15 s scripted Earth half of the trip (lift-off, climb, Earth shrinking, Moon flyby, stars), built on demand and
+     disposed afterwards; once only stars are left it opens Red Planet Lounge (which plays the Mars half) with the WebXR session live.
    - Multi-rider (Josh): several people board (trigger/click on the rocket), anyone aboard presses Launch, and every rider gets the
      same 3 s countdown and flight from one shared start (p2p room action 'rkt': launch phase + rider list; riders stand side by
-     side on one gallery). Boarding closes once the countdown starts. At touchdown everyone opens Red Planet Lounge together.
+     side on one gallery). Boarding closes once the countdown starts. In deep space everyone opens Red Planet Lounge together.
      Solo / ?nomp=1 works the same (board, Launch).
    - Far-edge haze: radial fog closes in as you fly out east so the 16 km edge of the terrain never shows against the sky. */
 (function () {
@@ -162,14 +162,11 @@ function goMars() { if (going) return; going = true; window.location.assign(MARS
 W3D.goMars = goMars;
 
 /* ---------- the flight: built on demand, disposed afterwards ---------- */
-const T = {count: 3, lift: 13, space: 19, cruise: 28, land: 38, end: 40};   // seconds (3 s shared countdown, then lift-off)
+const T = {count: 3, lift: 9, space: 11.5, moon0: 11, moon1: 16, stars: 16.5, end: 18};   // seconds: 3 s shared countdown, then ~15 s Earth half (lift-off, climb, Earth shrinking, Moon flyby, stars only); RPL plays the Mars half
 function earthTex() { return canvasTex(512, 256, (c, w, h) => { c.fillStyle = '#1d4f8f'; c.fillRect(0, 0, w, h); let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < 70; i++) { const x = r() * w, y = h * (0.15 + r() * 0.7), rr = 10 + r() * 34; c.fillStyle = r() < 0.5 ? '#4f7a3a' : '#8a7a4c'; c.beginPath(); c.ellipse(x, y, rr * 1.6, rr, r() * 3, 0, Math.PI * 2); c.fill(); }
   c.fillStyle = '#eef3f6'; c.fillRect(0, 0, w, 14); c.fillRect(0, h - 14, w, 14);
   c.fillStyle = 'rgba(255,255,255,0.55)'; for (let i = 0; i < 90; i++) { c.beginPath(); c.ellipse(r() * w, r() * h, 8 + r() * 30, 3 + r() * 6, 0, 0, Math.PI * 2); c.fill(); } }); }
-function marsTex(ground) { return canvasTex(ground ? 1024 : 512, ground ? 1024 : 256, (c, w, h) => { c.fillStyle = '#b5532d'; c.fillRect(0, 0, w, h); let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
-  for (let i = 0; i < (ground ? 900 : 160); i++) { const x = r() * w, y = r() * h, rr = (ground ? 2 : 3) + r() * (ground ? 26 : 22); c.fillStyle = ['#9c4426', '#c7693c', '#8a3a22', '#d0804f'][Math.floor(r() * 4)]; c.globalAlpha = 0.5; c.beginPath(); c.arc(x, y, rr, 0, Math.PI * 2); c.fill(); }
-  c.globalAlpha = 1; if (!ground) { c.fillStyle = '#f1e6dc'; c.fillRect(0, 0, w, 8); c.fillRect(0, h - 8, w, 8); } }); }
 function label(text) { const t = canvasTex(1024, 192, (c, w, h) => { c.fillStyle = 'rgba(10,12,18,0.72)'; c.fillRect(0, 0, w, h); c.fillStyle = '#ffd27a'; c.font = 'bold 84px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, w / 2, h / 2 + 4); });
   return new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.45), new THREE.MeshBasicMaterial({map: t, transparent: true, depthTest: false, toneMapped: false})); }
 function startFlight(o) {
@@ -201,14 +198,9 @@ function startFlight(o) {
   const stars = new THREE.Points(starG, new THREE.PointsMaterial({color: 0xffffff, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false})); stars.renderOrder = -8; F.add(stars);
   const shell = new THREE.Mesh(new THREE.SphereGeometry(6000, 24, 12), new THREE.MeshBasicMaterial({color: 0x000004, side: THREE.BackSide, transparent: true, opacity: 0, fog: false, depthWrite: false})); shell.renderOrder = -9; F.add(shell);
   const earth = new THREE.Mesh(new THREE.SphereGeometry(6000, 48, 24), new THREE.MeshLambertMaterial({map: earthTex()})); earth.visible = false; F.add(earth);
-  const mars = new THREE.Mesh(new THREE.SphereGeometry(3000, 48, 24), new THREE.MeshLambertMaterial({map: marsTex(false)})); mars.visible = false; F.add(mars);
-  const mg = new THREE.Group(); mg.visible = false; F.add(mg);
-  const gt = marsTex(true); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(40, 40);
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(9000, 48), new THREE.MeshLambertMaterial({map: gt})); ground.rotation.x = -Math.PI / 2; mg.add(ground);
-  for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2 + 0.3, d = 900 + Math.random() * 1600, hill = new THREE.Mesh(new THREE.ConeGeometry(300 + Math.random() * 500, 120 + Math.random() * 260, 7), new THREE.MeshLambertMaterial({color: 0x9a4728, flatShading: true})); hill.position.set(Math.cos(a) * d, 40, Math.sin(a) * d); mg.add(hill); }
-  const mpad = new THREE.Mesh(new THREE.CylinderGeometry(20, 21, 0.6, 8), new THREE.MeshStandardMaterial({color: 0x8f8a84, roughness: 0.9})); mpad.position.y = 0.3; mg.add(mpad);
-  const mpm = new THREE.Mesh(new THREE.RingGeometry(14, 15.2, 48), new THREE.MeshBasicMaterial({color: 0xf2c230})); mpm.rotation.x = -Math.PI / 2; mpm.position.y = 0.62; mg.add(mpm);
-  const sunL = new THREE.DirectionalLight(0xffffff, 1.6); sunL.position.set(1, 0.6, 0.4); F.add(sunL); F.add(new THREE.AmbientLight(0x404050, 0.6));
+  // Moon for the flyby (Mars itself is Red Planet Lounge's half of the trip)
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(1700, 32, 16), new THREE.MeshLambertMaterial(W3D.transitTex ? {map: W3D.transitTex.moon()} : {color: 0x9c9a94})); moon.visible = false; F.add(moon);
+  const sunL = new THREE.DirectionalLight(0xffffff, 1.6); sunL.position.set(1, 0.6, 0.4); F.add(sunL); F.add(sunL.target); F.add(new THREE.AmbientLight(0x404050, 0.6));
   const fade = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 8), new THREE.MeshBasicMaterial({color: 0x000000, side: THREE.BackSide, transparent: true, opacity: 1, depthTest: false, depthWrite: false, fog: false})); fade.renderOrder = 1e4; cam.add(fade);
   const txt = label('T-5'); txt.renderOrder = 1e4 - 1; F.add(txt);
   // in-world Skip / Cancel buttons (laser) + HTML ones (phone / desktop)
@@ -226,13 +218,14 @@ function startFlight(o) {
   const place = (y) => { // rider at (P0.x, y, P0.z); rocket base at y - DECK
     const rp = rig.object3D.position, cw = cam.getWorldPosition(new THREE.Vector3()); rp.x += P0.x - cw.x; rp.z += P0.z - cw.z; rp.y = y;
     deck.position.set(P0c.x, y, P0c.z); rocket.position.set(P0.x + rocketOff.x, y - DECK, P0.z + rocketOff.z); };
-  const world = (on) => { if (W3D.root) W3D.root.visible = on; s3.fog = on ? W3D.fog : null; };
+  const world = (on) => { if (W3D.root) W3D.root.visible = on; s3.fog = on ? W3D.fog : null; W3D.spaceView = !on; };
   const yAt = t => { const base = PAD.top + 0.6 + DECK; if (t < T.count) return base; const u = t - T.count; return base + 0.5 * 9 * u * u + (u > 6 ? 0.5 * 40 * (u - 6) * (u - 6) : 0); }; // smooth, increasing acceleration
   if (patch && patch.rocket) patch.rocket.visible = false;
   function finish(toMars) {
     // Quest fix: window.requestAnimationFrame does not fire during an immersive WebXR session (only the session's rAF does), so the fade
     // steps from the A-Frame tick (XR frame loop) with a setTimeout fallback that always completes it.
     if (done) return; done = true; RK.aboard = false; rkState(); ending = {t: performance.now(), toMars, fin: false};
+    if (toMars) { endNow(); return; }   // hand-off happens in deep space with only stars showing: navigate straight away, session live, no black fade
     stepEnd(); setTimeout(endNow, 900);
   }
   let ending = null;
@@ -251,8 +244,8 @@ function startFlight(o) {
   flight = {tick: () => {
     if (done) { stepEnd(); return; }
     const t = (performance.now() - t0) / 1000, cw = cam.getWorldPosition(new THREE.Vector3());
-    // fade in at start, a short fade at the space -> Mars-descent cut, fade out at touchdown
-    let fo = t < 0.8 ? 1 - t / 0.8 : 0; if (t > T.cruise - 0.8 && t < T.cruise + 0.8) fo = 1 - Math.abs(t - T.cruise) / 0.8; fade.material.opacity = fo;
+    // fade in at the start only; the end is a clean star field (RPL picks up from deep space)
+    fade.material.opacity = t < 0.8 ? 1 - t / 0.8 : 0;
     stars.position.copy(cw); shell.position.copy(cw);
     // HUD text and buttons float ahead of the rider (along the boarding yaw, no head locking)
     const ahead = cw.clone().addScaledVector(fwd, 3); txt.position.set(ahead.x, cw.y + 0.55, ahead.z); txt.lookAt(cw.x, cw.y + 0.55, cw.z);
@@ -267,22 +260,18 @@ function startFlight(o) {
         const s = 6 + age * 5; sp.scale.set(s, s, 1); sp.material.opacity = age > 0 ? Math.min(0.7, age * 0.5) * Math.max(0, 1 - age / 12) : 0; });
       const k = smooth((t - T.count - 2) / (T.lift - T.count - 2)); shell.material.opacity = k * 0.97; stars.material.opacity = smooth((k - 0.5) * 2);
       if (W3D.fog) { W3D.fog.color.copy(fogC).lerp(black, k); W3D.fog.near = 2000 * (1 - k) + 300; W3D.fog.far = 8200 * (1 - k) + 2500; } s3.background = W3D.fog ? W3D.fog.color : black;
-    } else if (t < T.cruise) {                            // 3-4: Earth falls away below, then a short cruise while Mars grows ahead
-      world(false); s3.background = black; flame.visible = true; smoke.forEach(sp => sp.visible = false);
-      const Y = yAt(T.lift); place(Y); shell.material.opacity = 1; stars.material.opacity = 1;
-      const u = (t - T.lift) / (T.space - T.lift); earth.visible = true; const ed = 6000 + 400 + 22000 * smooth(Math.min(1, u * 0.5 + (t - T.lift) / (T.cruise - T.lift) * 0.5));
-      earth.position.set(cw.x - fwd.x * 2000, cw.y - ed, cw.z - fwd.z * 2000); earth.rotation.y = t * 0.02;
-      const m = smooth((t - T.space + 2) / (T.cruise - T.space + 2)); mars.visible = t > T.space - 2; const md = 26000 - 20500 * m;
-      mars.position.set(cw.x + fwd.x * md * 0.82, cw.y + md * 0.57, cw.z + fwd.z * md * 0.82); mars.rotation.y = t * 0.03;
-      setTxt(t < T.space ? 'Leaving Earth' : 'Cruise to Mars');
-      flame.scale.setScalar(t < T.space ? 1 : 0.6);
-    } else if (t < T.land) {                              // 5: descent with a retro-burn onto the Mars landing pad
-      earth.visible = false; mars.visible = false; mg.visible = true; mg.position.set(PAD.x, PAD.g, PAD.z);
-      shell.material.color.copy(tan); shell.material.opacity = 1; stars.material.opacity = 0.0; s3.background = tan;
-      const u = (t - T.cruise) / (T.land - T.cruise), y = PAD.g + 0.6 + DECK + 1600 * Math.pow(1 - u, 2.2); place(y);
-      flame.visible = true; flame.scale.set(0.8, 0.6 + 0.6 * (1 - u), 0.8); setTxt(u < 0.85 ? 'Retro-burn - descending' : 'Touchdown');
-    } else {                                              // touchdown: fade to black, then Red Planet Lounge
-      flame.visible = false; place(PAD.g + 0.6 + DECK); setTxt('Welcome to Mars'); if (t > T.end) finish(true);
+    } else {                                              // 3-5: Earth shrinks away below, close Moon flyby, then stars only -> Red Planet Lounge
+      // the background is black now; hide the (transparent, depth-tested) sky shell or it would paint over the Moon and Earth beyond its 6 km radius
+      world(false); s3.background = black; smoke.forEach(sp => sp.visible = false); shell.visible = false; stars.material.opacity = 1;
+      place(yAt(T.lift)); flame.visible = t < T.stars; flame.scale.setScalar(t < T.space ? 1 : 0.6);
+      // Earth drops away ahead-below and shrinks to a far disc (scaled globe: the camera far plane is 30 km)
+      const u = smooth((t - T.lift) / (T.stars - T.lift)), ed = 7200 + 15000 * u, es = 1 - 0.85 * u, el = 0.8 - 0.45 * u;
+      earth.visible = t < T.stars; earth.scale.setScalar(es); earth.position.set(cw.x + fwd.x * Math.cos(el) * ed, cw.y - Math.sin(el) * ed, cw.z + fwd.z * Math.cos(el) * ed); earth.rotation.y = t * 0.02;
+      sunL.position.set(cw.x - fwd.x * 800 + side.x * 300, cw.y + 500, cw.z - fwd.z * 800 + side.z * 300); sunL.target.position.copy(cw);   // sun over your shoulder
+      const um = smooth((t - T.moon0) / (T.moon1 - T.moon0));                                  // Moon: from far ahead-right, past ~4 km off the right side, behind you
+      moon.visible = t > T.moon0 - 0.5 && t < T.stars; moon.position.set(cw.x + fwd.x * (24000 - 30000 * um) + side.x * 4300, cw.y + 2500 - 2600 * um, cw.z + fwd.z * (24000 - 30000 * um) + side.z * 4300); moon.rotation.y = t * 0.05;
+      setTxt(t < T.space ? 'Leaving Earth' : t < T.stars ? 'Passing the Moon' : 'Deep space - next stop Mars');
+      if (t > T.end) finish(true);
     }
   }};
   if (!AFRAME.components['w3d-ride']) AFRAME.registerComponent('w3d-ride', {tick: function () { flight && flight.tick(); }});

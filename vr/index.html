@@ -58,7 +58,7 @@ window.JFVR_LITE = (function () {
 <script src="w3d/cities.js?v=6"></script>
 <script src="w3d/saucer.js?v=6"></script>
 <script src="w3d/office.js?v=1"></script>
-<script src="w3d/roam.js?v=2"></script>
+<script src="w3d/roam.js?v=3"></script>
 <script src="w3d/shore.js?v=1"></script>
 <script src="w3d/doors.js?v=1"></script>
 <script src="w3d/vesta.js?v=2"></script>
@@ -67,7 +67,8 @@ window.JFVR_LITE = (function () {
 <script src="w3d/wildlife.js?v=4"></script>
 <script src="w3d/streets.js?v=10"></script>
 <script src="w3d/zoo.js?v=2"></script>
-<script src="w3d/launch.js?v=4"></script>
+<script src="w3d/transit.js?v=1"></script>
+<script src="w3d/launch.js?v=5"></script>
 <script src="w3d/invite.js?v=1"></script>
 <script src="w3d/realism.js?v=1"></script>
 <script>
@@ -232,7 +233,7 @@ function arrivalSpot(){ const sp = (QS.get('spot') || '').toLowerCase(), k = SPO
   if (!W3D.spots.temple) W3D.spots.temple = () => W3D.teleportTo(866, undefined, -380, -90);   // between the sphinxes, facing the gate
   if (FROM_MARS && (!k || k === 'launchpad') && W3D.spots.padland) return 'padland';   // back from Mars: on the pad deck beside the rocket
   if (k && W3D.spots[k]) return k; return FROM_MARS ? 'launchpad' : 'terrace'; }
-function arrivalToast(){ if (FROM_MARS) setTimeout(() => { if (W3D.toast) W3D.toast('Welcome back from Mars', 4000); else if (JFVR.hud) JFVR.hud('Welcome back from Mars'); }, 600); }
+function arrivalToast(){ if (FROM_MARS && !(W3D.arrival && W3D.arrival.active)) setTimeout(() => { if (W3D.toast) W3D.toast('Welcome back from Mars', 4000); else if (JFVR.hud) JFVR.hud('Welcome back from Mars'); }, 600); }
 /* XR before the world is ready (sessiongranted auto-enter starts the session while assets still load): a black cover around the head
    with a small 'Loading' line, removed as soon as the world is built. W3D.arrivalCover lets the Mars-arrival flight take over. */
 function xrCover(){ if (window.W3D_READY || window.JFVR_COVER || (window.W3D && W3D.arrivalCover)) return; const camE = document.querySelector('[camera]'); if (!camE) return;
