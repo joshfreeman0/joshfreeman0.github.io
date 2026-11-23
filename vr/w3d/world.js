@@ -862,8 +862,10 @@ function buildOffice() { // top floor of the tower: polished modern-Egyptian, fu
     const gl = new THREE.Mesh(new THREE.PlaneGeometry(S, Hh - 2.15), M.glass); gl.position.set(cx, fy + 0.85 + (Hh - 2.15) / 2, cz); if (!along) gl.rotation.y = Math.PI / 2; root.add(gl);
   }
   // desk, chair, small gilded obelisks
-  box(3.2, 0.12, 1.4, x + 3, fy + 0.78, z, M.granite, {collide: false}); box(0.4, 0.78, 1.2, x + 1.6, fy, z, M.marble, {}); box(0.4, 0.78, 1.2, x + 4.4, fy, z, M.marble, {});
-  box(0.7, 0.5, 0.7, x + 4.1, fy, z, M.marble, {collide: false}); box(0.7, 1.0, 0.12, x + 4.42, fy + 0.5, z, M.marble, {collide: false});
+  // rectangular desk + chair moved intact from the centre to the east side wall (centre now holds the round desk, w3d/office.js);
+  // same pieces turned 90 deg: desk along the wall, chair between desk and window, you sit facing into the room
+  const dx = x + 6.3; box(1.4, 0.12, 3.2, dx, fy + 0.78, z, M.granite, {collide: false}); box(1.2, 0.78, 0.4, dx, fy, z - 1.4, M.marble, {}); box(1.2, 0.78, 0.4, dx, fy, z + 1.4, M.marble, {});
+  box(0.7, 0.5, 0.7, dx + 1.1, fy, z, M.marble, {collide: false}); box(0.12, 1.0, 0.7, dx + 1.42, fy + 0.5, z, M.marble, {collide: false});
   for (const s of [-1, 1]) { const ob = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 2.2, 4), M.gold); ob.position.set(x + 6.5, fy + 1.1, z + s * 6.5); root.add(ob); }
   const l = new THREE.PointLight(0xfff1d0, 0.8, 30); l.position.set(x, fy + 4.5, z); root.add(l);
   W3D.liftOffice = {x: x - 5.5, y: fy, z: z + 5.5};
