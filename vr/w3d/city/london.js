@@ -5,7 +5,7 @@
    streets where OSM has no footprints. No names are shown anywhere in the scene. Local frame: pad centre = (0, 0, 0). */
 (function () {
 'use strict';
-W3D.cityModules.london = (grp, K) => fetch('/vr/w3d/city/london.json?v=1').then(r => r.json()).then(D => build(grp, K, D));
+W3D.cityModules.london = (grp, K) => fetch('/vr/w3d/city/london.json?v=2').then(r => r.json()).then(D => build(grp, K, D));
 function build(grp, K, D) {
   const L = K.LITE, R = 470, out = {R: 3000, fog: L ? [0xc3c9cf, 90, 560] : [0xc3c9cf, 120, 680], sky: 0xc6ccd2};
   const r = K.rnd(42), UP = new THREE.Vector3(0, 1, 0);
@@ -67,17 +67,22 @@ function build(grp, K, D) {
   const ovl = (a, c) => Math.max(0, Math.min(a[1], c[1]) - Math.max(a[0], c[0])) * Math.max(0, Math.min(a[3], c[3]) - Math.max(a[2], c[2]));
   const bbs = D.b.map(b => bbox(b.p)), bar = bb => (bb[1] - bb[0]) * (bb[3] - bb[2]);
   const keep = D.b.map((b, i) => !(b.h || b.lv) ? !bbs.some((o, j) => j !== i && bar(o) > bar(bbs[i]) && ovl(o, bbs[i]) > 0.6 * bar(bbs[i]) && K.inPoly((bbs[i][0] + bbs[i][1]) / 2, (bbs[i][2] + bbs[i][3]) / 2, D.b[j].p)) : true);
-  const blds = D.b.filter((b, i) => keep[i]).map((b, i) => ({p: b.p, k: b.k, lv: b.lv, h: b.h, eps: (i % 9) * 0.07})), occ = blds.map(b => bbox(b.p));
+  const blds = D.b.filter((b, i) => keep[i]).map((b, i) => ({p: b.p, k: b.k, lv: b.lv, h: b.h, hl: b.hl, mh: b.mh, eps: (i % 9) * 0.07})), occ = blds.map(b => bbox(b.p));
   const nOSM = blds.length; W3D.londonDeduped = D.b.length - nOSM;
   const free = P => { const bb = bbox(P), c = [(bb[0] + bb[1]) / 2, (bb[2] + bb[3]) / 2]; for (let i = 0; i < occ.length; i++) { const o = occ[i]; if (bb[0] < o[1] + 1 && bb[1] > o[0] - 1 && bb[2] < o[3] + 1 && bb[3] > o[2] - 1) { if (i >= nOSM) return false; if (K.inPoly(c[0], c[1], blds[i].p) || P.some(q => K.inPoly(q[0], q[1], blds[i].p))) return false; } } return true; };
   // terraced houses along residential streets where OSM has no footprints
-  const resPolys = D.a.filter(a => a.k === 'residential').map(a => a.p); let nh = 0; const HMAX = L ? 170 : 380;
+  const resPolys = D.a.filter(a => a.k === 'residential').map(a => a.p); let nh = 0; const HMAX = D.b.some(b => b.src === 'ml') ? 0 : L ? 170 : 380;   // no invented terraces once real (OSM + ML) footprints cover the streets
   roads.filter(rd => rd.k === 'residential' || rd.k === 'unclassified').forEach(rd => { for (let i = 1; i < rd.p.length && nh < HMAX; i++) { const a = rd.p[i - 1], b = rd.p[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (l < 12) continue; const dx = (b[0] - a[0]) / l, dz = (b[1] - a[1]) / l;
       for (const s of [-1, 1]) for (let t = 6; t < l - 6 && nh < HMAX; t += 6.2) { const off = W[rd.k] / 2 + 9, cx = a[0] + dx * t - dz * off * s, cz = a[1] + dz * t + dx * off * s; if (Math.abs(cx) > R - 10 || Math.abs(cz) > R - 10 || Math.hypot(cx, cz) < 40) continue;
         if (!resPolys.some(P => K.inPoly(cx, cz, P))) continue; const P = [[-2.85, -4.8], [2.85, -4.8], [2.85, 4.8], [-2.85, 4.8]].map(([u, v]) => [cx + dx * u - dz * v * s, cz + dz * u + dx * v * s]);
         if (!free(P) || nearRoad(cx, cz, 4.4)) continue; blds.push({p: P, k: 'terrace', lv: 2, gen: 1, rang: Math.atan2(dz, dx)}); occ.push(bbox(P)); nh++; } } });
   const T = K.tex, mats = {red: K.lamb({map: T.brick([142, 64, 46]), side: THREE.DoubleSide}), buff: K.lamb({map: T.brick([190, 160, 112], '#c9bfae'), side: THREE.DoubleSide}), brown: K.lamb({map: T.brick([120, 74, 52]), side: THREE.DoubleSide}), render: K.lamb({map: T.render('#e6e1d6'), side: THREE.DoubleSide}), tiles: K.lamb({map: T.tiles([96, 52, 42]), side: THREE.DoubleSide}), slate: K.lamb({map: T.tiles([70, 74, 80]), side: THREE.DoubleSide}), flat: K.lamb({map: T.render('#4c4f52'), side: THREE.DoubleSide})};
-  const geo = {red: [], buff: [], brown: [], render: [], tiles: [], slate: [], flat: []}, coll = [], win = [], ENT = D.ent;
+  const geo = {red: [], buff: [], brown: [], render: [], tiles: [], slate: [], flat: []}, coll = [], holes = [], win = [], ENT = D.ent;
+  // courtyards (multipolygon inner rings): walls facing into the yard, roof cap with the hole cut out, walkable inside
+  const flipN = g => { const n = g.attributes.normal; for (let i = 0; i < n.count; i++) n.setXYZ(i, -n.getX(i), -n.getY(i), -n.getZ(i)); return g; };
+  const capH = (P, HL, y, su) => { const sh = new THREE.Shape(P.map(p => new THREE.Vector2(p[0], p[1]))); for (const h of HL) sh.holes.push(new THREE.Path(h.map(p => new THREE.Vector2(p[0], p[1]))));
+    const g = new THREE.ShapeGeometry(sh); g.rotateX(Math.PI / 2); const pa = g.attributes.position, uv = g.attributes.uv; for (let i = 0; i < pa.count; i++) { pa.setY(i, y); uv.setXY(i, pa.getX(i) / (su || 4), pa.getZ(i) / (su || 4)); }
+    const n = g.attributes.normal; for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 1, 0); const ix = g.index; if (ix) { const a = ix.array; for (let i = 0; i < a.length; i += 3) { const t = a[i + 1]; a[i + 1] = a[i + 2]; a[i + 2] = t; } } return g.index ? g.toNonIndexed() : g; };
   const winStep = L ? 4.6 : 3.4, winR = L ? 300 : 470;
   blds.forEach(b => {
     const P = K.ccw(b.p), A = Math.abs(K.area(P)); if (A < 6) return;
@@ -90,6 +95,8 @@ function build(grp, K, D) {
     // brick parapet on the very same faces (coplanar), so the roof line flickered white / brick. The wall now stops where the band
     // starts, and modern blocks get no second parapet prism.
     geo[wm].push(K.prism(P, y0, modern ? h - 0.2 : h + 0.3, {su: 1.2, sv: 1.2}));
+    const HL = (b.hl || []).filter(q => q.length >= 3).map(q => K.ccw(q));
+    for (const q of HL) { geo[wm].push(flipN(K.prism(q, y0, h + 1.0, {su: 1.2, sv: 1.2}))); holes.push({p: q, y0: y0, top: y0 + h + 2}); }
     if (modern) geo.render.push(K.prism(P, y0 + h - 0.2, 1.0, {su: 1, sv: 1}));   // rendered parapet band (cap sits 0.5 m below its top)
     coll.push({p: P, y0: y0, top: y0 + h + 2});
     const bb = bbox(P);
@@ -102,13 +109,13 @@ function build(grp, K, D) {
       const uvs = rg.attributes.uv; for (let i = 0; i < uvs.count; i++) uvs.setXY(i, uvs.getX(i) * 0.5, uvs.getY(i) * 0.5);
       const mu = (u0 + u1) / 2, mv = (v0 + v1) / 2; rg.rotateY(Math.PI / 2 - ang); rg.translate(cx + mu * ca - mv * sa, y0 + h + 0.3, cz + mu * sa + mv * ca);
       geo[old ? 'slate' : 'tiles'].push(rg);
-    } else { geo.flat.push(K.cap(P, y0 + h + 0.3, 6)); if (!modern) geo[wm].push(K.prism(P, y0 + h + 0.3, 0.7, {su: 1.2, sv: 1.2})); }
+    } else { geo.flat.push(HL.length ? capH(P, HL, y0 + h + 0.3, 6) : K.cap(P, y0 + h + 0.3, 6)); if (!modern) geo[wm].push(K.prism(P, y0 + h + 0.3, 0.7, {su: 1.2, sv: 1.2})); }
     if (!lv || Math.min(...P.map(q => Math.hypot(q[0], q[1]))) > winR) return;
     for (const w of K.winList(P, y0 + 0.15, lv, {step: winStep, fh: 3.1, sx: modern ? 1.6 : 1})) win.push(w);
   });
   for (const k in geo) if (geo[k].length) grp.add(new THREE.Mesh(K.merge(geo[k]), mats[k]));
   K.wins(grp, win, {lit: 0.04, litCol: 0xf6e7c4, near: L ? 120 : 200});
-  out.blocked = K.polyIndex(coll, 20);
+  { const inB = K.polyIndex(coll, 20), inH = holes.length ? K.polyIndex(holes, 20) : null; out.blocked = inH ? (x, z, y) => inB(x, z, y) && !inH(x, z, y) : inB; }
   // entrance: canopy, posts and glazed doors, facing the footpath
   { const ex = ENT[0], ez = ENT[1], ey = H(ex, ez), prev = D.path[D.path.length - 2], ry = Math.atan2(prev[0] - ex, prev[1] - ez);
     const cm = new THREE.Mesh(K.merge([K.box(5.5, 0.25, 3.2, 0, 3.2, 1.4), K.box(0.2, 3.2, 0.2, -2.5, 0, 2.8), K.box(0.2, 3.2, 0.2, 2.5, 0, 2.8)]), K.lamb({color: 0xdedbd3})); cm.position.set(ex, ey, ez); cm.rotation.y = ry; grp.add(cm);
@@ -148,7 +155,7 @@ function build(grp, K, D) {
   K.pad(grp, 0, 15);
   K.sky(grp, {top: 0xa3aebb, horizon: 0xc6ccd2});
   K.lights(grp, {sky: 0xe3e8ee, ground: 0x5d6450, hi: 1.25, si: 0.55, dx: -60, dy: 200, dz: 120});
-  W3D.londonInfo = out.info = {osmBuildings: D.b.length, terraces: nh, trees: trees.length, lamps: lamps.length, cars: cars.length, windows: win.length, walk: D.walk, lat: D.lat, lon: D.lon};
+  W3D.londonInfo = out.info = {buildings: D.b.length, fromOSM: D.b.filter(b => b.src === 'osm').length, fromML: D.b.filter(b => b.src === 'ml').length, heightTagged: D.b.filter(b => b.h).length, courtyards: holes.length, terraces: nh, trees: trees.length, lamps: lamps.length, cars: cars.length, windows: win.length, walk: D.walk, lat: D.lat, lon: D.lon};
   return out;
 }
 })();
