@@ -175,6 +175,113 @@ function fixStoneUVs() { // boxes built without metric UVs (sphinx parts) showed
     const p = o.geometry.parameters, sizes = [[p.depth, p.height], [p.depth, p.height], [p.width, p.depth], [p.width, p.depth], [p.width, p.height], [p.width, p.height]];
     for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setXY(i, uv.getX(i) * sizes[f][0] / 4, uv.getY(i) * sizes[f][1] / 4); } uv.needsUpdate = true; o.geometry.userData.bankUV = 1; });
 }
+/* ---------- 1c. pylon gate portal framing (Josh-approved, Karnak / Edfu style). The gold sun disk stays exactly as it was; the two flat
+   blue bars beside it (the "blue line" seen from the sphinx avenue) are replaced by a carved, painted winged sun across the whole lintel
+   face, which now sits behind the disk. Added: cavetto cornice + torus roll over the lintel, battered jamb casings in the carved relief
+   stone, a painted cartouche band down each jamb, and dark flagpole niches behind the gilded masts. Nothing else on the temple changes. */
+function drawWingedSun(g, W, H, mode) {   // Behdety winged sun: once in colour, once as a height field (for the relief normal map)
+  const C = mode === 'col', cx = W / 2, cy = H * 0.48, R = H * 0.22;
+  const col = (c, h) => C ? c : 'rgb(' + h + ',' + h + ',' + h + ')';
+  g.fillStyle = C ? '#e8dcc0' : 'rgb(60,60,60)'; g.fillRect(0, 0, W, H);
+  if (C) for (let i = 0; i < 2600; i++) { g.fillStyle = 'rgba(' + (150 + Math.random() * 60 | 0) + ',' + (130 + Math.random() * 50 | 0) + ',' + (100 + Math.random() * 40 | 0) + ',0.08)'; g.fillRect(Math.random() * W, Math.random() * H, 2 + Math.random() * 5, 1 + Math.random() * 3); }
+  const band = (y, h, c, hv) => { g.fillStyle = col(c, hv); g.fillRect(0, y, W, h); };
+  band(0, H * 0.035, '#1f4f9a', 90); band(H * 0.035, H * 0.018, '#d4a640', 120); band(H * 0.053, H * 0.012, '#a83226', 90);
+  band(H * 0.935, H * 0.012, '#a83226', 90); band(H * 0.947, H * 0.018, '#d4a640', 120); band(H * 0.965, H * 0.035, '#1f4f9a', 90);
+  for (const s of [-1, 1]) {
+    g.save(); g.translate(cx, cy); g.scale(s, 1);
+    const x0 = R * 1.05, x1 = W * 0.47, span = x1 - x0;
+    const top = t => -R * 0.85 - Math.sin(Math.min(1, t * 2.2) * Math.PI * 0.5) * R * 0.32 + Math.pow(t, 2.4) * R * 1.0;
+    const bot = t => R * 1.25 - t * R * 0.6 + Math.pow(t, 2.0) * R * 0.05;
+    const wingPath = () => { g.beginPath(); g.moveTo(x0, top(0)); for (let i = 1; i <= 40; i++) { const t = i / 40; g.lineTo(x0 + span * t, top(t)); }
+      for (let i = 40; i >= 0; i--) { const t = i / 40; g.lineTo(x0 + span * t, bot(t)); } g.closePath(); };
+    wingPath(); g.fillStyle = col('#d4a640', 150); g.fill();
+    const midY = t => top(t) + (bot(t) - top(t)) * 0.27, mid2 = t => top(t) + (bot(t) - top(t)) * 0.47;
+    for (let i = 0; i < 26; i++) { const t0 = i / 26, t1 = (i + 1) / 26, xa = x0 + span * t0, xb = x0 + span * t1;
+      g.beginPath(); g.moveTo(xa, top(t0) + 3); g.lineTo(xb, top(t1) + 3); g.lineTo(xb, midY(t1)); g.quadraticCurveTo((xa + xb) / 2, midY((t0 + t1) / 2) + R * 0.12, xa, midY(t0)); g.closePath();
+      g.fillStyle = col(i % 2 ? '#a83226' : '#1f4f9a', 175); g.fill(); g.lineWidth = 3; g.strokeStyle = col('#d4a640', 205); g.stroke(); }
+    for (let i = 0; i < 20; i++) { const t0 = i / 20, t1 = (i + 1) / 20, xa = x0 + span * t0, xb = x0 + span * t1;
+      g.beginPath(); g.moveTo(xa, midY(t0)); g.lineTo(xb, midY(t1)); g.lineTo(xb, mid2(t1)); g.lineTo(xa, mid2(t0)); g.closePath();
+      g.fillStyle = col(i % 2 ? '#2f7d4a' : '#1f4f9a', 160); g.fill(); g.lineWidth = 3; g.strokeStyle = col('#d4a640', 205); g.stroke(); }
+    const NF = 19;
+    for (let i = 0; i < NF; i++) { const t0 = i / NF, t1 = (i + 1) / NF, xa = x0 + span * t0, xb = x0 + span * t1, tipA = bot(t0), tipB = bot(t1);
+      g.beginPath(); g.moveTo(xa, mid2(t0)); g.lineTo(xb, mid2(t1)); g.lineTo(xb + span * 0.012, tipB); g.quadraticCurveTo((xa + xb) / 2 + span * 0.01, (tipA + tipB) / 2 + R * 0.12, xa + span * 0.012, tipA); g.closePath();
+      g.fillStyle = col(i % 2 ? '#1f4f9a' : '#2f7d4a', 145); g.fill();
+      g.save(); g.clip(); g.fillStyle = col('#a83226', 165); g.fillRect(xa - 5, Math.min(tipA, tipB) - R * 0.16, xb - xa + 30, R * 0.5); g.restore();
+      g.lineWidth = 3.5; g.strokeStyle = col('#d4a640', 210); g.stroke(); }
+    wingPath(); g.lineWidth = 5; g.strokeStyle = col('#7a5a1a', 220); g.stroke();
+    // uraeus hanging beside the disk
+    g.save(); g.translate(R * 1.02, R * 0.55); g.scale(1.55, 1.55);
+    g.beginPath(); g.moveTo(-R * 0.22, R * 0.05); g.bezierCurveTo(-R * 0.35, R * 0.55, R * 0.05, R * 0.75, R * 0.12, R * 0.4); g.bezierCurveTo(R * 0.18, R * 0.1, R * 0.02, -R * 0.1, R * 0.08, -R * 0.42);
+    g.lineTo(R * 0.24, -R * 0.4); g.bezierCurveTo(R * 0.2, -R * 0.1, R * 0.34, R * 0.15, R * 0.26, R * 0.5); g.bezierCurveTo(R * 0.16, R * 0.95, -R * 0.5, R * 0.8, -R * 0.36, R * 0.1); g.closePath();
+    g.fillStyle = col('#2f7d4a', 200); g.fill(); g.lineWidth = 3; g.strokeStyle = col('#d4a640', 230); g.stroke();
+    g.beginPath(); g.ellipse(R * 0.17, -R * 0.62, R * 0.15, R * 0.3, -0.12, 0, Math.PI * 2); g.fillStyle = col('#d4a640', 230); g.fill(); g.lineWidth = 3; g.strokeStyle = col('#7a5a1a', 240); g.stroke();
+    g.beginPath(); g.ellipse(R * 0.24, -R * 0.93, R * 0.1, R * 0.07, 0.3, 0, Math.PI * 2); g.fillStyle = col('#d4a640', 240); g.fill(); g.stroke();
+    g.beginPath(); g.arc(R * 0.2, -R * 1.07, R * 0.07, 0, Math.PI * 2); g.fillStyle = col('#c0392b', 245); g.fill();
+    g.restore(); g.restore();
+  }
+}
+function heightToNormal(hc, k) { const w = hc.width, h = hc.height, src = hc.getContext('2d').getImageData(0, 0, w, h).data, c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'), out = g.createImageData(w, h);
+  const H = (x, y) => src[(Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))) * 4] / 255;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const dx = (H(x + 1, y) - H(x - 1, y)) * k, dy = (H(x, y + 1) - H(x, y - 1)) * k, l = Math.hypot(dx, dy, 1), i = (y * w + x) * 4;
+    out.data[i] = 128 - 127 * dx / l; out.data[i + 1] = 128 + 127 * dy / l; out.data[i + 2] = 128 + 127 / l; out.data[i + 3] = 255; }
+  g.putImageData(out, 0, 0); return c; }
+function cartoucheCanvas(mode) { // tall jamb band: three cartouches with generic signs (ankh, sun, water, reed, eye), no names
+  const W = 128, H = 1536, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), C = mode === 'col';
+  const col = (cc, h) => C ? cc : 'rgb(' + h + ',' + h + ',' + h + ')';
+  g.fillStyle = C ? '#e6d8b8' : 'rgb(150,150,150)'; g.fillRect(0, 0, W, H);
+  for (const x of [4, W - 10]) { g.fillStyle = col('#1f4f9a', 120); g.fillRect(x, 0, 6, H); }
+  const signs = [
+    (x, y) => { g.beginPath(); g.ellipse(x, y - 22, 12, 16, 0, 0, Math.PI * 2); g.lineWidth = 7; g.stroke(); g.fillRect(x - 24, y - 6, 48, 8); g.fillRect(x - 4, y - 6, 8, 46); },     // ankh
+    (x, y) => { g.beginPath(); g.arc(x, y, 17, 0, Math.PI * 2); g.fill(); },                                                                                                  // sun
+    (x, y) => { g.lineWidth = 6; for (let k = -1; k <= 1; k++) { g.beginPath(); for (let i = 0; i <= 8; i++) g.lineTo(x - 26 + i * 6.5, y + k * 14 + (i % 2 ? -5 : 5)); g.stroke(); } }, // water
+    (x, y) => { g.beginPath(); g.moveTo(x, y + 30); g.quadraticCurveTo(x - 6, y - 10, x + 14, y - 32); g.lineWidth = 7; g.stroke(); g.beginPath(); g.ellipse(x + 6, y - 20, 6, 14, 0.5, 0, Math.PI * 2); g.fill(); }, // reed
+    (x, y) => { g.beginPath(); g.ellipse(x, y, 24, 11, 0, 0, Math.PI * 2); g.lineWidth = 6; g.stroke(); g.beginPath(); g.arc(x, y, 7, 0, Math.PI * 2); g.fill(); g.fillRect(x - 4, y + 10, 6, 18); }]; // eye
+  for (let k = 0; k < 3; k++) { const cy0 = 70 + k * 490, ch = 420, cx = W / 2;
+    g.beginPath(); g.ellipse(cx, cy0 + ch / 2, 44, ch / 2, 0, 0, Math.PI * 2); g.fillStyle = col('#d4a640', 110); g.fill();
+    g.beginPath(); g.ellipse(cx, cy0 + ch / 2, 37, ch / 2 - 7, 0, 0, Math.PI * 2); g.fillStyle = col('#efe4c8', 90); g.fill();
+    g.fillStyle = col('#d4a640', 110); g.fillRect(cx - 40, cy0 + ch + 6, 80, 9);   // tie bar under the oval
+    g.fillStyle = g.strokeStyle = col(k === 1 ? '#a83226' : '#1f4f9a', 40);
+    for (let j = 0; j < 4; j++) signs[(k * 2 + j) % signs.length](cx, cy0 + 70 + j * 95); }
+  return c;
+}
+function quad(a, b, c, d, mat) { // a,b,c,d = corners (bottom-left, bottom-right, top-right, top-left) seen from the front
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([...a, ...b, ...c, ...d], 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2)); g.setIndex([0, 1, 2, 0, 2, 3]); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, mat); m.receiveShadow = true; (P || root).add(m); return m;
+}
+function gateFrame(y0, zc, corn, roll) {
+  const lite = !!(W3D.LITE || /[?&]lite=1/.test(location.search));
+  // 1. the old flat blue wing bars come away (the gold disk itself is untouched)
+  root.traverse(o => { const p = o.isMesh && o.geometry && o.geometry.parameters; if (p && o.geometry.type === 'BoxGeometry' && Math.abs(p.width - 0.15) < 1e-3 && Math.abs(p.height - 0.7) < 1e-3 && Math.abs(p.depth - 3.2) < 1e-3 && Math.abs(o.position.x - 892.35) < 0.01) o.visible = false; });
+  // 2. carved winged sun across the 12 x 3 m lintel face (x 892.8, y0+14..17), behind the disk
+  const Wc = lite ? 1024 : 2048, Hc = Wc / 4, cc = document.createElement('canvas'), hc = document.createElement('canvas'); cc.width = hc.width = Wc; cc.height = hc.height = Hc;
+  const gc = cc.getContext('2d'), gh = hc.getContext('2d'); gc.scale(Wc / 2048, Wc / 2048); gh.scale(Wc / 2048, Wc / 2048);
+  drawWingedSun(gc, 2048, 512, 'col'); drawWingedSun(gh, 2048, 512, 'h');
+  const bl = document.createElement('canvas'); bl.width = Wc; bl.height = Hc; const gb = bl.getContext('2d'); gb.filter = 'blur(' + (lite ? 1 : 2) + 'px)'; gb.drawImage(hc, 0, 0);
+  const lmat = std({map: ctex(cc, true), normalMap: new THREE.CanvasTexture(heightToNormal(bl, lite ? 3 : 5)), roughness: 0.62, envMapIntensity: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2});
+  lmat.map.wrapS = lmat.map.wrapT = THREE.ClampToEdgeWrapping;
+  const fx = 892.8 - 0.012;
+  quad([fx, y0 + 14, zc - 6], [fx, y0 + 14, zc + 6], [fx, y0 + 17, zc + 6], [fx, y0 + 17, zc - 6], lmat).name = 'winged-sun-lintel';
+  // 3. cavetto cornice + torus roll over the portal lintel
+  { const m = new THREE.Mesh(cavettoGeo(12, 1.0, 0.55), corn); m.rotation.y = Math.PI; m.position.set(892.8, y0 + 17, zc); m.castShadow = true; m.receiveShadow = true; (P || root).add(m); }
+  rod(new THREE.Vector3(892.8 - 0.1, y0 + 17, zc - 5.6), new THREE.Vector3(892.8 - 0.1, y0 + 17, zc + 5.6), 0.18, roll, P, 0.6);
+  // 4. battered jamb casings (front face leans back from 892.55 to 892.75 like the towers) in the carved relief stone, torus on the arris
+  for (const s of [-1, 1]) {
+    const zi = zc + s * 3.8, zo = zc + s * 6.2, zm = (zi + zo) / 2;
+    vbox(0.5, 14, 2.4, 892.8, y0, zm, M.relief, {collide: true, shadow: true, T: 6, batter: 0.2});
+    rod(new THREE.Vector3(892.56, y0 + 0.2, zi + s * 0.02), new THREE.Vector3(892.74, y0 + 14, zi + s * 0.02), 0.12, roll, P, 0.6);
+    // 5. painted cartouche band down the middle of each jamb
+    if (!W3D._cartM) { const cm = cartoucheCanvas('col'), ch = cartoucheCanvas('h');
+      W3D._cartM = std({map: ctex(cm, true), normalMap: new THREE.CanvasTexture(heightToNormal(ch, 3)), roughness: 0.6, envMapIntensity: 0.45, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3});
+      W3D._cartM.map.wrapS = W3D._cartM.map.wrapT = THREE.ClampToEdgeWrapping; }
+    const bx0 = 892.55 - 0.012, bx1 = 892.75 - 0.012, yb = y0 + 1.0, yt = y0 + 13.0, xb = bx0 + (bx1 - bx0) * 1 / 14, xt = bx0 + (bx1 - bx0) * 13 / 14, za = zm - 0.5, zb = zm + 0.5;
+    quad([xb, yb, za], [xb, yb, zb], [xt, yt, zb], [xt, yt, za], W3D._cartM).name = 'cartouche-band';
+    // 6. flagpole niche: a recessed dark slot on the battered tower face behind each gilded mast
+    const zn = zc + s * 14, nm = W3D._nicheM || (W3D._nicheM = std({color: 0x4a4032, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2}));
+    const nx = y => 892.5 + 0.9 * (y - y0) / 22 - 0.01;
+    quad([nx(y0 + 0.4), y0 + 0.4, zn - 0.8], [nx(y0 + 0.4), y0 + 0.4, zn + 0.8], [nx(y0 + 20.2), y0 + 20.2, zn + 0.8], [nx(y0 + 20.2), y0 + 20.2, zn - 0.8], nm).name = 'flag-niche';
+  }
+}
 function buildExterior() {
   const y0 = L.HQ.y, zc = L.HQ.z;
   fixStoneUVs();
@@ -210,6 +317,7 @@ function buildExterior() {
     hit.setAttribute('material', 'shader: flat; opacity: 0; transparent: true; depthWrite: false');
     hit.addEventListener('click', () => { W3D.gateManual = !W3D.gateOpenNow; W3D.gateManualT = performance.now(); });
     document.querySelector('a-scene').appendChild(hit); }
+  try { gateFrame(y0, zc, corn, roll); } catch (e) { console.warn('gate frame', e); }
   // banking hall: cornice + torus rolls + carved frieze + base course + steps and open gilded doors at the west door
   const hx0 = 924.25, hx1 = 965.75, hz0 = zc - 20.75, hz1 = zc + 20.75, ht = y0 + 16;
   cornice(hx0, hx1, hz0, hz1, ht - 1.3, 2.2, 1.0, corn);
@@ -226,7 +334,24 @@ function buildExterior() {
   const steps = [[920.4, 921.75, y0 + 0.35], [921.75, 923.1, y0 + 0.5], [923.1, 925.75, y0 + 0.65]];
   for (const [xa, xb, top] of steps) { const b = vbox(xb - xa, top - (y0 + 0.2), 8, (xa + xb) / 2, y0 + 0.2, zc, M.granite, {collide: false, shadow: true, T: 2}); L.floors.push({x0: xa, x1: xb, z0: zc - 4, z1: zc + 4, y: top});
     vbox(0.06, 0.04, 8, xa + 0.03, top - 0.03, zc, M.gold, {collide: false}); }
-  for (const s of [-1, 1]) { const m = leaf(3.0, 9.6, 927.3, y0 + 0.3, zc + s * 2.85); }
+  // hall doors (Josh-approved fix): the old leaves stood loose inside the hall and never moved. Now a stone frame (jambs, lintel,
+  // threshold) fills the 6 m doorway with no gaps and two gilded leaves hang in it like the pylon gate: same leaf art, gold hinge
+  // barrels, open when you come near (~10 m) or on a click (20 s override), same swing speed; closed leaves block walking.
+  { const fx0 = 924.25, fx1 = 925.75, fw = fx1 - fx0, fxc = (fx0 + fx1) / 2, thr = y0 + 0.66, top = y0 + 9.4;
+    for (const s of [-1, 1]) vbox(fw + 0.1, 10, 0.55, fxc, y0, zc + s * 2.725, M.stone, {collide: true, shadow: true, T: 2});   // jambs (opening 4.9 m)
+    vbox(fw + 0.1, 0.62, 6, fxc, top - 0.02, zc, M.stone, {collide: false, shadow: true, T: 2});                                 // lintel tight under the wall's head
+    vbox(fw, thr - y0, 4.9, fxc, y0, zc, M.granite, {collide: false, T: 2});                                                      // threshold, flush with the landing
+    W3D.hallDoors = []; const lh = top - thr - 0.04, lw = 2.43;
+    for (const s of [-1, 1]) {
+      const piv = new THREE.Group(); piv.position.set(fx1 - 0.2, thr + 0.02, zc + s * 2.45); (P || root).add(piv);
+      const lf = new THREE.Mesh(new THREE.BoxGeometry(0.32, lh, lw), dmat); lf.position.set(0, lh / 2, -s * lw / 2); lf.castShadow = true; lf.receiveShadow = true; piv.add(lf);
+      for (const hy of [1.2, lh / 2, lh - 1.2]) { const hb = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.7, 10), M.gold); hb.position.set(0, hy, 0); piv.add(hb); }
+      W3D.hallDoors.push({piv: piv, s: s, a: 0}); }
+    W3D.hallDoorWall = {x0: fx1 - 0.4, x1: fx1, z0: zc - 2.45, z1: zc + 2.45, y0: thr, y1: top, on: true, Y1: top}; L.walls.push(W3D.hallDoorWall);
+    const hit = document.createElement('a-box'); hit.setAttribute('class', 'btn'); hit.setAttribute('position', `${fx1 - 0.2} ${(thr + top) / 2} ${zc}`); hit.setAttribute('width', 0.5); hit.setAttribute('height', lh); hit.setAttribute('depth', 4.9);
+    hit.setAttribute('material', 'shader: flat; opacity: 0; transparent: true; depthWrite: false');
+    hit.addEventListener('click', () => { W3D.hallManual = !W3D.hallOpenNow; W3D.hallManualT = performance.now(); });
+    document.querySelector('a-scene').appendChild(hit); W3D.hallDoorHit = hit; }
   // column bases + gilded neck rings for every papyrus column (one InstancedMesh each)
   const cols = []; root.traverse(o => { if (o.isMesh && o.material === M.column && o.parent && o.parent.isGroup) cols.push({p: o.parent.position, r: o.geometry.parameters.radiusBottom, h: o.geometry.parameters.height}); });
   if (cols.length) {
@@ -453,6 +578,12 @@ W3D.tickBank = function (t) { // the vault is only drawn when you are below grou
     const near = Math.hypot(p.x - 894, p.z - L.HQ.z) < 14 && p.y < L.HQ.y + 16; let open = near;
     if (W3D.gateManualT && performance.now() - W3D.gateManualT < 20000) open = W3D.gateManual; W3D.gateOpenNow = open;
     for (const d of W3D.gateDoors) { const tgt = open ? -d.s * 1.5 : 0; d.a += Math.max(-0.035, Math.min(0.035, tgt - d.a)); d.piv.rotation.y = d.a; }
+  }
+  if (W3D.hallDoors) { // hall doors: same rules as the gate (near = within ~10 m of the doorway, at hall level)
+    const near = Math.hypot(p.x - 925, p.z - L.HQ.z) < 10 && p.y < L.HQ.y + 12 && p.y > L.HQ.y - 2; let open = near;
+    if (W3D.hallManualT && performance.now() - W3D.hallManualT < 20000) open = W3D.hallManual; W3D.hallOpenNow = open;
+    let amax = 0; for (const d of W3D.hallDoors) { const tgt = open ? -d.s * 1.5 : 0; d.a += Math.max(-0.035, Math.min(0.035, tgt - d.a)); d.piv.rotation.y = d.a; amax = Math.max(amax, Math.abs(d.a)); }
+    const w = W3D.hallDoorWall; w.y1 = amax < 0.25 ? w.Y1 : -1e6;   // leaves shut (or nearly) = solid; swung open = passable
   }
   if (!vaultG) return;
   const inside = p.y < 33.5 && p.x > 920 && p.x < 985 && p.z > -405 && p.z < -355; if (++frames > 3) vaultG.visible = inside; if (inside) for (const f of anim) f(t);

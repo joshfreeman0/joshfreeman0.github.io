@@ -43,6 +43,9 @@ AFRAME.registerSystem('w3d-roam', {
     // frame timing: in the headset, drop shadow refreshes when frames run late (black edges = late frames being reprojected)
     this.fN = (this.fN || 0) + 1; this.fT = (this.fT || 0) + dt; this.fMax = Math.max(this.fMax || 0, dt);
     if (this.fT > 1000) { const avg = this.fT / this.fN; W3D.xrSlow = xr && avg > 15; if (this.fpsT) this.fpsT.setAttribute('value', Math.round(1000 / avg) + ' fps  ' + avg.toFixed(1) + ' ms (max ' + this.fMax.toFixed(0) + ')' + (xr ? ' XR' : '') + (W3D.xrSlow ? ' SLOW' : '')); this.fN = 0; this.fT = 0; this.fMax = 0; }
+    // desktop / phone: fold mouse- or drag-look yaw into the rig so WASD walks where you look (wasd-controls only reads the rig heading)
+    if (!xr) { const lc = this.lc || (this.lc = (document.querySelector('[camera]') || {}).components); const l = lc && lc['look-controls'];
+      if (l && l.yawObject && l.yawObject.rotation.y !== 0) { const rg = document.getElementById('rig'); if (rg) { rg.object3D.rotation.y += l.yawObject.rotation.y; l.yawObject.rotation.y = 0; } } }
     if (!W3D.active || !sc.camera) { if (ground) ground.visible = false; return; }
     sc.camera.getWorldPosition(_cp);
     const gnd = W3D.groundAt ? W3D.groundAt(_cp.x, _cp.z, -1e4) : 0, alt = Math.max(0, _cp.y - (isFinite(gnd) ? gnd : 0)), far = Math.hypot(_cp.x, _cp.z);

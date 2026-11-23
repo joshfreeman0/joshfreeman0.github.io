@@ -496,7 +496,7 @@ function buildTrees(a) {
     const im = new THREE.InstancedMesh(geo, mat, list.length); const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), col = new THREE.Color();
     list.forEach((t, i) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (i * 2.39996) % 6.283); sv.set(t[3], t[3] * sy, t[3]); pv.set(t[0], t[1] - 0.35 + yOff * t[3], t[2]);   // sunk slightly so no tree base ever hovers on slopes m4.compose(pv, q, sv); im.setMatrixAt(i, m4);
       if (colors) { col.set(colors[i % colors.length]); col.offsetHSL(0, 0, ((i * 7919) % 100) / 1000 - 0.05); im.setColorAt(i, col); } });
-    im.frustumCulled = false; root.add(im); return im;
+    im.frustumCulled = false; im.name = 'trees'; root.add(im); return im;   // named so shore.js can clear trees off its path
   };
   const trunkG = new THREE.CylinderGeometry(0.25, 0.35, 4, 5, 1, true); trunkG.translate(0, 2, 0);   // lean geometry: Quest 3S triangle budget
   mk(trunkG, M.trunk, con, 0, 1); mk(trunkG, M.trunk, dec, 0, 1);
