@@ -291,7 +291,7 @@ AFRAME.registerSystem('w3d-launch', {
     const p = camPos(); if (!p) return;
     const d = Math.hypot(p.x - PATCH.cx, p.z - PATCH.cz);
     if (d < 3000 + PATCH.S / 2 * 0.6) loadPatch(); else if (d > 4200 + PATCH.S / 2) unloadPatch();
-    if (W3D.fog && !flight) { const r = Math.max(Math.abs(p.x), Math.abs(p.z)), far = Math.max(3200, Math.min(8200, 16384 - r - 400)); W3D.fog.far = far; W3D.fog.near = Math.min(2000, far * 0.3); }
+    if (W3D.fog && !flight && !W3D.roam) { const r = Math.max(Math.abs(p.x), Math.abs(p.z)), far = Math.max(3200, Math.min(8200, 16384 - r - 400)); W3D.fog.far = far; W3D.fog.near = Math.min(2000, far * 0.3); }
   }
 });
 // menu teleport spot 'Launch pad': on the ground south-west of the pad, looking at the rocket and the tower

@@ -4,17 +4,20 @@
    - hd-sky (on an entity): a high-resolution 360 photo sphere with sharp texture
      filtering; switch scenes with el.setAttribute('hd-sky','src','file.jpg').
      Frees the previous photo from GPU memory on each switch (Quest-friendly). */
+const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 AFRAME.registerComponent('hd-renderer', {
   schema: { scale: {default: 1.3} },
   init: function () {
     const apply = () => {
       const r = this.el.renderer; if (!r) return;
-      try { r.xr.setFramebufferScaleFactor(this.data.scale); } catch (e) {}
-      try { r.xr.setFoveation(0); } catch (e) {}
+      try { r.xr.setFramebufferScaleFactor(QUEST ? Math.min(this.data.scale, 0.85) : this.data.scale); } catch (e) {}
+      try { r.xr.setFoveation(QUEST ? 1 : 0.5); } catch (e) {}
       r.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.JFVR_LITE ? 1.25 : 2));   // lite (phones): smaller framebuffer
     };
     if (this.el.renderer) apply(); else this.el.addEventListener('renderstart', apply);
-    this.el.addEventListener('enter-vr', () => { try { this.el.renderer.xr.setFoveation(0); } catch (e) {} });
+    /* Quest: fixed foveated rendering + 0.85 framebuffer keep the headset at its frame rate; late frames get reprojected by the
+       compositor and show black at the edges when you turn your head */
+    this.el.addEventListener('enter-vr', () => { try { this.el.renderer.xr.setFoveation(QUEST ? 1 : 0.5); } catch (e) {} });
   }
 });
 AFRAME.registerComponent('hd-sky', {
