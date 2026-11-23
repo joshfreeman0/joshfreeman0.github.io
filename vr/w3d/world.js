@@ -336,7 +336,7 @@ W3D.build = function (scene3, sceneEl) {
   return Promise.all([
     fetch(BASE + 'terrain_t4.u16?v=4').then(need).then(r => r.arrayBuffer()).then(step),
     fetch(BASE + 'trees_t5.f32?v=4').then(need).then(r => r.arrayBuffer()).then(step),
-    fetch(BASE + 'water_t.json?v=7').then(need).then(r => r.json()).then(step),
+    fetch(BASE + 'water_t.json?v=8').then(need).then(r => r.json()).then(step),
     fetch(BASE + 'ring_mid.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step),
     fetch(BASE + 'ring_far.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step)
   ]).then(([hb, tb, wj, rmid, rfar]) => {
@@ -517,17 +517,36 @@ function buildRivers(J) {
    One stone bridge now carries the road (streets.js keeps the road at B.road across it): deck slab, parapets with a coping, abutments
    into both banks and two piers standing on the banks, so the river runs freely underneath. */
 function buildBridges(L) {
+  // Gardiner St (Josh, 1:58 AM): the road now runs straight along the deck axis (streets.js eases Gardiner St onto it over 'align' m
+  // either side), and the deck is built to a real two-lane bridge: thick slab, asphalt between 17 cm granite curbs, a raised sidewalk
+  // each side, parapets with a coping, and earth embankments carrying the road ramps down to the ground at both ends.
   for (const B of L || []) {
     const g = new THREE.Group(), ry = Math.atan2(-B.tz, B.tx); g.position.set(B.x, 0, B.z); g.rotation.y = ry; root.add(g);
     const sM = new THREE.MeshStandardMaterial({color: 0x9c9384, roughness: 0.88}), cM = new THREE.MeshStandardMaterial({color: 0xb7ae9c, roughness: 0.8});
+    const aM = new THREE.MeshStandardMaterial({color: 0x2f3134, roughness: 0.95}), kM = new THREE.MeshStandardMaterial({color: 0x8e8a84, roughness: 0.7});
     const add = (w, h, d, x, y, z, m) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
-    const top = B.road, half = B.len / 2;
-    add(B.len + 2, 1.0, B.w, 0, top - 0.55, 0, sM);   // deck slab (the road ribbon lies on it)
-    for (const sd of [-1, 1]) { add(B.len + 2, 1.0, 0.45, 0, top + 0.45, sd * (B.w / 2 - 0.22), sM); add(B.len + 2.2, 0.14, 0.6, 0, top + 1.0, sd * (B.w / 2 - 0.22), cM);   // parapets + coping
-      add(0.25, 1.0, B.w + 0.4, 0, top - 0.55, 0, cM).position.x = sd * (half + 1.0); }
-    const yb = Math.min(terrainH(B.x - half, B.z), terrainH(B.x + half, B.z)) - 2.5;
-    for (const sd of [-1, 1]) { const ax = sd * (half - 0.5); add(3.0, top - 1.05 - yb, B.w + 1.2, ax, (top - 1.05 + yb) / 2, 0, sM);   // abutments
-      const px = sd * (half * 0.42); add(1.6, top - 1.05 - yb, B.w - 1.0, px, (top - 1.05 + yb) / 2, 0, sM); }   // piers on the banks, clear of the channel
+    const top = B.road, half = B.len / 2, Ld = B.len + 2, PW = 0.45, SW = B.walk || 1.6, CW = B.w / 2 - PW - SW;   // CW = half carriageway
+    add(Ld, 1.2, B.w, 0, top - 0.6, 0, sM);                                   // deck slab, 1.2 m thick (top at road level)
+    add(Ld, 0.14, CW * 2, 0, top + 0.07, 0, aM);                              // asphalt wearing course (top + 0.14; the road ribbon lies just above)
+    for (const sd of [-1, 1]) {
+      add(Ld, 0.31, 0.2, 0, top + 0.155, sd * (CW + 0.1), kM);              // curb (17 cm above the asphalt)
+      add(Ld, 0.31, SW - 0.2, 0, top + 0.155, sd * (CW + 0.2 + (SW - 0.2) / 2), cM);   // sidewalk
+      add(Ld, 1.0, PW, 0, top + 0.31 + 0.5, sd * (B.w / 2 - PW / 2), sM);   // parapet
+      add(Ld + 0.2, 0.14, PW + 0.15, 0, top + 1.31 + 0.07, sd * (B.w / 2 - PW / 2), cM);   // coping
+      add(0.25, 1.2, B.w + 0.4, 0, top - 0.6, 0, cM).position.x = sd * (half + 1.0); }
+    const yb = Math.min(terrainH(B.x - half * B.tx, B.z - half * B.tz), terrainH(B.x + half * B.tx, B.z + half * B.tz)) - 2.5;
+    for (const sd of [-1, 1]) { const ax = sd * (half - 0.5); add(3.0, top - 1.2 - yb, B.w + 1.2, ax, (top - 1.2 + yb) / 2, 0, sM);   // abutments
+      const px = sd * (half * 0.42); add(1.6, top - 1.2 - yb, B.w - 1.0, px, (top - 1.2 + yb) / 2, 0, sM); }   // piers on the banks, clear of the channel
+    // approach embankments: same smoothstep ease as the road ribbon (streets.js), top a little under the ribbon, 1:1.5 side slopes
+    const E = B.ease || 20, N = 24, eM = new THREE.MeshStandardMaterial({color: 0x4a5330, roughness: 1});
+    for (const sd of [-1, 1]) { const pos = [], idx = [];
+      for (let i = 0; i <= N; i++) { const al = half + 1 + (E - 1) * i / N, t = 1 - (al - half) / E, w = t * t * (3 - 2 * t);
+        const wx = B.x + sd * al * B.tx, wz = B.z + sd * al * B.tz, gnd = terrainH(wx, wz), ytop = Math.max(gnd, gnd + (top - gnd) * w) - 0.04, hgt = Math.max(0, ytop - gnd);
+        const hw = B.w / 2, bw = hw + 1.5 * hgt + 0.5, yb2 = gnd - 1.2;
+        pos.push(sd * al, ytop, -hw, sd * al, ytop, hw, sd * al, yb2, -bw, sd * al, yb2, bw);
+        if (i) { const a = (i - 1) * 4, b = i * 4; idx.push(a, b, a + 1, a + 1, b, b + 1, a + 2, b + 2, a, a, b + 2, b, a + 1, b + 1, a + 3, a + 3, b + 1, b + 3); } }
+      const ge = new THREE.BufferGeometry(); ge.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); ge.setIndex(idx); ge.computeVertexNormals();
+      const em = new THREE.Mesh(ge, eM); em.material.side = THREE.DoubleSide; em.receiveShadow = true; g.add(em); }
     g.name = 'bridge-' + (B.name || '');
   }
 }

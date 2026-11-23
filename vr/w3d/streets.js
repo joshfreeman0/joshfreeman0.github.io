@@ -50,11 +50,16 @@ function project() {
   for (const r of data.roads) {
     const cls = r[0], nm = r[1], q = r[2], br = r[3] === 1, P = [];
     for (let i = 0; i < q.length; i += 2) P.push(toWorld(q[i] / 1e5, q[i + 1] / 1e5));
-    const D = [];
+    const D = [], BA = /^Gardiner St/.test(data.names[nm] || '') ? ((W3D.water && W3D.water.bridges) || []).filter(B => B.align) : [];
+    const nearB = (p) => BA.some(B => Math.hypot(p[0] - B.x, p[1] - B.z) < B.len / 2 + B.align + 40);
     for (let i = 0; i < P.length - 1; i++) {
-      const a = P[i], b = P[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = br ? 1 : Math.max(1, Math.ceil(L / STEP));
+      const a = P[i], b = P[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), st = BA.length && (nearB(a) || nearB(b)) ? 2 : STEP, n = br && !BA.length ? 1 : Math.max(1, Math.ceil(L / st));
       for (let k = (i ? 1 : 0); k <= n; k++) D.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
     }
+    // Gardiner St bridge: pull the centreline onto the deck axis (on the deck) and ease it back to the OSM line over B.align m beyond each end,
+    // so road and deck share one axis (the OSM line crossed the deck diagonally and ran off it). Only this street is touched.
+    for (const B of BA) for (const p of D) { const ax = p[0] - B.x, az = p[1] - B.z, al = ax * B.tx + az * B.tz, ac = -ax * B.tz + az * B.tx, A = Math.abs(al), h = B.len / 2 + 1;
+      if (Math.abs(ac) < 14 && A < h + B.align) { const t = A <= h ? 0 : (A - h) / B.align, w = t * t * (3 - 2 * t), nac = ac * w; p[0] = B.x + al * B.tx - nac * B.tz; p[1] = B.z + al * B.tz + nac * B.tx; } }
     // split where outside the world or under the restored pond (non-bridge). Low valley ground (the Forge / Taunton river towns sit at 4-9 m) is NOT water,
     // so roads there stay continuous (an old 'gh > 9' test cut them into dashes)
     let cur = [];
