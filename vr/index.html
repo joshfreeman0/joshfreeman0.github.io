@@ -30,12 +30,13 @@ window.JFVR_LITE = (function () {
 <script src="locomotion.js?v=14"></script>
 <script src="hd.js?v=4"></script>
 <script src="w3d/sphinx.js?v=2"></script>
-<script src="w3d/world.js?v=18"></script>
+<script src="w3d/world.js?v=19"></script>
 <script src="w3d/rooms.js?v=4"></script>
-<script src="w3d/bank.js?v=4"></script>
+<script src="w3d/bank.js?v=5"></script>
 <script src="w3d/showcase.js?v=2"></script>
 <script src="w3d/wildlife.js?v=3"></script>
 <script src="w3d/streets.js?v=8"></script>
+<script src="w3d/realism.js?v=1"></script>
 <script>
 /* Drag-to-look up/down on touch-style pointers (Quest browser 2D view): A-Frame look-controls only turns left/right for touch. */
 AFRAME.registerComponent('touch-pitch', {
@@ -73,7 +74,7 @@ body{margin:0;font-family:system-ui,sans-serif}
 #note{font-size:12px;opacity:.85;margin-top:4px}
 #ui .tools button{background:#333;color:#ffe9a8;font-size:13px;padding:6px 10px}
 </style></head><body>
-<a-scene vr-mode-ui="enabled: true" light="defaultLightsEnabled: false" renderer="antialias: true; colorManagement: true; highRefreshRate: false; foveationLevel: 1; logarithmicDepthBuffer: true; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160; precision: high" hd-renderer="scale: 1.0" w3d-anim>
+<a-scene vr-mode-ui="enabled: true" light="defaultLightsEnabled: false" renderer="antialias: true; colorManagement: true; toneMapping: ACESFilmic; exposure: 1.0; highRefreshRate: false; foveationLevel: 1; logarithmicDepthBuffer: true; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160; precision: high" hd-renderer="scale: 1.0" w3d-anim>
   <a-entity id="sky" visible="false"></a-entity>
   <a-entity id="rig" wasd-controls="acceleration: 25" w3d-physics w3d-keys>
     <!-- the winged-sun fly disk that hovered overhead is gone; Fly is a button on the menu (A/X still toggles it) -->
@@ -121,7 +122,7 @@ body{margin:0;font-family:system-ui,sans-serif}
   <button data-w="ufo">UFO room</button>
   <button data-w="pond">Fly over the pond</button>
   <button data-w="pyramid">Pyramid park (24/495)</button></div>
-  <div id="note">Concept rendering only, not a real institution or engineering design. Terrain: USGS 3DEP elevation. Ground imagery: USGS National Map orthoimagery (public domain), edited to show Fowling Pond Restoration Plan v6 (restored pond and wetlands, herring passage, King's Pond, regraded landfill/quarry, rail tunnel, relocated Thrasher St) approximately. Buildings, plants and animals are procedural concept models; sphinx heads: 3D scan of KAS38, cast of a sphinx with the features of Amenemhat, Royal Cast Collection, SMK - National Gallery of Denmark (public domain); the Propulsion hall and UFO room (through the doors in the banking hall's north wall) use procedural models and summarize public sources; the bank vault (lift in the banking hall, or Bank vault in the menu) and Josh's account board are concept displays, not a real account or balance; panoramas are AI-generated concept art. Street names: (c) OpenStreetMap contributors (ODbL).
+  <div id="note">Concept rendering only, not a real institution or engineering design. Terrain: USGS 3DEP elevation. Ground imagery: USGS National Map orthoimagery (public domain), edited to show Fowling Pond Restoration Plan v6 (restored pond and wetlands, herring passage, King's Pond, regraded landfill/quarry, rail tunnel, relocated Thrasher St) approximately. Buildings, plants and animals are procedural concept models; sphinx heads: 3D scan of KAS38, cast of a sphinx with the features of Amenemhat, Royal Cast Collection, SMK - National Gallery of Denmark (public domain); the Propulsion hall and UFO room (through the doors in the banking hall's north wall) use procedural models and summarize public sources; the bank vault (lift in the banking hall, or Bank vault in the menu) and Josh's account board are concept displays, not a real account or balance; panoramas are AI-generated concept art and also light the 3D rooms; photo textures for grass, marble, limestone and wood: ambientCG (CC0). Street names: (c) OpenStreetMap contributors (ODbL).
   Desktop: WASD + mouse, F = fly, Space/Shift = up/down. Quest: left stick move, right stick turn, right trigger teleport, A/X or the Fly button on the menu = fly, press left stick or Y = menu.</div>
 </div>
 <script>

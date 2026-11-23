@@ -131,18 +131,9 @@ function detailTex() { // grass/soil micro-detail (grey around 0.5), tiles every
   for (let i = 0; i < S * S; i++) { const a = 0.5 + (A2[i] - 0.5) * 2.2 + (A[i] - 0.5) * 0.25, b = 0.5 + (B2[i] - 0.5) * 5.0; img.data[i * 4] = Math.max(0, Math.min(255, a * 255)); img.data[i * 4 + 1] = Math.max(0, Math.min(255, b * 255)); img.data[i * 4 + 2] = 128; img.data[i * 4 + 3] = 255; }
   g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 16; return t;
 }
-function grassTex() { // sharp repeating grass/soil: thousands of short blades over mottled soil, ~3 m tile
-  const S = 1024, c = canvas(S, S), g = c.getContext('2d');
-  g.fillStyle = '#6f7a45'; g.fillRect(0, 0, S, S);
-  for (let i = 0; i < 1400; i++) { const x = Math.random() * S, y = Math.random() * S, r = 6 + Math.random() * 30; g.fillStyle = Math.random() < 0.35 ? 'rgba(110,92,60,0.18)' : 'rgba(60,90,35,0.2)'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
-  for (let i = 0; i < 26000; i++) {
-    const x = Math.random() * S, y = Math.random() * S, l = 6 + Math.random() * 16, a = -Math.PI / 2 + (Math.random() - 0.5) * 1.3, h = 70 + Math.random() * 40, li = 22 + Math.random() * 30;
-    g.strokeStyle = 'hsl(' + h + ',' + (35 + Math.random() * 30) + '%,' + li + '%)'; g.lineWidth = 1 + Math.random() * 1.6; g.beginPath();
-    for (const dx of [0, -S, S]) for (const dy of [0, -S, S]) { g.moveTo(x + dx, y + dy); g.lineTo(x + dx + Math.cos(a) * l, y + dy + Math.sin(a) * l); }
-    g.stroke();
-  }
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 16; t.colorSpace = THREE.SRGBColorSpace; return t;
-}
+// photo PBR textures (CC0, ambientCG: Grass004, Marble014, Tiles143, WoodFloor051) - 1k on full, 512 px files on phones
+function pbr(name, srgb, rep) { const t = new THREE.TextureLoader().load(BASE + 'tex/pbr/' + name + (LITE ? '_512' : '') + '.jpg?v=1'); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = LITE ? 4 : 16; if (rep) t.repeat.set(rep, rep); return t; }
+W3D.pbr = pbr;
 function cofferTex() { // round coffered dome: rings of recessed coffers with gold rosettes, lapis star oculus at the crown
   const c = hcanvas(1024), g = c.getContext('2d'); noiseFill(g, 1024, 1024, '#e9d6ab', 0.04, 20000);
   g.fillStyle = '#163a7a'; g.fillRect(0, 0, 1024, 150); g.fillStyle = '#e8c255'; for (let x = 16; x < 1024; x += 42) star(g, x, 40 + (x % 84 ? 0 : 50), 10), star(g, x + 21, 105, 8);
@@ -297,7 +288,7 @@ W3D.build = function (scene3, sceneEl) {
   const sun = new THREE.DirectionalLight(0xfff0d8, 1.55); sun.position.set(HQ.x - 260, HQ.y + 360, HQ.z + 210); sun.target.position.set(HQ.x + 20, HQ.y, HQ.z - 10);
   sun.castShadow = true; sun.shadow.mapSize.set(LITE ? 1024 : 2048, LITE ? 1024 : 2048); const sc = sun.shadow.camera; sc.left = -130; sc.right = 130; sc.top = 130; sc.bottom = -130; sc.near = 50; sc.far = 900; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.05;
   root.add(sun); root.add(sun.target);
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true; // sun is fixed: redraw shadows ~6x/s, not every frame
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = LITE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true; // sun is fixed: redraw shadows ~6x/s, not every frame
   // materials
   const ash = ashlarTex();
   M = {
@@ -320,6 +311,9 @@ W3D.build = function (scene3, sceneEl) {
   };
   if (W3D.env) for (const k in M) if (M[k].isMeshStandardMaterial) M[k].envMap = W3D.env, M[k].envMapIntensity = 0.55;
   M.officeFloor.envMapIntensity = M.granite.envMapIntensity = 0.8; M.marble.envMapIntensity = 0.45; M.marble.color.setHex(0xc9bfae); M.marble.roughness = 0.22; M.officeFloor.color.setHex(0xd6d0c4);
+  { // photo marble (CC0 ambientCG Marble014) for the terrace, avenue, forecourt and hall floors: one shared set of maps, 4 m tile like before
+    const mc = pbr('marble_col', true), mr = pbr('marble_rgh'), mn = LITE ? null : pbr('marble_nrm');
+    for (const [m, c, r] of [[M.marble, 0xf2ece2, 0.9], [M.granite, 0xcfc4b2, 0.75]]) { if (m.map) m.map.dispose(); m.map = mc; m.roughnessMap = mr; m.roughness = r; m.normalMap = mn; m.color.setHex(c); m.needsUpdate = true; } }
   W3D.M = M;
   W3D.lib = {box: box, floorOnly: floorOnly, canvas: canvas, tex: tex, starCeilingTex: starCeilingTex, HQ: HQ, walls: walls, floors: floors};
   let nd = 0; const step = x => { W3D.status('Loading terrain data ' + (++nd) + '/5...'); return x; };
@@ -352,12 +346,12 @@ function buildTerrain() {
   const t = new THREE.TextureLoader().load(BASE + (LITE ? 'ortho_t_lite.jpg?v=6' : 'ortho_t.jpg?v=5')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = LITE ? 4 : 16;
   // sharper ground near the compound and pond: 0.5 m/px USGS tile (x -324..1724, z -1249..799) + fine detail texture that fades in within ~200 m
   const hi = LITE ? t : new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=5'); hi.colorSpace = THREE.SRGBColorSpace; if (!LITE) hi.anisotropy = 16;   // lite: no 0.5 m tile (hiRect moved off the map)
-  const det = detailTex(), grs = grassTex();
+  const det = detailTex(), grs = pbr('grass_col', true), grn = LITE ? null : pbr('grass_nrm');   // photo lawn (CC0) instead of the drawn blades
   const tm = new THREE.MeshLambertMaterial({map: t});
   tm.onBeforeCompile = sh => {
-    sh.uniforms.hiMap = {value: hi}; sh.uniforms.detMap = {value: det}; sh.uniforms.grsMap = {value: grs}; sh.uniforms.hiRect = {value: LITE ? new THREE.Vector4(1e7, 1e7, 1, 1) : new THREE.Vector4(-324, -1249, 2048, 2048)};
+    sh.uniforms.hiMap = {value: hi}; sh.uniforms.detMap = {value: det}; sh.uniforms.grsMap = {value: grs}; sh.uniforms.grsN = {value: grn}; sh.uniforms.hiRect = {value: LITE ? new THREE.Vector4(1e7, 1e7, 1, 1) : new THREE.Vector4(-324, -1249, 2048, 2048)};
     sh.vertexShader = 'varying vec3 vWp;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvWp = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'uniform sampler2D hiMap; uniform sampler2D detMap; uniform sampler2D grsMap; uniform vec4 hiRect; varying vec3 vWp;\n' + sh.fragmentShader.replace('#include <map_fragment>', [
+    sh.fragmentShader = 'uniform sampler2D hiMap; uniform sampler2D detMap; uniform sampler2D grsMap; uniform sampler2D grsN; uniform vec4 hiRect; varying vec3 vWp; float gNear = 0.0;\n' + sh.fragmentShader.replace('#include <map_fragment>', [
       'vec4 texelColor = texture2D(map, vMapUv);',
       'vec2 hu = (vWp.xz - hiRect.xy) / hiRect.zw;',
       'if (hu.x > 0.0 && hu.x < 1.0 && hu.y > 0.0 && hu.y < 1.0) { vec4 hc = texture2D(hiMap, vec2(hu.x, 1.0 - hu.y)); float e = min(min(hu.x, 1.0 - hu.x), min(hu.y, 1.0 - hu.y)); texelColor = mix(texelColor, hc, smoothstep(0.0, 0.03, e)); }',
@@ -369,14 +363,18 @@ function buildTerrain() {
       'texelColor.rgb *= mix(1.0, (0.8 + 0.4 * (texture2D(detMap, vWp.xz / 0.4).r * 0.55 + texture2D(detMap, vWp.xz / 2.6).g * 0.45)) * (0.965 + 0.05 * rip), sandy);',
       'float cano = (1.0 - smoothstep(0.05, 0.12, texelColor.g)) * smoothstep(0.0, 0.01, texelColor.g - texelColor.b) * (1.0 - smoothstep(90.0, 1500.0, dd));',   // blurry tree canopy: leaf-clump detail
       'texelColor.rgb *= mix(1.0, 0.62 + 0.75 * (texture2D(detMap, vWp.xz / 5.5).r * 0.6 + texture2D(detMap, vWp.xz / 1.7).r * 0.4), cano * 0.7);',
-      'vec3 gt = mix(texture2D(grsMap, vWp.xz / 3.0).rgb, texture2D(grsMap, vWp.xz / 9.7).rgb, 0.35);',
+      'vec2 gq = mat2(0.8, 0.6, -0.6, 0.8) * vWp.xz;',   // second scale rotated so the photo tile never lines up
+      'float gv = texture2D(detMap, vWp.xz / 41.0).g;',   // macro patches: lusher / drier lawn
+      'vec3 gt = mix(texture2D(grsMap, vWp.xz / 2.2).rgb, texture2D(grsMap, gq / 7.3).rgb, 0.3 + 0.4 * gv) * mix(vec3(1.12, 1.04, 0.78), vec3(0.86, 1.0, 0.92), gv) * vec3(1.6, 1.5, 2.4);',
       'vec3 tint = clamp(texelColor.rgb / vec3(0.16, 0.19, 0.08), 0.35, 2.2);',
       'float gn = 1.0 - smoothstep(25.0, 220.0, dd); float veg = smoothstep(0.0, 0.05, texelColor.g - texelColor.b) * smoothstep(-0.005, 0.02, texelColor.g - texelColor.r);   // not on beach sand (red > green)',
-      'texelColor.rgb = mix(texelColor.rgb, gt * tint, gn * mix(0.35, 0.8, veg));',
+      'vec3 gg = gt * tint; gg = mix(vec3(dot(gg, vec3(0.3, 0.59, 0.11))), gg, 0.72) * vec3(0.97, 0.9, 0.8);',   // real lawn in sun: yellower, less saturated than the photo tile
+      'texelColor.rgb = mix(texelColor.rgb, gg, gn * mix(0.35, 0.8, veg)); gNear = gn * veg;',
       'diffuseColor *= texelColor;'].join('\n'));
+    if (grn) { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n{ vec3 gN = texture2D(grsN, vWp.xz / 2.2).xyz * 2.0 - 1.0; normal = normalize(normal + (viewMatrix * vec4(gN.x, 0.0, -gN.y, 0.0)).xyz * 0.9 * gNear); }'); }
   };
   const mesh = new THREE.Mesh(geo, tm); mesh.receiveShadow = true; mesh.name = 'terrain'; root.add(mesh);
-  W3D._terrainMat = tm; W3D._extraTex = [hi, det, grs];
+  W3D._terrainMat = tm; W3D._extraTex = [hi, det, grs].concat(grn ? [grn] : []);
   buildRings();
 }
 /* Surroundings in the same true frame (geo.json): a mid ring to +-6.1 km (64 m grid, ~3 m photo) and a far ring to +-16.4 km
@@ -649,7 +647,7 @@ function buildFootbridge(F) {
   if (!F) return;
   const [ax, az] = F.a, [bx, bz] = F.b, L = Math.hypot(bx - ax, bz - az), tx = (bx - ax) / L, tz = (bz - az) / L, W = F.w || 3, NS = Math.ceil(L / 2), yaw = Math.atan2(tx, tz);
   const yA = terrainH(ax, az) + 0.25, yB = terrainH(bx, bz) + 0.25, rise = F.rise || 1.8, yAt = t => yA + (yB - yA) * t + rise * Math.sin(Math.PI * t);
-  const wood = new THREE.MeshLambertMaterial({color: 0x8a6a45}), dark = new THREE.MeshLambertMaterial({color: 0x5e4630});
+  const wood = new THREE.MeshStandardMaterial({map: pbr('wood_col', true), roughnessMap: pbr('wood_rgh'), normalMap: LITE ? null : pbr('wood_nrm'), color: 0xc9b8a0, roughness: 1}), dark = new THREE.MeshLambertMaterial({color: 0x5e4630});
   const deck = new THREE.InstancedMesh(new THREE.BoxGeometry(W, 0.22, L / NS + 0.05), wood, NS), rail = new THREE.InstancedMesh(new THREE.BoxGeometry(0.12, 0.12, L / NS + 0.05), dark, NS * 2), post = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 1.1, 0.14), dark, (NS + 1) * 2);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
   let y0 = 1e9, y1 = -1e9;
@@ -707,8 +705,13 @@ function buildBank() {
     const lip = new THREE.Mesh(new THREE.RingGeometry(R - 0.6, R + 0.9, 96, 1), M.gold); lip.rotation.x = -Math.PI / 2; lip.position.set(dc.x, y0 + 0.1 + H + 1.2, dc.z); root.add(lip);
     const inner = new THREE.Mesh(new THREE.SphereGeometry(R - 0.6, 96, 32, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({map: cofferTex(), roughness: 0.55, side: THREE.BackSide, envMap: W3D.env || null, envMapIntensity: 0.4}));
     inner.position.set(dc.x, y0 + 0.1 + H + 1.2, dc.z); root.add(inner);
-    const outer = new THREE.Mesh(new THREE.SphereGeometry(R + 0.9, 96, 32, 0, Math.PI * 2, 0, Math.PI / 2), M.stone); outer.position.copy(inner.position); outer.castShadow = true; root.add(outer);
-    const fin = new THREE.Mesh(new THREE.SphereGeometry(0.6, 24, 16), M.gold); fin.position.set(dc.x, inner.position.y + R + 1.2, dc.z); root.add(fin);
+    const domeM = M.stone.clone(); (W3D.stoneClones = W3D.stoneClones || []).push([domeM, 14, 4]);   // smaller courses on the curved shell; bank.js gives it the photo stone maps (shared image, no extra GPU copy)
+    const outer = new THREE.Mesh(new THREE.SphereGeometry(R + 0.9, 96, 32, 0, Math.PI * 2, 0, Math.PI / 2), domeM); outer.position.copy(inner.position); outer.castShadow = true; root.add(outer);
+    { const rib = new THREE.TorusGeometry(R + 0.98, 0.13, 6, 40, Math.PI / 2 - 0.12); const ribs = new THREE.InstancedMesh(rib, M.stone, 16), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+      for (let i = 0; i < 16; i++) { e.set(0, i / 16 * Math.PI * 2, 0, 'YXZ'); q.setFromEuler(e); m4.compose(inner.position, q, new THREE.Vector3(1, 1, 1)); ribs.setMatrixAt(i, m4); }   // 16 meridian ribs
+      ribs.castShadow = true; ribs.frustumCulled = false; root.add(ribs);
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.25, 1.1, 24), M.stone); drum.position.set(dc.x, inner.position.y + R + 0.55, dc.z); root.add(drum); }   // lantern drum under the finial
+    const fin = new THREE.Mesh(new THREE.SphereGeometry(0.6, 24, 16), M.gold); fin.position.set(dc.x, inner.position.y + R + 1.6, dc.z); root.add(fin);
     const lamp = new THREE.PointLight(0xffe2b0, 0.5, 14); lamp.position.set(dc.x, y0 + 5, dc.z); root.add(lamp);
   }
   box(16, 0.4, 56, 845, y0 - 0.1, zc, M.marble, {floor: true, collide: false, T: 4});

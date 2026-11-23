@@ -1,6 +1,6 @@
 /* Josh Freeman's VR World - the gold Egyptian bank ("central command"): quality pass, vault hall and account board.
    Concept rendering only: not a real bank, account, balance or engineering design.
-   All textures are original procedural art (w3d/tex/*.jpg made with numpy, or drawn on canvas at load). */
+   Textures: procedural art (w3d/tex/*.jpg made with numpy, or drawn on canvas) plus CC0 photo PBR sets from ambientCG in w3d/tex/pbr. */
 (function () {
 /* ===== Josh's account (concept display) - change the balance here ===== */
 const ACCOUNT = {
@@ -71,7 +71,7 @@ function makeEnvs() {
   for (const x of [-12, 0, 12]) for (const z of [-10, 10]) lamp(x, z);
   for (const s of [-1, 1]) { const g = new THREE.Mesh(new THREE.BoxGeometry(36, 3, 1), new THREE.MeshBasicMaterial()); g.material.color.setRGB(0.9, 0.6, 0.18); g.position.set(0, 0, s * 19); vs.add(g); }
   const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 5, 30), new THREE.MeshBasicMaterial()); wall.material.color.setRGB(0.5, 0.42, 0.3); wall.position.set(19, 3, 0); vs.add(wall);
-  envIn = pm.fromScene(vs, 0.03).texture;
+  envIn = pm.fromScene(vs, 0.03).texture; W3D.envOut = envOut; W3D.envIn = envIn;
   pm.dispose();
 }
 
@@ -134,8 +134,9 @@ function rectNormal(h, W, H, strength) { // non-square height field -> normal ma
 /* ---------- 1. materials: sandstone ashlar, carved reliefs, gold leaf, painted capitals ---------- */
 function upgradeMaterials() {
   const set = (m, o) => { Object.assign(m, o); if (o.color !== undefined) m.color = o.color; m.envMap = envOut; m.needsUpdate = true; };
-  set(M.stone, {map: ltex('ashlar_col.jpg', true), normalMap: ltex('ashlar_nrm.jpg'), roughnessMap: ltex('ashlar_rgh.jpg'), roughness: 1, metalness: 0, envMapIntensity: 0.5});
+  set(M.stone, {map: W3D.pbr('lime_col', true), normalMap: W3D.pbr('lime_nrm'), roughnessMap: W3D.pbr('lime_rgh'), roughness: 1, metalness: 0, envMapIntensity: 0.5});   // photo limestone blocks (CC0 ambientCG Tiles143), was drawn ashlar
   M.stone.color.setHex(0xffffff); M.stone.normalScale.set(1.1, 1.1);
+  for (const [m, rx, ry] of W3D.stoneClones || []) { for (const k of ['map', 'normalMap', 'roughnessMap']) { m[k] = M.stone[k].clone(); m[k].repeat.set(rx, ry); } m.color.setHex(0xffffff); m.roughness = 1; m.normalScale.copy(M.stone.normalScale); m.needsUpdate = true; }
   for (const k of ['relief', 'column']) { const m = M[k]; if (!m.map || !m.map.image) continue; m.normalMap = carvedNormal(m.map.image, 1024, [236, 216, 171], 5, false); m.normalScale.set(1, 1); m.roughness = 0.62; m.envMap = envOut; m.envMapIntensity = 0.45; m.needsUpdate = true; }
   set(M.gold, {map: ltex('gold_col.jpg', true), normalMap: ltex('gold_nrm.jpg'), roughnessMap: ltex('gold_rgh.jpg'), roughness: 1, metalness: 1, envMapIntensity: 1.25});
   M.gold.color.setHex(0xffffff); M.gold.normalScale.set(0.35, 0.35);
