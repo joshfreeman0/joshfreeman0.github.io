@@ -45,7 +45,8 @@ window.JFVR_LITE = (function () {
 <script src="w3d/wildlife.js?v=4"></script>
 <script src="w3d/streets.js?v=10"></script>
 <script src="w3d/zoo.js?v=2"></script>
-<script src="w3d/launch.js?v=2c"></script>
+<script src="w3d/launch.js?v=3b"></script>
+<script src="w3d/invite.js?v=1"></script>
 <script src="w3d/realism.js?v=1"></script>
 <script>
 /* Drag-to-look up/down on touch-style pointers (Quest browser 2D view): A-Frame look-controls only turns left/right for touch. */
@@ -117,6 +118,8 @@ body{margin:0;font-family:system-ui,sans-serif}
     <a-plane class="btn" data-w="pyramid" position="0 -0.8 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Pyramid park (24/495)" align="center" color="#111" width="2.4"></a-text></a-plane>
     <a-plane class="btn" data-w="saucer" position="1.7 -0.8 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Flying saucer" align="center" color="#111" width="1.9"></a-text></a-plane>
     <a-plane class="btn" data-w="home" position="0 -1.2 0" width="1.6" height="0.26" material="shader:flat;color:#9ffcff"><a-text value="Home: Fowling Pond" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-invite="world" position="-1.7 -1.2 0" width="0.8" height="0.26" material="shader:flat;color:#9ffcff"><a-text value="Invite" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-invite="here" position="1.7 -1.2 0" width="0.8" height="0.26" material="shader:flat;color:#9ffcff"><a-text value="Invite here" align="center" color="#111" width="1.9"></a-text></a-plane>
     <a-plane class="btn" fly-toggle position="2.1 -0.4 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text id="flylabel" value="Fly: OFF" align="center" color="#111" width="1.9"></a-text></a-plane>
   </a-entity>
 </a-scene>
@@ -198,12 +201,21 @@ function watchGL(){
 }
 if (scn.canvas) watchGL(); else scn.addEventListener('render-target-loaded', watchGL);
 setTimeout(() => { if (!window.W3D_READY) window.JFVR_fail('The 3D world is taking too long to load (over 3 minutes). Check the connection and try again.'); }, 180000);
+/* ?spot=<id> lands you at a named spot (invite links, Red Planet Lounge return shuttle); ?from=redplanetlounge says welcome back
+   and, with no spot, lands at the Bridgewater launch pad beside the rocket */
+const QS = new URLSearchParams(location.search), FROM_MARS = /^redplanet/i.test(QS.get('from') || '');
+const SPOT_ALIAS = {pond: 'marker', temple: 'temple', bank: 'hall', vesta: 'vesta', saucer: 'saucer', launchpad: 'launchpad', 'launch-pad': 'launchpad', pad: 'launchpad',
+  terrace: 'terrace', hall: 'hall', vault: 'vault', office: 'office', conservatory: 'conservatory', propulsion: 'propulsion', ufo: 'ufo', showcase: 'showcase', pyramid: 'pyramid', marker: 'marker', home: 'home'};
+function arrivalSpot(){ const sp = (QS.get('spot') || '').toLowerCase(), k = SPOT_ALIAS[sp];
+  if (!W3D.spots.temple) W3D.spots.temple = () => W3D.teleportTo(866, undefined, -380, -90);   // between the sphinxes, facing the gate
+  if (k && W3D.spots[k]) return k; return FROM_MARS ? 'launchpad' : 'terrace'; }
+function arrivalToast(){ if (FROM_MARS) setTimeout(() => { if (W3D.toast) W3D.toast('Welcome back from Mars', 4000); else if (JFVR.hud) JFVR.hud('Welcome back from Mars'); }, 600); }
 function start(){
   W3D.onImagery = (done, total) => { const d = document.querySelector('#load'); if (!d || d.dataset.failed) return; if (done >= total) d.remove(); else d.textContent = 'Loading imagery ' + done + '/' + total + '...'; };
   W3D.build(scn.object3D, scn).then(() => {
       if (window.JFVR_failed) return;
       const d = document.querySelector('#load'); if (d) { if (window.W3D_LOADING) { d.className = 'bg'; d.textContent = 'Loading imagery...'; } else d.remove(); }
-      goWorld('terrace'); window.W3D_READY = true; })
+      goWorld(arrivalSpot()); window.W3D_READY = true; arrivalToast(); })
     .catch(e => { console.error(e); window.JFVR_fail('The 3D world did not load (' + (e && e.message || e) + ').'); });
 }
 if (scn.hasLoaded) start(); else scn.addEventListener('loaded', start);

@@ -7,6 +7,10 @@
      nuclear thermal rocket from the Propulsion hall.
    - Pulling the right trigger (or click / tap) on that rocket boards it and flies a ~38 s scripted Earth -> Mars trip, built on demand and
      disposed afterwards; on touchdown it fades out, ends the WebXR session and opens Red Planet Lounge at its landing pad.
+   - Multi-rider (Josh): several people board (trigger/click on the rocket), anyone aboard presses Launch, and every rider gets the
+     same 3 s countdown and flight from one shared start (p2p room action 'rkt': launch phase + rider list; riders stand side by
+     side on one gallery). Boarding closes once the countdown starts. At touchdown everyone opens Red Planet Lounge together.
+     Solo / ?nomp=1 works the same (board, Launch).
    - Far-edge haze: radial fog closes in as you fly out east so the 16 km edge of the terrain never shows against the sky. */
 (function () {
 'use strict';
@@ -22,6 +26,7 @@ const SC = 12;                      // full-size = 12x the Propulsion-hall model
 const ROCKET_H = 2.5 * SC;
 let scene3 = null, patch = null, flight = null, clipU = null, checkT = 0;
 const v3 = new THREE.Vector3();
+const hud = m => window.JFVR && JFVR.hud && JFVR.hud(m);
 const camPos = () => { const c = document.querySelector('[camera]'); return c ? c.object3D.getWorldPosition(v3) : null; };
 const smooth = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
 const canvasTex = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
@@ -136,7 +141,7 @@ function unloadPatch() {
 function rocketProxy(rocket, pad) {
   const hc = document.createElement('canvas'); hc.width = 512; hc.height = 96; const hg = hc.getContext('2d'), ht = new THREE.CanvasTexture(hc); ht.colorSpace = THREE.SRGBColorSpace;
   const draw = on => { hg.clearRect(0, 0, 512, 96); hg.fillStyle = on ? 'rgba(181,83,45,0.95)' : 'rgba(20,20,24,0.75)'; hg.beginPath(); hg.roundRect ? hg.roundRect(4, 4, 504, 88, 18) : hg.rect(4, 4, 504, 88); hg.fill();
-    hg.fillStyle = '#fff'; hg.font = 'bold 36px Arial, sans-serif'; hg.textAlign = 'center'; hg.textBaseline = 'middle'; hg.fillText('Pull trigger to launch to Mars', 256, 50); ht.needsUpdate = true; };
+    hg.fillStyle = '#fff'; hg.font = 'bold 36px Arial, sans-serif'; hg.textAlign = 'center'; hg.textBaseline = 'middle'; hg.fillText(hintText(), 256, 50); ht.needsUpdate = true; }; patch.drawHint = () => draw(false);
   const hint = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.31), new THREE.MeshBasicMaterial({map: ht, transparent: true, toneMapped: false, depthWrite: false}));
   hint.position.set(PAD.x, PAD.top + 9, PAD.z + 5.5); hint.renderOrder = 6; patch.grp.add(hint); patch.hint = hint; draw(false);
   const mats = rocket.userData.mats, base = mats.map(m => m.emissive.getHex());
@@ -145,7 +150,7 @@ function rocketProxy(rocket, pad) {
   e.setAttribute('position', PAD.x + ' ' + (PAD.top + ROCKET_H / 2) + ' ' + PAD.z);
   e.setAttribute('geometry', 'primitive: cylinder; radius: ' + (0.3 * SC) + '; height: ' + ROCKET_H); e.setAttribute('material', 'shader: flat; transparent: true; opacity: 0; depthWrite: false');
   e.addEventListener('mouseenter', () => hover(true)); e.addEventListener('mouseleave', () => hover(false));
-  e.addEventListener('click', ev => { const ce = ev.detail && ev.detail.cursorEl, lc = ce && ce.getAttribute && ce.getAttribute('laser-controls'); if (lc && /left/.test(typeof lc === 'string' ? lc : lc.hand)) return; hover(false); startFlight(); });
+  e.addEventListener('click', ev => { const ce = ev.detail && ev.detail.cursorEl, lc = ce && ce.getAttribute && ce.getAttribute('laser-controls'); if (lc && /left/.test(typeof lc === 'string' ? lc : lc.hand)) return; hover(false); if (RK.aboard) showBoard(); else board(); });
   document.querySelector('a-scene').appendChild(e);
   return e;
 }
@@ -160,7 +165,7 @@ function goMars() {
 W3D.goMars = goMars;
 
 /* ---------- the flight: built on demand, disposed afterwards ---------- */
-const T = {count: 6, lift: 16, space: 22, cruise: 31, land: 41, end: 43};   // seconds
+const T = {count: 3, lift: 13, space: 19, cruise: 28, land: 38, end: 40};   // seconds (3 s shared countdown, then lift-off)
 function earthTex() { return canvasTex(512, 256, (c, w, h) => { c.fillStyle = '#1d4f8f'; c.fillRect(0, 0, w, h); let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < 70; i++) { const x = r() * w, y = h * (0.15 + r() * 0.7), rr = 10 + r() * 34; c.fillStyle = r() < 0.5 ? '#4f7a3a' : '#8a7a4c'; c.beginPath(); c.ellipse(x, y, rr * 1.6, rr, r() * 3, 0, Math.PI * 2); c.fill(); }
   c.fillStyle = '#eef3f6'; c.fillRect(0, 0, w, 14); c.fillRect(0, h - 14, w, 14);
@@ -170,21 +175,23 @@ function marsTex(ground) { return canvasTex(ground ? 1024 : 512, ground ? 1024 :
   c.globalAlpha = 1; if (!ground) { c.fillStyle = '#f1e6dc'; c.fillRect(0, 0, w, 8); c.fillRect(0, h - 8, w, 8); } }); }
 function label(text) { const t = canvasTex(1024, 192, (c, w, h) => { c.fillStyle = 'rgba(10,12,18,0.72)'; c.fillRect(0, 0, w, h); c.fillStyle = '#ffd27a'; c.font = 'bold 84px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, w / 2, h / 2 + 4); });
   return new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.45), new THREE.MeshBasicMaterial({map: t, transparent: true, depthTest: false, toneMapped: false})); }
-function startFlight() {
-  if (flight || going) return;
+function startFlight(o) {
+  if (flight || going) return; o = o || {}; hideBoard();
   const sc = document.querySelector('a-scene'), rig = document.querySelector('#rig'), cam = sc.camera; if (!rig || !cam) return;
   const s3 = sc.object3D, F = new THREE.Group(); F.name = 'flight'; s3.add(F);
   const saved = {pos: rig.object3D.position.clone(), fly: JFVR.fly, maxY: JFVR.flyMaxY, rad: JFVR.flyRadius, fog: s3.fog, bg: s3.background, rootVis: W3D.root ? W3D.root.visible : true, fogCol: W3D.fog ? W3D.fog.color.getHex() : 0, fogNear: W3D.fog && W3D.fog.near, fogFar: W3D.fog && W3D.fog.far};
   JFVR.fly = true; JFVR.flyMaxY = 1e7; JFVR.flyRadius = 1e7;
-  const yaw = new THREE.Euler().setFromQuaternion(cam.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y;
+  const yaw = typeof o.yaw === 'number' ? o.yaw : new THREE.Euler().setFromQuaternion(cam.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y;
+  const seat = o.seat || 0, nR = Math.max(1, o.n || 1), SP = 1.2;   // riders stand side by side, 1.2 m apart, away from the rocket
   const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)), side = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
   // rider gallery: you stand 6.5 m beside the rocket at 14 m up; the rocket is on your right, the view ahead is open
   const DECK = 14, rocketOff = side.clone().multiplyScalar(6.5);
   const rocket = makeRocket(true); F.add(rocket);
   const deck = new THREE.Group(); F.add(deck);
   const steel = new THREE.MeshStandardMaterial({color: 0x6c7076, metalness: 0.6, roughness: 0.5});
-  const plat = new THREE.Mesh(new THREE.BoxGeometry(3, 0.2, 3), steel); plat.position.y = -0.1; deck.add(plat);
-  for (const [x, z, w, d] of [[0, -1.5, 3, 0.06], [0, 1.5, 3, 0.06], [-1.5, 0, 0.06, 3]]) { const r = new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, d), steel); r.position.set(x, 1.05, z); deck.add(r); }
+  const GW = 3 + SP * (nR - 1), gx = -SP * (nR - 1) / 2;
+  const plat = new THREE.Mesh(new THREE.BoxGeometry(GW, 0.2, 3), steel); plat.position.set(gx, -0.1, 0); deck.add(plat);
+  for (const [x, z, w, d] of [[gx, -1.5, GW, 0.06], [gx, 1.5, GW, 0.06], [gx - GW / 2, 0, 0.06, 3]]) { const r = new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, d), steel); r.position.set(x, 1.05, z); deck.add(r); }
   const armM = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.3, 0.8), steel); armM.position.set(3.3, -0.1, 0); deck.add(armM); deck.rotation.y = yaw;
   // flame + smoke
   const flame = new THREE.Mesh(new THREE.ConeGeometry(0.16 * SC, 0.9 * SC, 16, 1, true), new THREE.MeshBasicMaterial({color: 0xffb04a, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false}));
@@ -210,25 +217,25 @@ function startFlight() {
   // in-world Skip / Cancel buttons (laser) + HTML ones (phone / desktop)
   const mkBtn = (t, x, fn) => { const b = document.createElement('a-plane'); b.setAttribute('class', 'btn'); b.setAttribute('width', 0.7); b.setAttribute('height', 0.22); b.setAttribute('material', 'shader:flat;color:#FFD700');
     const tx = document.createElement('a-text'); tx.setAttribute('value', t); tx.setAttribute('align', 'center'); tx.setAttribute('color', '#111'); tx.setAttribute('width', 1.8); b.appendChild(tx); b.addEventListener('click', fn); sc.appendChild(b); b.userData = {x}; return b; };
-  const bSkip = mkBtn('Skip to Mars', -0.4, () => finish(true)), bCancel = mkBtn('Cancel', 0.4, () => finish(false));
+  const skipAll = () => { rkSend({k: 'skip'}); finish(true); };
+  const bSkip = mkBtn('Skip to Mars', -0.4, skipAll), bCancel = mkBtn('Cancel', 0.4, () => finish(false));
   const ov = document.createElement('div'); ov.id = 'flightui'; ov.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:50;display:flex;gap:10px';
-  for (const [t, fn] of [['Skip to Mars', () => finish(true)], ['Cancel', () => finish(false)]]) { const b = document.createElement('button'); b.textContent = t; b.style.cssText = 'font:600 15px sans-serif;padding:8px 14px;border-radius:8px;border:0;background:#ffd700;color:#111'; b.onclick = fn; ov.appendChild(b); }
+  for (const [t, fn] of [['Skip to Mars', skipAll], ['Cancel', () => finish(false)]]) { const b = document.createElement('button'); b.textContent = t; b.style.cssText = 'font:600 15px sans-serif;padding:8px 14px;border-radius:8px;border:0;background:#ffd700;color:#111'; b.onclick = fn; ov.appendChild(b); }
   document.body.appendChild(ov);
-  const onB = () => finish(true), onKey = e => { if (e.key === 'Escape') finish(false); };
+  const onB = skipAll, onKey = e => { if (e.key === 'Escape') finish(false); };
   sc.addEventListener('bbuttondown', onB); window.addEventListener('keydown', onKey);
-  const P0 = new THREE.Vector3(PAD.x, PAD.top + 0.6, PAD.z).sub(rocketOff);   // rider spot (rocket at pad centre)
-  let t0 = performance.now(), done = false;
+  const P0c = new THREE.Vector3(PAD.x, PAD.top + 0.6, PAD.z).sub(rocketOff), P0 = P0c.clone().addScaledVector(side, -SP * seat);   // my spot on the shared gallery (rocket at pad centre)
+  let t0 = performance.now() - (o.ph || 0), done = false, lastBeep = -1;
   const place = (y) => { // rider at (P0.x, y, P0.z); rocket base at y - DECK
     const rp = rig.object3D.position, cw = cam.getWorldPosition(new THREE.Vector3()); rp.x += P0.x - cw.x; rp.z += P0.z - cw.z; rp.y = y;
-    deck.position.set(P0.x, y, P0.z); rocket.position.set(P0.x + rocketOff.x, y - DECK, P0.z + rocketOff.z); };
+    deck.position.set(P0c.x, y, P0c.z); rocket.position.set(P0.x + rocketOff.x, y - DECK, P0.z + rocketOff.z); };
   const world = (on) => { if (W3D.root) W3D.root.visible = on; s3.fog = on ? W3D.fog : null; };
   const yAt = t => { const base = PAD.top + 0.6 + DECK; if (t < T.count) return base; const u = t - T.count; return base + 0.5 * 9 * u * u + (u > 6 ? 0.5 * 40 * (u - 6) * (u - 6) : 0); }; // smooth, increasing acceleration
   if (patch && patch.rocket) patch.rocket.visible = false;
   function finish(toMars) {
-    // Quest fix: window.requestAnimationFrame does not fire during an immersive WebXR session (only the session's rAF does), so the old
-    // rAF-driven fade froze on its first frame and goMars()/restore() never ran. The fade now steps from the A-Frame tick (which runs on
-    // the XR session's frame loop) with a setTimeout fallback that always completes it.
-    if (done) return; done = true; ending = {t: performance.now(), toMars, fin: false};
+    // Quest fix: window.requestAnimationFrame does not fire during an immersive WebXR session (only the session's rAF does), so the fade
+    // steps from the A-Frame tick (XR frame loop) with a setTimeout fallback that always completes it.
+    if (done) return; done = true; RK.aboard = false; rkState(); ending = {t: performance.now(), toMars, fin: false};
     stepEnd(); setTimeout(endNow, 900);
   }
   let ending = null;
@@ -256,7 +263,8 @@ function startFlight() {
     const setTxt = s => { if (txt.userData.s === s) return; txt.userData.s = s; txt.material.map.dispose(); const n = label(s); txt.material.map = n.material.map; n.geometry.dispose(); n.material.dispose(); txt.visible = !!s; };
     if (t < T.lift) {                                     // 1-2: countdown, ignition, lift-off and climb; sky goes from blue to black
       world(true); place(yAt(t));
-      setTxt(t < 1 ? 'Boarding...' : t < T.count ? 'T-' + Math.max(1, Math.ceil(T.count - t)) : t < T.count + 2.5 ? 'Lift-off!' : '');
+      setTxt(t < T.count ? String(Math.max(1, Math.ceil(T.count - t))) : t < T.count + 2.5 ? 'Lift-off!' : '');
+      const bi = t < T.count ? Math.floor(t) : t < T.count + 0.3 ? 99 : -2; if (bi !== lastBeep && bi >= 0) { lastBeep = bi; beep(bi === 99 ? 1320 : 880, bi === 99 ? 0.45 : 0.16); }
       const ign = t > T.count - 1.6; flame.visible = ign; if (ign) { const k = 0.9 + 0.1 * Math.sin(t * 40); flame.scale.set(k, 1 + 0.15 * Math.sin(t * 23), k); }
       smoke.forEach((sp, i) => { const age = Math.max(0, t - (T.count - 1.4)); const r = (4 + age * 7) * sp.userData.r, a = sp.userData.a; sp.position.set(PAD.x + Math.cos(a) * r, PAD.top + 1 + age * 1.5 * sp.userData.r, PAD.z + Math.sin(a) * r);
         const s = 6 + age * 5; sp.scale.set(s, s, 1); sp.material.opacity = age > 0 ? Math.min(0.7, age * 0.5) * Math.max(0, 1 - age / 12) : 0; });
@@ -282,8 +290,75 @@ function startFlight() {
   }};
   if (!AFRAME.components['w3d-ride']) AFRAME.registerComponent('w3d-ride', {tick: function () { flight && flight.tick(); }});
   rig.setAttribute('w3d-ride', '');
-  W3D.flight = {skip: () => finish(true), cancel: () => finish(false), T};
+  W3D.flight = {skip: () => finish(true), cancel: () => finish(false), skipAll, T, t0: () => t0, seat, n: nR};
 }
+
+/* ---------- multi-rider boarding + p2p sync (action 'rkt') ---------- */
+const RK = {aboard: false, peers: {}, act: null, myId: '', fly: null, ui: null, xr: null};   // fly = {t0, until} of the current/last launch seen
+let actx = null;
+function beep(f, d) { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = f; o.type = 'sine';
+  g.gain.setValueAtTime(0.0001, actx.currentTime); g.gain.exponentialRampToValueAtTime(0.25, actx.currentTime + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + d);
+  o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + d + 0.05); } catch (e) {} }
+const nowMs = () => performance.now();
+function ridersAboard() { const t = nowMs(), out = []; for (const id in RK.peers) { const p = RK.peers[id]; if (p.aboard && t - p.t < 7000 && (!window.JFMP || !JFMP.peers || JFMP.peers[id])) out.push(id); } return out; }
+function aboardCount() { return ridersAboard().length + (RK.aboard ? 1 : 0); }
+function hintText() { const n = aboardCount(); return closed() ? 'Launched - boarding closed' : n ? n + ' aboard - trigger to board' : 'Pull trigger to board for Mars'; }
+function closed() { return !!(RK.fly && nowMs() < RK.fly.until && !(flight)); }
+function rkSend(m) { if (!RK.act) return; try { RK.act.send(Object.assign({n: window.JFMP && JFMP.name}, m)).catch(() => {}); } catch (e) {} }
+function rkState() { rkSend({k: 'st', aboard: RK.aboard}); if (patch && patch.drawHint) patch.drawHint(); updBoard(); }
+function hookRK() {
+  const MP = window.JFMP; if (RK.act) return true; if (!MP || !MP.room || !MP.room.makeAction) return false;
+  try { RK.act = MP.room.makeAction('rkt'); RK.myId = MP.selfId || '';
+    RK.act.onMessage((d, ctx) => onRK(d, ctx && ctx.peerId));
+    if (MP.room.onPeerJoin) MP.room.onPeerJoin(() => setTimeout(() => { rkState(); if (flight && W3D.flight) rkSend({k: 'go', ph: nowMs() - W3D.flight.t0(), late: 1}); }, 900));
+  } catch (e) { console.warn('rocket mp', e); RK.act = null; }
+  return true;
+}
+(function poll() { if (!hookRK()) setTimeout(poll, 1500); })();
+setInterval(() => { if (RK.aboard) rkState(); else if (patch && patch.drawHint) patch.drawHint(); }, 2500);
+function onRK(d, id) {
+  if (!d || !id) return; RK.myId = RK.myId || (window.JFMP && JFMP.selfId) || '';
+  const p = RK.peers[id] = RK.peers[id] || {}; p.t = nowMs(); p.n = d.n;
+  if (d.k === 'st') { p.aboard = !!d.aboard; if (patch && patch.drawHint) patch.drawHint(); updBoard(); return; }
+  if (d.k === 'go') { const t0 = nowMs() - (+d.ph || 0); RK.fly = {t0, until: t0 + T.end * 1000 + 2000}; p.aboard = false;
+    for (const rid of (d.riders || [])) if (RK.peers[rid]) RK.peers[rid].aboard = false;
+    if (RK.aboard && !flight && !d.late) { const rs = (d.riders || []).slice().sort(), i = rs.indexOf(RK.myId); startFlight({ph: +d.ph || 0, yaw: d.yaw, seat: i >= 0 ? i : rs.length, n: i >= 0 ? rs.length : rs.length + 1}); }
+    else if (patch && patch.drawHint) patch.drawHint(); return; }
+  if (d.k === 'skip') { if (flight && W3D.flight) W3D.flight.skip(); }
+}
+function board() {
+  if (flight || going) return; if (closed()) { hud('The rocket has launched - boarding is closed'); return; }
+  beep(660, 0.08); RK.aboard = true; loadPatch(); W3D.teleportTo(PAD.x - 9, undefined, PAD.z + 9, -45); rkState(); showBoard();
+  hud(aboardCount() > 1 ? 'Aboard with ' + (aboardCount() - 1) + ' other' + (aboardCount() > 2 ? 's' : '') + ' - anyone can press Launch' : 'Aboard - press Launch (others can still board)');
+}
+function leaveBoard() { RK.aboard = false; hideBoard(); rkState(); }
+function launch() {
+  if (!RK.aboard || flight || going) return; if (closed()) { hud('Already launched'); return; }
+  const cam = document.querySelector('a-scene').camera, yaw = new THREE.Euler().setFromQuaternion(cam.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y;
+  RK.myId = RK.myId || (window.JFMP && JFMP.selfId) || 'me';
+  const riders = ridersAboard().concat([RK.myId]).sort(); RK.fly = {t0: nowMs(), until: nowMs() + T.end * 1000 + 2000};
+  rkSend({k: 'go', ph: 0, yaw, riders});
+  startFlight({ph: 0, yaw, seat: riders.indexOf(RK.myId), n: riders.length});
+}
+function boardText() { const n = aboardCount(); return 'Aboard the Mars rocket - ' + n + ' rider' + (n === 1 ? '' : 's'); }
+function showBoard() {
+  if (!RK.ui) { const ov = RK.ui = document.createElement('div'); ov.id = 'rocketboard'; ov.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:50;display:flex;gap:10px;align-items:center;font:600 15px sans-serif;background:rgba(10,12,18,0.78);color:#ffd27a;padding:8px 12px;border-radius:10px';
+    const sp = document.createElement('span'); sp.className = 'rbt'; ov.appendChild(sp);
+    for (const [t, fn] of [['Launch', launch], ['Leave', leaveBoard]]) { const b = document.createElement('button'); b.textContent = t; b.dataset.rk = t.toLowerCase(); b.style.cssText = 'font:600 15px sans-serif;padding:8px 14px;border-radius:8px;border:0;background:#ffd700;color:#111'; b.onclick = fn; ov.appendChild(b); }
+    document.body.appendChild(ov); }
+  RK.ui.style.display = 'flex';
+  const sc = document.querySelector('a-scene');
+  if (!RK.xr) { const g = RK.xr = document.createElement('a-entity'); g.id = 'rocketboard-xr';
+    const tt = document.createElement('a-text'); tt.setAttribute('align', 'center'); tt.setAttribute('color', '#ffd27a'); tt.setAttribute('width', 2.4); tt.setAttribute('position', '0 0.32 0'); g.appendChild(tt); g.userData = {tt};
+    const bg = document.createElement('a-plane'); bg.setAttribute('width', 1.9); bg.setAttribute('height', 0.85); bg.setAttribute('position', '0 0.12 -0.01'); bg.setAttribute('material', 'shader:flat;color:#0a0c12;opacity:0.75;transparent:true'); g.appendChild(bg);
+    for (const [t, x, fn] of [['Launch', -0.45, launch], ['Leave', 0.45, leaveBoard]]) { const b = document.createElement('a-plane'); b.setAttribute('class', 'btn'); b.setAttribute('width', 0.75); b.setAttribute('height', 0.26); b.setAttribute('position', x + ' 0 0'); b.setAttribute('material', 'shader:flat;color:#FFD700');
+      const tx = document.createElement('a-text'); tx.setAttribute('value', t); tx.setAttribute('align', 'center'); tx.setAttribute('color', '#111'); tx.setAttribute('width', 1.9); b.appendChild(tx); b.addEventListener('click', fn); g.appendChild(b); }
+    sc.appendChild(g); }
+  RK.xr.setAttribute('visible', true); RK.xr.object3D.visible = true; setTimeout(() => { if (RK.xr && JFVR.placeInFront) JFVR.placeInFront(RK.xr, 1.7, -0.2); }, 60); updBoard();
+}
+function hideBoard() { if (RK.ui) RK.ui.style.display = 'none'; if (RK.xr) { RK.xr.setAttribute('visible', false); RK.xr.object3D.visible = false; RK.xr.object3D.position.y = -1e4; } }
+function updBoard() { if (!RK.aboard) return; const s = boardText(); if (RK.ui) RK.ui.querySelector('.rbt').textContent = s; if (RK.xr && RK.xr.userData.tt) RK.xr.userData.tt.setAttribute('value', s); }
+W3D.rocket = {board, launch, leave: leaveBoard, RK, aboardCount, _onRK: onRK};
 W3D.startFlight = startFlight;
 
 /* ---------- per-frame: lazy patch, far-edge haze ---------- */
@@ -293,6 +368,7 @@ AFRAME.registerSystem('w3d-launch', {
     if (patch && patch.hint && !flight) { const c = camPos(); if (c) { const h = patch.hint; h.rotation.y = Math.atan2(c.x - h.position.x, c.z - h.position.z); } }
     if (!W3D.root || !W3D.active || t - checkT < 500) return; checkT = t;
     const p = camPos(); if (!p) return;
+    if (RK.aboard && !flight && Math.hypot(p.x - PAD.x, p.z - PAD.z) > 80) { leaveBoard(); hud('You left the rocket'); }
     const d = Math.hypot(p.x - PATCH.cx, p.z - PATCH.cz);
     if (d < 3000 + PATCH.S / 2 * 0.6) loadPatch(); else if (d > 4200 + PATCH.S / 2) unloadPatch();
     if (W3D.fog && !flight && !W3D.roam) { const r = Math.max(Math.abs(p.x), Math.abs(p.z)), far = Math.max(3200, Math.min(8200, 16384 - r - 400)); W3D.fog.far = far; W3D.fog.near = Math.min(2000, far * 0.3); }
@@ -300,6 +376,6 @@ AFRAME.registerSystem('w3d-launch', {
 });
 // menu teleport spot 'Launch pad': on the ground south-west of the pad, looking at the rocket and the tower
 const addSpots = () => { if (!W3D.spots) return setTimeout(addSpots, 50);
-  W3D.spots.launchpad = () => { loadPatch(); W3D.teleportTo(PAD.x - 34, undefined, PAD.z + 34, -45); }; };
+  W3D.spots.launchpad = () => { loadPatch(); W3D.teleportTo(PAD.x - 24, undefined, PAD.z + 24, -45); }; };   // beside the rocket, looking at it and the tower
 addSpots();
 })();
