@@ -250,7 +250,7 @@ function quad(a, b, c, d, mat) { // a,b,c,d = corners (bottom-left, bottom-right
   const m = new THREE.Mesh(g, mat); m.receiveShadow = true; (P || root).add(m); return m;
 }
 function gateFrame(y0, zc, corn, roll) {
-  const lite = !!(W3D.LITE || /[?&]lite=1/.test(location.search));
+  const lite = !!W3D.lite;
   // 1. the old flat blue wing bars come away (the gold disk itself is untouched)
   root.traverse(o => { const p = o.isMesh && o.geometry && o.geometry.parameters; if (p && o.geometry.type === 'BoxGeometry' && Math.abs(p.width - 0.15) < 1e-3 && Math.abs(p.height - 0.7) < 1e-3 && Math.abs(p.depth - 3.2) < 1e-3 && Math.abs(o.position.x - 892.35) < 0.01) o.visible = false; });
   // 2. carved winged sun across the 12 x 3 m lintel face (x 892.8, y0+14..17), behind the disk
