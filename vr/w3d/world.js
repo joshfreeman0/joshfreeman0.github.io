@@ -171,11 +171,11 @@ function waterMat(alphaMap, river) {
     transparent: !!river, opacity: river ? 0.84 : 1, depthWrite: !river});
   if (W3D.env) { mat.envMap = W3D.env; mat.envMapIntensity = 0.75; }
   mat.name = 'water';
-  if (!W3D.waterU) W3D.waterU = {wN: {value: rippleNormal()}, wT: {value: 0}};
+  if (!W3D.waterU) W3D.waterU = {wN: {value: rippleNormal()}, wT: {value: 0}, wNi: {value: 0}};
   mat.onBeforeCompile = sh => {
-    sh.uniforms.wN = W3D.waterU.wN; sh.uniforms.wT = W3D.waterU.wT;
+    sh.uniforms.wN = W3D.waterU.wN; sh.uniforms.wT = W3D.waterU.wT; sh.uniforms.wNi = W3D.waterU.wNi;
     sh.vertexShader = 'varying vec3 vWw;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvWw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'uniform sampler2D wN; uniform float wT; varying vec3 vWw;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', [
+    sh.fragmentShader = 'uniform sampler2D wN; uniform float wT; uniform float wNi; varying vec3 vWw;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', [
       'vec2 wp = vWw.xz;',
       'vec3 n1 = texture2D(wN, wp / 30.0 + vec2(0.011, 0.007) * wT).xyz * 2.0 - 1.0;',
       'float wd = length(vWw - cameraPosition);',
@@ -187,7 +187,7 @@ function waterMat(alphaMap, river) {
       '{ vec3 vd = normalize(vViewPosition); float cth = clamp(dot(normal, vd), 0.0, 1.0);',
       '  float fr = 0.02 + 0.98 * pow(1.0 - cth, 5.0);',
       '  vec3 rw = inverseTransformDirection(reflect(-vd, normal), viewMatrix);',
-      '  vec3 sky = mix(vec3(0.62, 0.72, 0.80), vec3(0.27, 0.45, 0.70), clamp(rw.y * 1.6, 0.0, 1.0));',
+      '  vec3 sky = mix(vec3(0.62, 0.72, 0.80), vec3(0.27, 0.45, 0.70), clamp(rw.y * 1.6, 0.0, 1.0)) * mix(1.0, 0.07, wNi);',  // night layer (daynight.js); 1.0 by day
       '  outgoingLight = mix(outgoingLight, sky, clamp(fr, 0.0, 0.55)); }',
       '#include <opaque_fragment>'].join('\n'));
   };

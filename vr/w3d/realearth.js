@@ -29,7 +29,7 @@ function bump() { const o = dayLog(); o.n++; o.log.push(new Date().toTimeString(
 
 /* ---------- cutout mask (local frame, +-12288 m) ---------- */
 const MR = 12288, MN = LITE ? 1024 : 2048;
-const clipU = W3D.clipU = {jfOn: {value: 0}, jfMask: {value: null}, jfMR: {value: MR}, jfRect: {value: [new THREE.Vector4(0, 0, -1, 0), new THREE.Vector4(0, 0, -1, 0), new THREE.Vector4(0, 0, -1, 0), new THREE.Vector4(0, 0, -1, 0)]}};
+const clipU = W3D.clipU = {jfNi: {value: 0}, jfOn: {value: 0}, jfMask: {value: null}, jfMR: {value: MR}, jfRect: {value: [new THREE.Vector4(0, 0, -1, 0), new THREE.Vector4(0, 0, -1, 0), new THREE.Vector4(0, 0, -1, 0), new THREE.Vector4(0, 0, -1, 0)]}};
 function buildMask() {
   const c = document.createElement('canvas'); c.width = c.height = MN; const g = c.getContext('2d'), s = MN / (2 * MR);
   const P = (x, z) => [(x + MR) * s, (z + MR) * s];
@@ -62,12 +62,15 @@ function clipMat(mat, mode) {
   mat.onBeforeCompile = (sh, r) => { if (prev) prev.call(mat, sh, r);
     Object.assign(sh.uniforms, clipU);
     sh.vertexShader = 'varying vec2 vJfW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n{ vec4 jw = vec4(transformed, 1.0);\n#ifdef USE_INSTANCING\n jw = instanceMatrix * jw;\n#endif\n jw = modelMatrix * jw; vJfW = jw.xz; }');
-    sh.fragmentShader = 'uniform float jfOn; uniform sampler2D jfMask; uniform float jfMR; uniform vec4 jfRect[4]; varying vec2 vJfW;\n' +
+    sh.fragmentShader = 'uniform float jfNi; uniform float jfOn; uniform sampler2D jfMask; uniform float jfMR; uniform vec4 jfRect[4]; varying vec2 vJfW;\n' +
       'float jfM() { vec2 u = (vJfW + jfMR) / (2.0 * jfMR); float m = 0.0; if (u.x > 0.0 && u.x < 1.0 && u.y > 0.0 && u.y < 1.0) m = texture2D(jfMask, u).r;\n' +
       ' for (int i = 0; i < 4; i++) { vec4 R = jfRect[i]; if (R.z > 0.0) { vec2 d = abs(vJfW - R.xy) - vec2(R.z); m = max(m, clamp(1.0 - max(d.x, d.y) / R.w, 0.0, 1.0)); } } return m; }\n' +
       'float jfD() { return fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715)))); }\n' +
       (function (fs) { fs = fs.replace(/void\s+main\s*\(\s*\)\s*\{/, 'void main() {\n float jm = 0.0; if (jfOn > 0.5) { jm = jfM(); float jd = 0.5 + (jfD() - 0.5) * 0.08; ' + (mode === 1 ? 'if (jm > jd) discard;' : 'if (jm < jd) discard;') + ' }\n');
         // our ground just inside a cutout edge eases toward the Google ground's colour, so a lawn doesn't read as a pasted-on square
+        // night (daynight.js): Google tiles are unlit photos, so darken them toward moonlight
+        if (mode === 1) { const nt = '\n if (jfNi > 0.0) gl_FragColor.rgb *= mix(vec3(1.0), vec3(0.075, 0.09, 0.14), jfNi);\n';
+          fs = fs.indexOf('#include <fog_fragment>') >= 0 ? fs.replace('#include <fog_fragment>', nt + '#include <fog_fragment>') : fs.replace(/\}\s*$/, nt + '}'); }
         if (mode === 2) { const tint = '\n if (jfOn > 0.5) { float je = smoothstep(0.5, 0.9, jm); gl_FragColor.rgb = mix(gl_FragColor.rgb * vec3(0.8, 0.84, 0.72) + vec3(0.015, 0.02, 0.0), gl_FragColor.rgb, je); }\n';
           fs = fs.indexOf('#include <fog_fragment>') >= 0 ? fs.replace('#include <fog_fragment>', tint + '#include <fog_fragment>') : fs.replace(/\}\s*$/, tint + '}'); }
         return fs; })(sh.fragmentShader);
@@ -197,7 +200,7 @@ function topAt(x, z, now) { const T = RE.tiles; _rc.set(_o.set(x, 3000, z), _d.s
 function tileBlocked(x, z, y) {
   if (!oursOn || !RE.tiles) return false; const c = HC.get(key(x, z)); if (!c || c.y === null) return false;
   const g = W3D.terrainH ? W3D.terrainH(x, z) : 0; return c.y > y + 0.6 && c.y - g > 2.5 && maskAt(x, z) < 0.5; }
-RE.tileBlocked = tileBlocked;
+RE.tileBlocked = tileBlocked; RE.setNight = n => { clipU.jfNi.value = n; };
 (function hookCity() { let cb = W3D.cityBlocked || null; const comb = (x, z, y) => (cb ? cb(x, z, y) : false) || tileBlocked(x, z, y);
   try { Object.defineProperty(W3D, 'cityBlocked', {configurable: true, get: () => comb, set: v => { cb = v; }}); } catch (e) {} })();
 function collide(t, sc) {
