@@ -326,16 +326,16 @@ W3D.build = function (scene3, sceneEl) {
   const need = r => { if (!r.ok) throw new Error(r.url.replace(/^.*\//, '').replace(/\?.*/, '') + ' HTTP ' + r.status); return r; };
   W3D.status('Loading terrain data 0/5...');
   return Promise.all([
-    fetch(BASE + 'terrain_t4.u16?v=2').then(need).then(r => r.arrayBuffer()).then(step),
-    fetch(BASE + 'trees_t5.f32?v=2').then(need).then(r => r.arrayBuffer()).then(step),
-    fetch(BASE + 'water_t.json?v=4').then(need).then(r => r.json()).then(step),
+    fetch(BASE + 'terrain_t4.u16?v=3').then(need).then(r => r.arrayBuffer()).then(step),
+    fetch(BASE + 'trees_t5.f32?v=3').then(need).then(r => r.arrayBuffer()).then(step),
+    fetch(BASE + 'water_t.json?v=5').then(need).then(r => r.json()).then(step),
     fetch(BASE + 'ring_mid.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step),
     fetch(BASE + 'ring_far.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step)
   ]).then(([hb, tb, wj, rmid, rfar]) => {
     W3D.status('Building the world (terrain, bank, rooms)...');
     if (rmid) RINGS.mid.h = new Int16Array(rmid); if (rfar) RINGS.far.h = new Int16Array(rfar);
     const u = new Uint16Array(hb); heights = new Float32Array(u.length); for (let i = 0; i < u.length; i++) heights[i] = u[i] * 0.01 - 10;
-    W3D.water = wj; carveRail(wj.rail); parkSetup(wj.park); buildTerrain(); buildWater(wj); buildRivers(wj); buildFootbridge(wj.footbridge); buildTrees(new Float32Array(tb)); buildRail(wj.rail); buildPark(wj.park);
+    W3D.water = wj; carveRail(wj.rail); parkSetup(wj.park); buildTerrain(); buildWater(wj); buildRivers(wj); buildFootbridge(wj.footbridge); buildBeach(wj.beach); buildTrees(new Float32Array(tb)); buildRail(wj.rail); buildPark(wj.park);
     buildBank(); buildOffice(); buildConservatory(); buildSigns();
     if (W3D.buildRooms) try { W3D.buildRooms(root); } catch (e) { console.warn('exhibit rooms failed', e); }
     if (W3D.buildBankPlus) try { W3D.buildBankPlus(root); } catch (e) { console.warn('bank upgrade failed', e); }
@@ -349,9 +349,9 @@ function buildTerrain() {
   const geo = new THREE.PlaneGeometry(SIZE, SIZE, N - 1, N - 1); geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, heights[i]);
   geo.computeVertexNormals();
-  const t = new THREE.TextureLoader().load(BASE + (LITE ? 'ortho_t_lite.jpg?v=5' : 'ortho_t.jpg?v=4')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = LITE ? 4 : 16;
+  const t = new THREE.TextureLoader().load(BASE + (LITE ? 'ortho_t_lite.jpg?v=6' : 'ortho_t.jpg?v=5')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = LITE ? 4 : 16;
   // sharper ground near the compound and pond: 0.5 m/px USGS tile (x -324..1724, z -1249..799) + fine detail texture that fades in within ~200 m
-  const hi = LITE ? t : new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=4'); hi.colorSpace = THREE.SRGBColorSpace; if (!LITE) hi.anisotropy = 16;   // lite: no 0.5 m tile (hiRect moved off the map)
+  const hi = LITE ? t : new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=5'); hi.colorSpace = THREE.SRGBColorSpace; if (!LITE) hi.anisotropy = 16;   // lite: no 0.5 m tile (hiRect moved off the map)
   const det = detailTex(), grs = grassTex();
   const tm = new THREE.MeshLambertMaterial({map: t});
   tm.onBeforeCompile = sh => {
@@ -364,9 +364,14 @@ function buildTerrain() {
       'float dd = length(vWp - cameraPosition); float df = 1.0 - smoothstep(60.0, 650.0, dd);',
       'float dtl = texture2D(detMap, vWp.xz / 2.5).r * 0.4 + texture2D(detMap, vWp.xz / 13.0).g * 0.35 + texture2D(detMap, vWp.xz / 0.7).r * 0.25;',
       'texelColor.rgb *= mix(1.0, 0.55 + dtl * 0.9, df);',
+      'float sandy = smoothstep(0.012, 0.045, texelColor.r - texelColor.g) * smoothstep(0.22, 0.36, texelColor.r) * (1.0 - smoothstep(15.0, 320.0, dd));',   // beach sand: grain + faint wind ripples up close
+      'float rip = sin(dot(vWp.xz, vec2(2.3, 1.1)) + texture2D(detMap, vWp.xz / 6.0).g * 6.0) * 0.5 + 0.5;',
+      'texelColor.rgb *= mix(1.0, (0.8 + 0.4 * (texture2D(detMap, vWp.xz / 0.4).r * 0.55 + texture2D(detMap, vWp.xz / 2.6).g * 0.45)) * (0.965 + 0.05 * rip), sandy);',
+      'float cano = (1.0 - smoothstep(0.05, 0.12, texelColor.g)) * smoothstep(0.0, 0.01, texelColor.g - texelColor.b) * (1.0 - smoothstep(90.0, 1500.0, dd));',   // blurry tree canopy: leaf-clump detail
+      'texelColor.rgb *= mix(1.0, 0.62 + 0.75 * (texture2D(detMap, vWp.xz / 5.5).r * 0.6 + texture2D(detMap, vWp.xz / 1.7).r * 0.4), cano * 0.7);',
       'vec3 gt = mix(texture2D(grsMap, vWp.xz / 3.0).rgb, texture2D(grsMap, vWp.xz / 9.7).rgb, 0.35);',
       'vec3 tint = clamp(texelColor.rgb / vec3(0.16, 0.19, 0.08), 0.35, 2.2);',
-      'float gn = 1.0 - smoothstep(25.0, 220.0, dd); float veg = smoothstep(0.0, 0.05, texelColor.g - texelColor.b);',
+      'float gn = 1.0 - smoothstep(25.0, 220.0, dd); float veg = smoothstep(0.0, 0.05, texelColor.g - texelColor.b) * smoothstep(-0.005, 0.02, texelColor.g - texelColor.r);   // not on beach sand (red > green)',
       'texelColor.rgb = mix(texelColor.rgb, gt * tint, gn * mix(0.35, 0.8, veg));',
       'diffuseColor *= texelColor;'].join('\n'));
   };
@@ -404,7 +409,7 @@ function buildRings() {
 }
 function buildWater(J) { // Fowling Pond (restored) inside the real pond bed (OSM Pine Swamp); the soft mask gives a smooth natural shoreline
   const P = J.pond, x0 = P.x0, x1 = P.x1, z0 = P.z0, z1 = P.z1, w = x1 - x0, d = z1 - z0;
-  const am = new THREE.TextureLoader().load(BASE + 'pondmask_t4.png?v=2'); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
+  const am = new THREE.TextureLoader().load(BASE + 'pondmask_t4.png?v=3'); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d, 8, 4), waterMat(am)); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, WATER, (z0 + z1) / 2); m.receiveShadow = true; root.add(m);
 }
 /* Smooth river banks: the 10.7 m terrain grid makes the waterline stair-step, so each side gets a thin ground-textured strip that
@@ -621,6 +626,24 @@ function clipStreetsToPark() {
 }
 W3D.clipStreetsToPark = clipStreetsToPark;
 { let tries = 0; const iv = setInterval(() => { if (window.W3D_READY && (clipStreetsToPark() || ++tries > 120)) { if (tries <= 120) setTimeout(clipStreetsToPark, 3000); clearInterval(iv); } }, 1000); }
+/* Lake 3: viewing pull-offs on the lakeside drive, each with two timber benches on the beach facing the water */
+function buildBeach(B) {
+  if (!B || !B.benches || !B.benches.length) return;
+  const n = B.benches.length, wood = new THREE.MeshLambertMaterial({color: 0x8d6b48}), stone = new THREE.MeshLambertMaterial({color: 0xb9ae9a}), pave = new THREE.MeshLambertMaterial({color: 0x8a8478});
+  const seat = new THREE.InstancedMesh(new THREE.BoxGeometry(1.9, 0.08, 0.48), wood, n * 2), back = new THREE.InstancedMesh(new THREE.BoxGeometry(1.9, 0.42, 0.07), wood, n * 2), leg = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.44, 0.44), stone, n * 4), pad = new THREE.InstancedMesh(new THREE.BoxGeometry(14, 0.1, 4.5), pave, n);   // gravel pull-off beside the drive
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  B.benches.forEach(([x, z, a], i) => {   // a: yaw facing the water
+    const fx = Math.sin(a), fz = Math.cos(a), rx = Math.cos(a), rz = -Math.sin(a); q.setFromAxisAngle(up, a);
+    const px = x - fx * 7, pz = z - fz * 7, py = terrainH(px, pz); p.set(px, py + 0.02, pz); m4.compose(p, q, one); pad.setMatrixAt(i, m4);
+    floors.push({x0: px - 4, x1: px + 4, z0: pz - 4, z1: pz + 4, y: py + 0.08});
+    for (let k = 0; k < 2; k++) { const s = k ? 1.6 : -1.6, bx = x + rx * s, bz = z + rz * s, by = terrainH(bx, bz);
+      p.set(bx, by + 0.46, bz); m4.compose(p, q, one); seat.setMatrixAt(i * 2 + k, m4);
+      p.set(bx - fx * 0.22, by + 0.74, bz - fz * 0.22); m4.compose(p, q, one); back.setMatrixAt(i * 2 + k, m4);
+      for (let l = 0; l < 2; l++) { const t = l ? 0.75 : -0.75; p.set(bx + rx * t, by + 0.22, bz + rz * t); m4.compose(p, q, one); leg.setMatrixAt(i * 4 + k * 2 + l, m4); }
+      walls.push({x0: bx - 1, x1: bx + 1, z0: bz - 1, z1: bz + 1, y0: by, y1: by + 0.5}); }
+  });
+  for (const im of [seat, back, leg, pad]) { im.castShadow = im !== pad; im.receiveShadow = true; im.frustumCulled = false; root.add(im); }
+}
 /* Timber footbridge from behind Town Hall (558 South Main St) across the river to the field: gentle arch, railings, walkable deck */
 function buildFootbridge(F) {
   if (!F) return;
