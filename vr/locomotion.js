@@ -88,6 +88,21 @@ JFVR.hud = function (msg) {
   clearTimeout(JFVR._h); JFVR._h = setTimeout(() => t.setAttribute('visible', false), 2500);
 };
 document.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') { JFVR.toggleFly && JFVR.toggleFly(); } });
+/* Desktop / non-VR keyboard turning: hold Q = turn left, E = turn right (~90 deg/s). Rotates the rig (the camera's parent),
+   so WASD walking follows the new heading and mouse drag-look (look-controls, on the camera) still adds on top without fighting. Ignored inside an XR session and while typing in a field. */
+(function () {
+  const held = {q: false, e: false}; let last = 0;
+  const typing = t => t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+  const inXR = () => { const sc = document.querySelector('a-scene'); return !!(sc && (sc.is('vr-mode') || sc.is('ar-mode') || (sc.renderer && sc.renderer.xr && sc.renderer.xr.isPresenting))); };
+  const key = (e, down) => { if (e.code !== 'KeyQ' && e.code !== 'KeyE') return; if (down && (typing(e.target) || e.ctrlKey || e.metaKey || e.altKey)) return; held[e.code === 'KeyQ' ? 'q' : 'e'] = down; };
+  document.addEventListener('keydown', e => key(e, true)); document.addEventListener('keyup', e => key(e, false));
+  window.addEventListener('blur', () => { held.q = held.e = false; });
+  const step = t => { requestAnimationFrame(step); const dt = last ? Math.min(0.25, (t - last) / 1000) : 0; last = t;
+    const dir = (held.q ? 1 : 0) - (held.e ? 1 : 0); if (!dir || !dt || inXR() || typing(document.activeElement)) return;
+    const rig = document.getElementById('rig'); if (!rig) return;
+    rig.object3D.rotation.y += dir * (Math.PI / 2) * (JFVR.turnSpeed || 1) * dt; };
+  requestAnimationFrame(step);
+})();
 /* Press the LEFT thumbstick in to hide/show the menu rectangles.
    Listens for the controller event AND reads the gamepad button directly every frame. */
 AFRAME.registerComponent('menu-toggle', {
