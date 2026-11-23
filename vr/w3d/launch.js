@@ -155,13 +155,10 @@ function rocketProxy(rocket, pad) {
   return e;
 }
 
-/* ---------- navigation (WebXR session ended cleanly first) ---------- */
+/* ---------- navigation: with the immersive session still LIVE (Quest cross-site hand-off; the Red Planet Lounge page receives
+   navigator.xr 'sessiongranted' and enters VR itself). Never session.end() / exitVR() first - that drops the headset to 2D. ---------- */
 let going = false;
-function goMars() {
-  if (going) return; going = true; const nav = () => { window.location.href = MARS_URL; };
-  const sc = document.querySelector('a-scene'), ses = sc && sc.renderer && sc.renderer.xr && sc.renderer.xr.getSession && sc.renderer.xr.getSession();
-  if (ses) { setTimeout(nav, 1500); ses.end().then(nav, nav); } else nav();
-}
+function goMars() { if (going) return; going = true; window.location.assign(MARS_URL); }
 W3D.goMars = goMars;
 
 /* ---------- the flight: built on demand, disposed afterwards ---------- */
@@ -376,6 +373,10 @@ AFRAME.registerSystem('w3d-launch', {
 });
 // menu teleport spot 'Launch pad': on the ground south-west of the pad, looking at the rocket and the tower
 const addSpots = () => { if (!W3D.spots) return setTimeout(addSpots, 50);
-  W3D.spots.launchpad = () => { loadPatch(); W3D.teleportTo(PAD.x - 24, undefined, PAD.z + 24, -45); }; };   // beside the rocket, looking at it and the tower
+  W3D.spots.launchpad = () => { loadPatch(); W3D.teleportTo(PAD.x - 24, undefined, PAD.z + 24, -45); };
+  W3D.spots.padland = () => { loadPatch(); const go = () => W3D.teleportTo(PAD.x - 12, undefined, PAD.z + 12, -45); go();
+    // the pad deck's ground comes with the Bridgewater patch (async); stand on it once it is in, unless you've already walked off
+    let n = 0; const iv = setInterval(() => { if (++n > 100) return clearInterval(iv); if (!patch || patch.loading) return; clearInterval(iv);
+      const r = document.querySelector('#rig'), p = r && r.object3D.position; if (p && Math.hypot(p.x - (PAD.x - 12), p.z - (PAD.z + 12)) < 3) go(); }, 200); }; };   // on the pad deck beside the rocket (arrival from Mars)   // beside the rocket, looking at it and the tower
 addSpots();
 })();

@@ -11,6 +11,27 @@
 <meta name="theme-color" content="#c9a24a">
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script>
+/* Quest cross-site hand-off (Red Planet Lounge <-> Fowling Pond): a page reached by navigating from inside an immersive session gets
+   navigator.xr 'sessiongranted' and may start its own immersive session without a click. Listen as early as possible (before the
+   scene exists), then enter as soon as the scene's renderer is up - never waiting for the world's assets. A-Frame's own listener is
+   registered later (when <a-scene> attaches) and can call enterVR() before the headset check has resolved, which would drop into
+   fake "fullscreen VR"; enterVR() is patched to wait for that check and to merge overlapping calls into one request. */
+(function () {
+  const P = customElements.get('a-scene') && customElements.get('a-scene').prototype;
+  if (P && !P._jfEnterPatched) { const orig = P.enterVR; P._jfEnterPatched = true;
+    P.enterVR = function (ar) { const sc = this; if (sc.is('vr-mode')) return Promise.resolve('Already in VR.'); if (sc._jfEntering) return sc._jfEntering;
+      const go = () => orig.call(sc, ar);
+      const pr = (navigator.xr && !ar && !sc.checkHeadsetConnected() ? navigator.xr.isSessionSupported('immersive-vr').catch(() => false).then(go) : go());
+      sc._jfEntering = Promise.resolve(pr).finally(() => { sc._jfEntering = null; }); return sc._jfEntering; }; }
+  window.JFVR_GRANTED = false;
+  if (!navigator.xr || !navigator.xr.addEventListener) return;
+  navigator.xr.addEventListener('sessiongranted', () => { window.JFVR_GRANTED = true; console.log('xr: sessiongranted'); enter(0); });
+  function enter(n) { const sc = document.querySelector('a-scene');
+    if (!sc || !sc.renderer || !sc.systems || !sc.systems.webxr) { if (n < 300) setTimeout(() => enter(n + 1), 50); return; }
+    if (sc.is('vr-mode')) return; sc.enterVR().catch(e => console.warn('xr: granted enterVR failed', e)); }
+})();
+</script>
+<script>
 /* A-Frame's text shader (msdf, a raw shader) has no logarithmic-depth code, so with logarithmicDepthBuffer on every a-text
    lands at the wrong depth and hides behind its own button plane (the "all yellow" menu). Give it the same log depth as three. */
 (function () { const S = AFRAME.shaders.msdf && AFRAME.shaders.msdf.Shader.prototype; if (!S || S.vertexShader.indexOf('vFragDepth') >= 0) return;
@@ -35,7 +56,7 @@ window.JFVR_LITE = (function () {
 <script src="w3d/world.js?v=21e"></script>
 <script src="w3d/rooms.js?v=5"></script>
 <script src="w3d/cities.js?v=6"></script>
-<script src="w3d/saucer.js?v=5"></script>
+<script src="w3d/saucer.js?v=6"></script>
 <script src="w3d/office.js?v=1"></script>
 <script src="w3d/roam.js?v=2"></script>
 <script src="w3d/shore.js?v=1"></script>
@@ -45,7 +66,7 @@ window.JFVR_LITE = (function () {
 <script src="w3d/wildlife.js?v=4"></script>
 <script src="w3d/streets.js?v=10"></script>
 <script src="w3d/zoo.js?v=2"></script>
-<script src="w3d/launch.js?v=3b"></script>
+<script src="w3d/launch.js?v=4"></script>
 <script src="w3d/invite.js?v=1"></script>
 <script src="w3d/realism.js?v=1"></script>
 <script>
@@ -208,8 +229,18 @@ const SPOT_ALIAS = {pond: 'marker', temple: 'temple', bank: 'hall', vesta: 'vest
   terrace: 'terrace', hall: 'hall', vault: 'vault', office: 'office', conservatory: 'conservatory', propulsion: 'propulsion', ufo: 'ufo', showcase: 'showcase', pyramid: 'pyramid', marker: 'marker', home: 'home'};
 function arrivalSpot(){ const sp = (QS.get('spot') || '').toLowerCase(), k = SPOT_ALIAS[sp];
   if (!W3D.spots.temple) W3D.spots.temple = () => W3D.teleportTo(866, undefined, -380, -90);   // between the sphinxes, facing the gate
+  if (FROM_MARS && (!k || k === 'launchpad') && W3D.spots.padland) return 'padland';   // back from Mars: on the pad deck beside the rocket
   if (k && W3D.spots[k]) return k; return FROM_MARS ? 'launchpad' : 'terrace'; }
 function arrivalToast(){ if (FROM_MARS) setTimeout(() => { if (W3D.toast) W3D.toast('Welcome back from Mars', 4000); else if (JFVR.hud) JFVR.hud('Welcome back from Mars'); }, 600); }
+/* XR before the world is ready (sessiongranted auto-enter starts the session while assets still load): a black cover around the head
+   with a small 'Loading' line, removed as soon as the world is built. W3D.arrivalCover lets the Mars-arrival flight take over. */
+function xrCover(){ if (window.W3D_READY || window.JFVR_COVER || (window.W3D && W3D.arrivalCover)) return; const camE = document.querySelector('[camera]'); if (!camE) return;
+  const g = new THREE.Group(); const m = new THREE.Mesh(new THREE.SphereGeometry(3, 16, 8), new THREE.MeshBasicMaterial({color: 0x000000, side: THREE.BackSide, depthTest: false, depthWrite: false, fog: false}));
+  m.renderOrder = 1e6; g.add(m); const c = document.createElement('canvas'); c.width = 512; c.height = 64; const x = c.getContext('2d'); x.fillStyle = '#c9a24a'; x.font = '32px sans-serif'; x.textAlign = 'center'; x.fillText('Loading Fowling Pond...', 256, 42);
+  const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; const t = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.2), new THREE.MeshBasicMaterial({map: tx, transparent: true, depthTest: false, depthWrite: false, fog: false}));
+  t.position.set(0, 0, -2); t.renderOrder = 1e6 + 1; g.add(t); camE.object3D.add(g); window.JFVR_COVER = g;
+  const iv = setInterval(() => { if (!window.W3D_READY) return; clearInterval(iv); camE.object3D.remove(g); m.geometry.dispose(); m.material.dispose(); t.geometry.dispose(); t.material.dispose(); tx.dispose(); window.JFVR_COVER = null; }, 200); }
+scn.addEventListener('enter-vr', xrCover); if (scn.is && scn.is('vr-mode')) xrCover();
 function start(){
   W3D.onImagery = (done, total) => { const d = document.querySelector('#load'); if (!d || d.dataset.failed) return; if (done >= total) d.remove(); else d.textContent = 'Loading imagery ' + done + '/' + total + '...'; };
   W3D.build(scn.object3D, scn).then(() => {

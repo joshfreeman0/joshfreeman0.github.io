@@ -261,8 +261,8 @@ function buildClouds() {
   clouds.userData = {tex, mat}; clouds.visible = false; document.querySelector('a-scene').object3D.add(clouds);
 }
 function disposeClouds() { if (!clouds) return; clouds.parent && clouds.parent.remove(clouds); clouds.userData.tex.dispose(); clouds.userData.mat.dispose(); clouds = null; }
-function goMars() { if (navDone) return; navDone = true; const nav = () => { window.location.href = MARS_URL; }; if (W3D.goMars) return W3D.goMars();
-  const sc = document.querySelector('a-scene'), ses = sc && sc.renderer && sc.renderer.xr && sc.renderer.xr.getSession && sc.renderer.xr.getSession(); if (ses) { setTimeout(nav, 1500); ses.end().then(nav, nav); } else nav(); }
+// navigate with the immersive session still live (Red Planet Lounge auto-enters on sessiongranted); never session.end() first
+function goMars() { if (navDone) return; navDone = true; if (W3D.goMars) return W3D.goMars(); window.location.assign(MARS_URL); }
 W3D.saucerNav = goMars;
 
 /* ---------- menu (tabs Space / Earth / Here, destinations, Launch, Leave) ---------- */
