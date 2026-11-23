@@ -12,7 +12,7 @@ const DEFS = {   // origin = landing pad centre (local 0,0,0); yaw = direction t
   boston:    {name: 'Boston',        x: 100000, z: 60000, yaw: 0, v: 1},
   bangkok:   {name: 'Bangkok',       x: 120000, z: 60000, yaw: 0, v: 1},
   hongkong:  {name: 'Hong Kong',     x: 140000, z: 60000, yaw: 0, v: 1},
-  dubai:     {name: 'Dubai',         x: 160000, z: 60000, yaw: 0, v: 3}
+  dubai:     {name: 'Dubai',         x: 160000, z: 60000, yaw: 0, v: 4}
 };
 W3D.cityModules = W3D.cityModules || {};
 let cur = null;          // {id, grp, mod, ready, entered}

@@ -5,7 +5,7 @@
    The fountain plays jets in the lake. No names are shown. Local frame: pad centre = (0, 0, 0), north = -z. */
 (function () {
 'use strict';
-W3D.cityModules.dubai = (grp, K) => fetch('/vr/w3d/city/dubai.json?v=2').then(r => r.json()).then(D => build(grp, K, D));
+W3D.cityModules.dubai = (grp, K) => fetch('/vr/w3d/city/dubai.json?v=3').then(r => r.json()).then(D => build(grp, K, D));
 function build(grp, K, D) {
   const L = K.LITE, R = D.R, r = K.rnd(31), T = K.tex;
   const out = {R: R + 300, ground: () => 0, fog: L ? [0xd6cdbb, 350, 2800] : [0xd6cdbb, 500, 4600], sky: 0xd6cdbb};
