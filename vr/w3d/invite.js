@@ -71,11 +71,20 @@ async function showPanel(here) {
 function hidePanel() { if (!panel) return; panel.object3D.visible = false; panel.object3D.position.y = -1e4; if (W3D.invitePanel) W3D.invitePanel.visible = false; }
 W3D.showInvitePanel = showPanel; W3D.hideInvitePanel = hidePanel;
 /* ---------- buttons: menu (#ui), the People area (next to the room count, added by mp.js), VR menu bar ---------- */
+function chooser(anchor) {
+  let c = document.getElementById('invitechoose'); if (c) { c.remove(); return; }
+  c = document.createElement('div'); c.id = 'invitechoose'; const r = anchor.getBoundingClientRect();
+  c.style.cssText = 'position:fixed;z-index:70;display:flex;gap:6px;padding:6px;border-radius:10px;background:rgba(11,29,38,0.92);left:' + Math.max(6, r.left) + 'px;top:' + (r.bottom + 6) + 'px';
+  for (const [t, h] of [['Whole world', false], ['This spot', true]]) { const x = document.createElement('button'); x.type = 'button'; x.textContent = t; x.style.cssText = 'background:#9ffcff;color:#111;font-weight:600;border:0;border-radius:8px;padding:7px 11px'; x.onclick = ev => { ev.stopPropagation(); c.remove(); invite(h); }; c.appendChild(x); }
+  document.body.appendChild(c); setTimeout(() => document.addEventListener('click', function off() { const e = document.getElementById('invitechoose'); if (e) e.remove(); document.removeEventListener('click', off); }), 0);
+}
 function wire() {
   const tools = document.querySelector('#ui .tools');
-  if (tools && !document.getElementById('invitebtn')) { for (const [id, t, h] of [['invitebtn', 'Invite', false], ['invitehere', 'Invite here', true]]) { const b = document.createElement('button'); b.id = id; b.type = 'button'; b.textContent = t; b.style.cssText = 'background:#9ffcff;color:#111;font-weight:600'; b.onclick = () => invite(h); tools.appendChild(b); } }
+  // one Invite button (bug batch: there were three - 'Invite', 'Invite here' and 'Invite people' - doing the same two jobs): it opens a small
+  // chooser with 'Whole world' and 'This spot'
+  if (tools && !document.getElementById('invitebtn')) { const b = document.createElement('button'); b.id = 'invitebtn'; b.type = 'button'; b.textContent = 'Invite'; b.style.cssText = 'background:#9ffcff;color:#111;font-weight:600'; b.onclick = ev => { ev.stopPropagation(); chooser(b); }; tools.appendChild(b); }
   document.querySelectorAll('[data-invite]').forEach(el => { if (el._inv) return; el._inv = 1; el.addEventListener('click', () => { const h = el.dataset.invite === 'here'; if (inXR() || el.tagName === 'A-PLANE') showPanel(h); else invite(h); }); });
-  const cnt = document.getElementById('mpcount'); if (cnt && !document.getElementById('invitepeople')) { const b = document.createElement('button'); b.id = 'invitepeople'; b.type = 'button'; b.textContent = 'Invite people'; b.style.cssText = 'background:#9ffcff;color:#111;font-weight:600'; b.onclick = () => invite(false); cnt.after(b); }
+  ['invitehere', 'invitepeople'].forEach(id => { const e = document.getElementById(id); if (e) e.remove(); });
 }
 wire(); let n = 0; const iv = setInterval(() => { wire(); if (++n > 40) clearInterval(iv); }, 1500);
 })();

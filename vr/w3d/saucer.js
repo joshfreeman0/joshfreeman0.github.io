@@ -267,16 +267,24 @@ W3D.saucerNav = goMars;
 
 /* ---------- menu (tabs Space / Earth / Here, destinations, Launch, Leave) ---------- */
 let menu = null, menuOpen = false;
+// menu labels are canvas textures (bug batch): the a-text MSDF labels looked doubled and jittery on desktop. Same setAttribute('value') API.
+function canvasLabel(obj, w, h, col, scale, bold) { const W = 512, H = Math.max(32, Math.round(512 * h / w)), c = document.createElement('canvas'); c.width = W; c.height = H;
+  const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 4;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({map: tx, transparent: true, depthTest: false, depthWrite: false, toneMapped: false}));
+  m.position.z = 0.004; m.renderOrder = 2002; m.userData.label = true; obj.add(m); let cur = null;
+  return {setAttribute(k, v) { if (k !== 'value' || v === cur) return; cur = v; if (obj.el && obj.el.dataset) obj.el.dataset.label = v; const g = c.getContext('2d'); g.clearRect(0, 0, W, H); if (!v) { tx.needsUpdate = true; return; }
+    let fs = Math.round(H * 0.58 * Math.min(1.25, scale || 1)); g.font = (bold ? 'bold ' : '600 ') + fs + 'px Arial, sans-serif'; const mw = g.measureText(v).width; if (mw > W * 0.94) { fs = Math.floor(fs * W * 0.94 / mw); g.font = (bold ? 'bold ' : '600 ') + fs + 'px Arial, sans-serif'; }
+    g.fillStyle = col; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(v, W / 2, H / 2 + 1); tx.needsUpdate = true; }, getAttribute(k) { return k === 'value' ? cur : null; }}; }
 function btn(parent, label, w, h, x, y, col, fn, tw) {
-  const b = document.createElement('a-plane'); b.setAttribute('class', 'btn'); b.setAttribute('width', w); b.setAttribute('height', h); b.setAttribute('position', x + ' ' + y + ' 0'); b.setAttribute('material', 'shader:flat;color:' + col);
-  const t = document.createElement('a-text'); t.setAttribute('value', label); t.setAttribute('align', 'center'); t.setAttribute('color', '#111'); t.setAttribute('width', tw || 2.2); t.setAttribute('position', '0 0 0.005'); b.appendChild(t);
+  const b = document.createElement('a-plane'); b.setAttribute('class', 'btn'); b.setAttribute('width', w); b.setAttribute('height', h); b.setAttribute('position', x + ' ' + y + ' 0'); b.setAttribute('material', 'shader:flat;transparent:true;depthTest:false;depthWrite:false;color:' + col);
+  const t = canvasLabel(b.object3D, w, h, '#111', (tw || 2.2) / 2.2); t.setAttribute('value', label);
   b.addEventListener('click', ev => { const ce = ev.detail && ev.detail.cursorEl, lc = ce && ce.getAttribute && ce.getAttribute('laser-controls'); if (lc && /left/.test(typeof lc === 'string' ? lc : lc.hand)) return; ev.stopPropagation && ev.stopPropagation(); fn(); });
   parent.appendChild(b); b.userData = {t}; return b;
 }
 function buildMenu() {
   menu = document.createElement('a-entity'); menu.setAttribute('scale', '0.6 0.6 0.6'); menu.setAttribute('visible', false); ent.appendChild(menu);
-  const bg = document.createElement('a-plane'); bg.setAttribute('width', 1.5); bg.setAttribute('height', 1.62); bg.setAttribute('material', 'shader:flat;color:#0b1d26;opacity:0.86;transparent:true'); bg.setAttribute('position', '0 0 -0.01'); menu.appendChild(bg);
-  const title = document.createElement('a-text'); title.setAttribute('value', 'Choose a destination'); title.setAttribute('align', 'center'); title.setAttribute('color', '#9ffcff'); title.setAttribute('width', 2.6); title.setAttribute('position', '0 0.7 0'); menu.appendChild(title);
+  const bg = document.createElement('a-plane'); bg.setAttribute('width', 1.5); bg.setAttribute('height', 1.62); bg.setAttribute('material', 'shader:flat;color:#0b1d26;opacity:0.86;transparent:true;depthTest:false;depthWrite:false'); bg.setAttribute('position', '0 0 -0.01'); menu.appendChild(bg);
+  const tg = new THREE.Group(); tg.position.set(0, 0.7, 0); menu.object3D.add(tg); const title = canvasLabel(tg, 1.4, 0.14, '#9ffcff', 1.2, true); title.setAttribute('value', 'Choose a destination');
   menu.userData = {tabs: {}, items: [], title};
   [['space', 'Space', -0.47], ['earth', 'Earth', 0], ['here', 'Here', 0.47]].forEach(([id, l, x]) => { menu.userData.tabs[id] = btn(menu, l, 0.44, 0.16, x, 0.5, '#7fd3e0', () => { S.tab = id; renderMenu(); }); });
   for (let i = 0; i < 5; i++) menu.userData.items.push(btn(menu, '', 1.3, 0.15, 0, 0.29 - i * 0.18, '#d8f6ff', () => { const d = menu.userData.list[i]; if (!d || S.mode !== 'parked') return; if (d.id === S.at && d.kind !== 'mars') { hud('The saucer is already here'); return; } bump({dest: d.id}); renderMenu(); }));
@@ -295,6 +303,7 @@ function renderMenu() {
   const L = U.launch; if (S.mode === 'count') { L.userData.t.setAttribute('value', 'CANCEL LAUNCH (' + Math.ceil((COUNT - (now() - S.t0)) / 1000) + ')'); L.setAttribute('material', 'color', '#ff6060'); }
   else { L.userData.t.setAttribute('value', 'LAUNCH: ' + D(S.dest).name.toUpperCase()); L.setAttribute('material', 'color', '#ff9a3c'); }
   U.title.setAttribute('value', S.mode === 'count' ? 'Launching - hop on or off now' : 'Choose a destination');
+  overlayMenu();
 }
 function openMenu() {
   if (!ent) return; if (!menu) buildMenu(); if (S.mode === 'fly' || S.mode === 'away') return;
@@ -303,11 +312,21 @@ function openMenu() {
   ent.object3D.updateMatrixWorld(true); const cp = camPos(), lp = ent.object3D.worldToLocal(cp.clone()), cam = document.querySelector('a-scene').camera;
   const f = new THREE.Vector3(); cam.getWorldDirection(f); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize();
   const iq = ent.object3D.getWorldQuaternion(new THREE.Quaternion()).invert(); f.applyQuaternion(iq); f.y = 0; f.normalize();
-  const r = new THREE.Vector3(-f.z, 0, f.x), P = lp.clone().addScaledVector(f, 1.3).addScaledVector(r, 0.42); P.y = lp.y - 0.45;
+  // (desktop bug batch: it sat 0.45 m below the eye and its lower half, Launch included, dropped under the cabin floor; now just below eye
+  // level, tilted back, and drawn on top of the cabin - see overlayMenu)
+  const r = new THREE.Vector3(-f.z, 0, f.x), P = lp.clone().addScaledVector(f, 1.3).addScaledVector(r, 0.42); P.y = lp.y - 0.12;
   const a = Math.atan2(-f.x, -f.z);
-  menu.setAttribute('position', P.x + ' ' + P.y + ' ' + P.z); menu.setAttribute('rotation', '-12 ' + (a * 180 / Math.PI - 14) + ' 0'); menu.setAttribute('visible', true); menuOpen = true;
+  menu.setAttribute('position', P.x + ' ' + P.y + ' ' + P.z); menu.setAttribute('rotation', '-18 ' + (a * 180 / Math.PI - 14) + ' 0'); menu.setAttribute('visible', true); menuOpen = true; overlayMenu();
   setProx(false);
 }
+// draw the panel over the cabin (no depth test) in a fixed order: backing 0, buttons 1, labels 2 - nothing hides it and the coplanar
+// text / button / backing layers can no longer z-fight (that was the doubled, jittery text). a-text meshes appear when the font loads, so re-run.
+let lastBandMode = '';   // after landing (fly -> parked) clear the 'EN ROUTE' band too
+function overlayMenu() { if (!menu) return; let pend = false;
+  menu.object3D.traverse(o => { if (!o.isMesh || !o.material) return; const el = o.el, txt = el && el.tagName === 'A-TEXT';
+    if (o.userData.label) return; o.renderOrder = 2000 + (txt ? 2 : el && el.classList && el.classList.contains('btn') ? 1 : 0); for (const m of [].concat(o.material)) { m.depthTest = false; m.depthWrite = false; if (txt) m.transparent = true; } });
+  menu.querySelectorAll('a-text').forEach(t => { if (!t.getObject3D('text')) pend = true; });
+  if (pend && menuOpen) setTimeout(overlayMenu, 300); }
 function closeMenu() { if (!menu) return; menu.setAttribute('visible', false); menu.setAttribute('position', '0 -1000 0'); menuOpen = false; setProx(true); }
 // the invisible console / hull click targets must not sit in front of the menu buttons while the menu is open
 function setProx(on) { ['ufo-console', 'ufo-hull'].forEach(id => { const e = document.getElementById(id); if (e) { if (on) e.classList.add('btn'); else e.classList.remove('btn'); } });
@@ -389,7 +408,7 @@ function tick(t, dt) {
   sign.visible = mySeat < 0 && (S.mode === 'parked' || S.mode === 'count') && dist < 40 && dist > 5; if (sign.visible && cp) { const lp = ent.object3D.worldToLocal(cp.clone()); sign.rotation.y = Math.atan2(lp.x - sign.position.x, lp.z - sign.position.z); }
   // countdown + seat names
   if (S.mode === 'count') { const n = Math.max(0, Math.ceil((COUNT - (T - S.t0)) / 1000)); if (n !== lastCount) { lastCount = n; drawBand('LAUNCH TO ' + D(S.dest).name.toUpperCase() + ' IN ' + n + '   '); if (mySeat >= 0) { headCount(n); beep(n === 0); if (menuOpen) closeMenu(); } if (menuOpen) renderMenu(); if (ov) ov.info.textContent = 'Launch in ' + n + ' s'; } }
-  else if (lastCount !== -1) { lastCount = -1; headCount(null); if (mySeat >= 0 && S.mode === 'fly') beep(true); drawBand(S.mode === 'fly' ? 'EN ROUTE: ' + D(S.to).name.toUpperCase() + '   ' : ''); if (ov) ov.info.textContent = S.mode === 'fly' ? 'Flying to ' + D(S.to).name : ''; if (menuOpen) renderMenu(); }
+  else if (lastCount !== -1 || (S.mode !== lastBandMode && (lastBandMode = S.mode, S.mode === 'parked'))) { lastCount = -1; headCount(null); if (mySeat >= 0 && S.mode === 'fly') beep(true); drawBand(S.mode === 'fly' ? 'EN ROUTE: ' + D(S.to).name.toUpperCase() + '   ' : ''); if (ov) ov.info.textContent = S.mode === 'fly' ? 'Flying to ' + D(S.to).name : ''; if (menuOpen) renderMenu(); }
   if (ov) ov.leave.style.display = S.mode === 'fly' ? 'none' : '';
   if (T - lastSeatDraw > 700) { lastSeatDraw = T; const o = occupied(); for (let i = 0; i < NSEAT; i++) drawTag(seatTags[i], i === mySeat ? '' : o[i] || '', false); }
   if (!act && window.JFMP && JFMP.room) hookMP();
