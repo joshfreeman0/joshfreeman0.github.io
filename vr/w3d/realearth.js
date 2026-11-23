@@ -22,6 +22,7 @@ const CAP = 32, LS = 'jfvr.gtiles', LSR = 'jfvr.gtiles.root', PREF = 'jfvr.realE
 const q = location.search, forced = /[?&]realearth=1/.test(q) ? true : /[?&]realearth=0/.test(q) ? false : null;
 function pref() { if (forced !== null) return forced; const v = localStorage.getItem(PREF); return v ? v === 'on' : !LITE; }
 const RE = W3D.realEarth = {on: pref(), ready: false, tiles: null, anchor: 'home', count: dayCount, setOn, toggle: () => setOn(!RE.on), stats: () => stats()};
+RE.clipOurs = m => clipMat(m, 2);   // late-built layers of ours (home3d houses) clip to the cutouts too
 
 function today() { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
 function dayLog() { let o = null; try { o = JSON.parse(localStorage.getItem(LS) || 'null'); } catch (e) {} if (!o || o.day !== today()) o = {day: today(), n: 0, log: []}; return o; }
