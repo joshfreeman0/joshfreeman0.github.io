@@ -7,7 +7,7 @@
 (function () {
   const LITE = !!window.JFVR_LITE, QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent) || /[?&]quest=1/.test(location.search);
   const VIS = LITE ? 400 : QUEST ? 1000 : 2200, TS = LITE ? 300 : 600, WATER = 16.5;
-  const H = W3D.home3d = {tiles: [], tris: 0, n: 0, skipped: 0};
+  const H = W3D.home3d = {tiles: [], tris: 0, n: 0, skipped: 0, occ: new Set()};
   function wallTex() {   // one 3.2 m x 3 m bay: lap siding + a trimmed window; top-left 16 px = plain (used by roofs)
     const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
     g.fillStyle = '#f2f0ea'; g.fillRect(0, 0, 256, 256);
@@ -55,6 +55,8 @@
         const tri = THREE.ShapeUtils.triangulateShape(P.map(q => new THREE.Vector2(q[0], q[1])), []);
         for (const t of tri) for (const k of t) push(P[k][0], y1, P[k][1], 0, 1, 0, RU[0], RU[1], rc);
         for (const t of tri) for (const k of [t[0], t[2], t[1]]) push(P[k][0], y1, P[k][1], 0, 1, 0, RU[0], RU[1], rc); }
+      { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const [x, z] of P) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }   // occupancy (4 m cells + 3 m) so planting layers keep clear
+        for (let gx = Math.floor((x0 - 3) / 4); gx <= Math.floor((x1 + 3) / 4); gx++) for (let gz = Math.floor((z0 - 3) / 4); gz <= Math.floor((z1 + 3) / 4); gz++) H.occ.add(gx + ',' + gz); }
       H.n++;
     });
     const mat = new THREE.MeshLambertMaterial({map: wallTex(), vertexColors: true}); mat.name = 'houses';
