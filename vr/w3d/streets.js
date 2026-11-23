@@ -27,10 +27,10 @@ function toWorld(lat, lon) { return [(lon - geo.lon0) * geo.kx, (geo.lat0 - lat)
 function gh(x, z) { return W3D.terrainH(x, z); }
 function underPond(x, z) { const P = W3D.water && W3D.water.pond; return !!P && x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1 && gh(x, z) < 13.5; }
 const EXT = () => 6140;
-function roadTex() {
-  const c = document.createElement('canvas'); c.width = 64; c.height = 8; const g = c.getContext('2d');
-  g.fillStyle = '#34373a'; g.fillRect(0, 0, 64, 8); g.fillStyle = '#d9d6c8'; g.fillRect(3, 0, 2, 8); g.fillRect(59, 0, 2, 8);
-  g.fillStyle = '#3d4044'; g.fillRect(14, 0, 36, 8);
+function roadTex() { // bottom half (v 0.25): asphalt with white edge lines; top half (v 0.75): same asphalt, no lines (junction mouths)
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#34373a'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#3d4044'; g.fillRect(14, 0, 36, 64);
+  g.fillStyle = '#d9d6c8'; g.fillRect(3, 32, 2, 32); g.fillRect(59, 32, 2, 32);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
 function buildCorner(c) {
@@ -64,6 +64,9 @@ function project() {
     for (const p of D) { if (Math.abs(p[0]) < E && Math.abs(p[1]) < E && (br || !underPond(p[0], p[1]))) cur.push(p); else flush(); }
     flush();
   }
+  const BRG = (W3D.water && W3D.water.bridges) || [];
+  for (const r of R) if (r.br && BRG.some(B => r.p.every(([x, z]) => Math.hypot(x - B.x, z - B.z) < B.len / 2 + 6))) r.br = false;
+  junctions();
   // labels sit on the drawn ribbons only (not bridges), every ~200 m, one per street per 130 m
   const done = [];
   for (const r of R) {
@@ -79,10 +82,38 @@ function project() {
   }
   LAB = done;
 }
+/* T junctions (clip 21, Gardiner St / Cobb St): the through road's edge line ran straight across the side road's mouth and the side road's
+   lines poked into the through road. Where a ribbon ends on another ribbon, the through road gets extra vertices either side of the mouth
+   and those vertices (and the side road's last metres inside the through road) use the line-free half of the road texture. */
+function junctions() {
+  const len = p => { const L = [0]; for (let i = 1; i < p.length; i++) L.push(L[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1])); return L; };
+  for (const r of R) { r.L = len(r.p); r.j = r.p.map(() => 0); r.cut = []; }
+  const near = (r, x, z) => { let best = [1e9, 0]; const p = r.p;
+    for (let i = 0; i < p.length - 1; i++) { const ax = p[i][0], az = p[i][1], dx = p[i + 1][0] - ax, dz = p[i + 1][1] - az, l2 = dx * dx + dz * dz || 1; let t = ((x - ax) * dx + (z - az) * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d = Math.hypot(ax + dx * t - x, az + dz * t - z); if (d < best[0]) best = [d, r.L[i] + t * Math.sqrt(l2)]; }
+    return best; };
+  const CELL = 80, grid = new Map(), key = (x, z) => Math.floor(x / CELL) * 100003 + Math.floor(z / CELL);
+  R.forEach((r, i) => { const seen = new Set(); for (const [x, z] of r.p) for (const k of [key(x, z)]) if (!seen.has(k)) { seen.add(k); (grid.get(k) || grid.set(k, []).get(k)).push(i); } });
+  const sideCuts = [];
+  R.forEach((s, si) => { if (s.br) return; const ws = RW[s.cls] / 2;
+    for (const end of [0, 1]) { const e = end ? s.p[s.p.length - 1] : s.p[0];
+      const cand = new Set(); for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) for (const k of grid.get(key(e[0] + ox * CELL, e[1] + oz * CELL)) || []) cand.add(k);
+      for (const ti of cand) { if (ti === si) continue; const t = R[ti]; if (t.br) continue; const wt = RW[t.cls] / 2, [d, sj] = near(t, e[0], e[1]), Lt = t.L[t.L.length - 1];
+        if (d > wt + 1.0 || sj < wt + 3 || sj > Lt - wt - 3) continue;   // not on the through road, or an end-to-end joint
+        t.cut.push([sj, ws + 1.2]); sideCuts.push([si, end, wt + 0.4]); } } });
+  const insert = (r, sv) => { const L = r.L; if (!(sv > 0.05)) return; let i = 1; while (i < L.length && L[i] < sv) i++; if (i >= L.length || L[i] - L[i - 1] < 1e-6) return;
+    if (Math.abs(L[i] - sv) < 0.05 || Math.abs(L[i - 1] - sv) < 0.05) return; const t = (sv - L[i - 1]) / (L[i] - L[i - 1]), a = r.p[i - 1], b = r.p[i];
+    r.p.splice(i, 0, [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); L.splice(i, 0, sv); r.j.splice(i, 0, 0); };
+  for (const r of R) { for (const [sj, he] of r.cut) for (const sv of [sj - he - 0.4, sj - he, sj, sj + he, sj + he + 0.4]) insert(r, sv);
+    for (let i = 0; i < r.p.length; i++) if (r.cut.some(([sj, he]) => Math.abs(r.L[i] - sj) <= he + 0.01)) r.j[i] = 1; }
+  for (const [si, end, dd] of sideCuts) { const r = R[si], Lr = r.L[r.L.length - 1], s0 = end ? Lr - dd : dd, s1 = end ? Lr - dd - 0.3 : dd + 0.3;
+    insert(r, s0); insert(r, s1); for (let i = 0; i < r.p.length; i++) if (end ? r.L[i] >= s0 - 0.01 : r.L[i] <= s0 + 0.01) r.j[i] = 1; }
+  W3D.roadJunctions = R.reduce((n, r) => n + r.cut.length, 0);
+}
 function buildRoads() {
   const G = []; for (let l = 0; l < 8; l++) G.push({pos: [], uv: [], idx: []});
   const BR = {pos: [], idx: []};   // bridge slab + rails (plain grey)
-  const WJ = W3D.water || {}, CVL = (WJ.culverts || (WJ.culvert ? [WJ.culvert] : [])).filter(c => !c.br);
+  const WJ = W3D.water || {}, CVL = (WJ.culverts || (WJ.culvert ? [WJ.culvert] : [])).filter(c => !c.br), BRG = WJ.bridges || [];
   R.forEach((r, ri) => {
     const lvl = Math.min(3, r.cls) * 2 + (ri & 1), g = G[lvl], pos = g.pos, uv = g.uv, idx = g.idx, LIFT = 0.15 + 0.03 * lvl, w = RW[r.cls] / 2, P = r.p;
     let y0 = 0, y1 = 0, tot = 0;
@@ -101,8 +132,11 @@ function buildRoads() {
         const hs = (ox, oz) => Math.max(gh(x + ox, z + oz), gh(x + ox + dx * 5, z + oz + dz * 5), gh(x + ox - dx * 5, z + oz - dz * 5));
         const hc = hs(0, 0); yl = Math.max(hs(px, pz), hc - 0.3) + LIFT; yr = Math.max(hs(-px, -pz), hc - 0.3) + LIFT;
         // over a culvert the road keeps the embankment height, easing in/out over 18-32 m (no kink)
-        for (const C of CVL) { const d = Math.hypot(x - C.x, z - C.z); if (d < 32) { const t = d < 18 ? 1 : 1 - (d - 18) / 14, w = t * t * (3 - 2 * t), Y = (C.road || 17.3) + LIFT; yl = Math.max(yl, yl + (Y - yl) * w); yr = Math.max(yr, yr + (Y - yr) * w); } } }
-      const i0 = pos.length / 3; pos.push(x + px, yl, z + pz, x - px, yr, z - pz); uv.push(0, 0, 1, 0);
+        for (const C of CVL) { const d = Math.hypot(x - C.x, z - C.z); if (d < 32) { const t = d < 18 ? 1 : 1 - (d - 18) / 14, w = t * t * (3 - 2 * t), Y = (C.road || 17.3) + LIFT; yl = Math.max(yl, yl + (Y - yl) * w); yr = Math.max(yr, yr + (Y - yr) * w); } }
+        // Gardiner St bridge: the road keeps one level across the deck and eases into the approaches (water runs underneath)
+        for (const B of BRG) { const ax = x - B.x, az = z - B.z, al = Math.abs(ax * B.tx + az * B.tz), ac = Math.abs(-ax * B.tz + az * B.tx), E = B.ease || 20;
+          if (ac < B.w && al < B.len / 2 + E) { const t = al <= B.len / 2 ? 1 : 1 - (al - B.len / 2) / E, w = t * t * (3 - 2 * t), Y = B.road + LIFT; yl = Math.max(yl, yl + (Y - yl) * w); yr = Math.max(yr, yr + (Y - yr) * w); if (t === 1) { yl = yr = Y; } } } }
+      const i0 = pos.length / 3, jv = r.j && r.j[k] ? 0.75 : 0.25; pos.push(x + px, yl, z + pz, x - px, yr, z - pz); uv.push(0, jv, 1, jv);
       if (prev >= 0) idx.push(prev, prev + 1, i0, i0, prev + 1, i0 + 1);
       prev = i0;
       if (r.br) {

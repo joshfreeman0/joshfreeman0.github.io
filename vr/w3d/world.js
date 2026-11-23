@@ -15,7 +15,7 @@ const floors = [];   // {x0,x1,z0,z1,y}
 const walls = [];    // {x0,x1,z0,z1,y0,y1}
 W3D.floors = floors; W3D.walls = walls;
 
-const RINGS = {mid: {n: 193, R: 6144, img: LITE ? 'ring_mid_lite.jpg?v=1' : 'ring_mid.jpg?v=1', name: 'ring-mid', h: null}, far: {n: 129, R: 16384, img: LITE ? 'ring_far_lite.jpg?v=1' : 'ring_far.jpg?v=1', name: 'ring-far', h: null}};
+const RINGS = {mid: {n: 193, R: 6144, img: LITE ? 'ring_mid_lite.jpg?v=2' : 'ring_mid.jpg?v=2', name: 'ring-mid', h: null}, far: {n: 129, R: 16384, img: LITE ? 'ring_far_lite.jpg?v=2' : 'ring_far.jpg?v=2', name: 'ring-far', h: null}};
 function ringH(x, z) {
   for (const L of [RINGS.mid, RINGS.far]) {
     if (!L.h || Math.abs(x) > L.R || Math.abs(z) > L.R) continue;
@@ -164,23 +164,34 @@ function rippleNormal() { // tileable noise height field -> normal map (no strip
 /* one shared water look for Fowling Pond, King's Pond and the rivers: blue-green, two drifting ripple layers sampled in
    world space (so overlapping water meshes match exactly), sky reflection with Fresnel from the PBR env map. */
 function waterMat(alphaMap, river) {
-  // river: dark tea-brown/olive like the real Forge River in the aerial photo, semi-transparent so the photographed riverbed shows through
-  // pond and river are the same water: one dark olive-brown colour and the same soft sheen (no cyan sky mirror)
-  const mat = new THREE.MeshStandardMaterial({color: 0x2f3a2c, roughness: 0.16, metalness: 0.0, alphaMap: alphaMap || null, alphaTest: alphaMap ? 0.5 : 0,
-    transparent: !!river, opacity: river ? 0.78 : 1, depthWrite: !river});
-  if (W3D.env) { mat.envMap = W3D.env; mat.envMapIntensity = 0.6; } // pond: dark, low sheen like the real lakes in the photo (was a bright cyan sky mirror)
+  // clip 21: the pond read as a flat opaque dark-green plane. Now natural blue-green water: two drifting normal-mapped ripple layers
+  // (one on phones), a sky reflection from the scene env map plus an analytic sky gradient weighted by a Schlick fresnel term, so the
+  // water is darker looking straight down and reflects the sky toward the horizon. Pond, King's Pond and the rivers share it.
+  const mat = new THREE.MeshStandardMaterial({color: 0x24474a, roughness: 0.1, metalness: 0.0, alphaMap: alphaMap || null, alphaTest: alphaMap ? 0.5 : 0,
+    transparent: !!river, opacity: river ? 0.84 : 1, depthWrite: !river});
+  if (W3D.env) { mat.envMap = W3D.env; mat.envMapIntensity = 0.75; }
+  mat.name = 'water';
   if (!W3D.waterU) W3D.waterU = {wN: {value: rippleNormal()}, wT: {value: 0}};
   mat.onBeforeCompile = sh => {
     sh.uniforms.wN = W3D.waterU.wN; sh.uniforms.wT = W3D.waterU.wT;
     sh.vertexShader = 'varying vec3 vWw;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvWw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = 'uniform sampler2D wN; uniform float wT; varying vec3 vWw;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', [
       'vec2 wp = vWw.xz;',
-      'vec3 n1 = texture2D(wN, wp / 36.0 + vec2(0.011, 0.007) * wT).xyz * 2.0 - 1.0;',
-      'vec3 n2 = texture2D(wN, mat2(0.8, -0.6, 0.6, 0.8) * wp / 9.0 + vec2(-0.017, 0.012) * wT).xyz * 2.0 - 1.0;',
-      'float wd = length(vWw - cameraPosition); vec2 sl = (n1.xy + n2.xy * 0.6 * (1.0 - smoothstep(30.0, 180.0, wd))) * 0.30 * mix(1.0, 0.08, smoothstep(60.0, 450.0, wd));',
-      'normal = normalize((viewMatrix * vec4(normalize(vec3(sl.x, 1.0, sl.y)), 0.0)).xyz);'].join('\n'));
+      'vec3 n1 = texture2D(wN, wp / 30.0 + vec2(0.011, 0.007) * wT).xyz * 2.0 - 1.0;',
+      'float wd = length(vWw - cameraPosition);',
+      LITE ? 'vec2 sl = n1.xy * 0.26 * mix(1.0, 0.1, smoothstep(60.0, 450.0, wd));'
+        : 'vec3 n2 = texture2D(wN, mat2(0.8, -0.6, 0.6, 0.8) * wp / 7.5 + vec2(-0.017, 0.012) * wT).xyz * 2.0 - 1.0;\n' +
+          'vec2 sl = (n1.xy + n2.xy * 0.55 * (1.0 - smoothstep(25.0, 160.0, wd))) * 0.26 * mix(1.0, 0.1, smoothstep(60.0, 450.0, wd));',
+      'normal = normalize((viewMatrix * vec4(normalize(vec3(sl.x, 1.0, sl.y)), 0.0)).xyz);'].join('\n'))
+      .replace('#include <opaque_fragment>', [
+      '{ vec3 vd = normalize(vViewPosition); float cth = clamp(dot(normal, vd), 0.0, 1.0);',
+      '  float fr = 0.02 + 0.98 * pow(1.0 - cth, 5.0);',
+      '  vec3 rw = inverseTransformDirection(reflect(-vd, normal), viewMatrix);',
+      '  vec3 sky = mix(vec3(0.62, 0.72, 0.80), vec3(0.27, 0.45, 0.70), clamp(rw.y * 1.6, 0.0, 1.0));',
+      '  outgoingLight = mix(outgoingLight, sky, clamp(fr, 0.0, 0.55)); }',
+      '#include <opaque_fragment>'].join('\n'));
   };
-  mat.customProgramCacheKey = () => 'jfwater' + (alphaMap ? 'a' : '') + (river ? 'r' : '');
+  mat.customProgramCacheKey = () => 'jfwater2' + (alphaMap ? 'a' : '') + (river ? 'r' : '') + (LITE ? 'l' : '');
   return mat;
 }
 
@@ -323,9 +334,9 @@ W3D.build = function (scene3, sceneEl) {
   const need = r => { if (!r.ok) throw new Error(r.url.replace(/^.*\//, '').replace(/\?.*/, '') + ' HTTP ' + r.status); return r; };
   W3D.status('Loading terrain data 0/5...');
   return Promise.all([
-    fetch(BASE + 'terrain_t4.u16?v=3').then(need).then(r => r.arrayBuffer()).then(step),
-    fetch(BASE + 'trees_t5.f32?v=3').then(need).then(r => r.arrayBuffer()).then(step),
-    fetch(BASE + 'water_t.json?v=5').then(need).then(r => r.json()).then(step),
+    fetch(BASE + 'terrain_t4.u16?v=4').then(need).then(r => r.arrayBuffer()).then(step),
+    fetch(BASE + 'trees_t5.f32?v=4').then(need).then(r => r.arrayBuffer()).then(step),
+    fetch(BASE + 'water_t.json?v=7').then(need).then(r => r.json()).then(step),
     fetch(BASE + 'ring_mid.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step),
     fetch(BASE + 'ring_far.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step)
   ]).then(([hb, tb, wj, rmid, rfar]) => {
@@ -346,9 +357,9 @@ function buildTerrain() {
   const geo = new THREE.PlaneGeometry(SIZE, SIZE, N - 1, N - 1); geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, heights[i]);
   geo.computeVertexNormals();
-  const t = new THREE.TextureLoader().load(BASE + (LITE ? 'ortho_t_lite.jpg?v=6' : 'ortho_t.jpg?v=5')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = LITE ? 4 : 16;
+  const t = new THREE.TextureLoader().load(BASE + (LITE ? 'ortho_t_lite.jpg?v=7' : 'ortho_t.jpg?v=6')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = LITE ? 4 : 16;
   // sharper ground near the compound and pond: 0.5 m/px USGS tile (x -324..1724, z -1249..799) + fine detail texture that fades in within ~200 m
-  const hi = LITE ? t : new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=5'); hi.colorSpace = THREE.SRGBColorSpace; if (!LITE) hi.anisotropy = 16;   // lite: no 0.5 m tile (hiRect moved off the map)
+  const hi = LITE ? t : new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=6'); hi.colorSpace = THREE.SRGBColorSpace; if (!LITE) hi.anisotropy = 16;   // lite: no 0.5 m tile (hiRect moved off the map)
   const det = detailTex(), grs = pbr('grass_col', true), grn = LITE ? null : pbr('grass_nrm');   // photo lawn (CC0) instead of the drawn blades
   const tm = new THREE.MeshLambertMaterial({map: t});
   tm.onBeforeCompile = sh => {
@@ -392,8 +403,12 @@ function ringLayer(L, inner) {
     const a = j * n + i, b = a + 1, c = a + n, d = c + 1; idx.push(a, c, b, b, c, d);
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
-  const t = new THREE.TextureLoader().load(BASE + L.img); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
-  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({map: t})); m.name = L.name; root.add(m); return m;
+  // clip 22: until its photo has loaded (a 4096 px JPEG takes a while to decode on the Quest) a ring tile drew with an empty texture,
+  // i.e. black / dark purple slabs in the distance. It now shows a neutral land colour and switches to the photo once it is ready.
+  const mat = new THREE.MeshLambertMaterial({color: 0x6d7a5a}); mat.name = 'ring-placeholder';
+  const t = new THREE.TextureLoader().load(BASE + L.img, tx => { mat.map = tx; mat.color.set(0xffffff); mat.name = ''; mat.needsUpdate = true; });
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const m = new THREE.Mesh(g, mat); m.name = L.name; m.userData.photo = t; root.add(m); return m;
 }
 function curtain(pts, drop, color) {
   const pos = [], idx = []; let k = 0;
@@ -487,11 +502,41 @@ function buildRivers(J) {
       const w = new THREE.Mesh(new THREE.BoxGeometry(7, top - bot, 0.6), hwM); w.position.y = (top + bot) / 2; g.add(w);
       const mo = new THREE.Mesh(new THREE.CircleGeometry(0.85, 14, 0, Math.PI), moM); mo.position.set(0, bot + 0.55, 0.32); g.add(mo); root.add(g); } }
   // King's dam spillway headwall (the real road over it comes from the streets layer)
-  const D = J.dam; if (D) { const face = new THREE.Mesh(new THREE.BoxGeometry(D.w * 2.4, 3.2, 1.2), M.stone); face.position.set(D.x, K.level - 0.6, D.z + 2); face.castShadow = true; root.add(face); }
+  // clip 21: the dam was one floating tan plank. Now a low stone weir across the river mouth: crest flush with King's Pond, a sloping
+  // apron with white water down to the river, and wing walls into both banks
+  const D = J.dam; if (D) { const fr = J.rivers && J.rivers[0], rl = fr ? fr.lev[3] : K.level - 0.6, W = 20, dmM = new THREE.MeshStandardMaterial({color: 0x8a8273, roughness: 0.9});
+    const crest = new THREE.Mesh(new THREE.BoxGeometry(W, K.level + 0.06 - (rl - 2.2), 1.6), dmM); crest.position.set(D.x, (K.level + 0.06 + rl - 2.2) / 2, D.z + 1.2); crest.castShadow = true; root.add(crest);
+    const ap = new THREE.PlaneGeometry(W - 0.4, 3.6, 1, 6), pa = ap.attributes.position;
+    for (let i = 0; i < pa.count; i++) { const t = (pa.getY(i) + 1.8) / 3.6; pa.setXYZ(i, pa.getX(i), rl + 0.05 + (K.level + 0.02 - rl) * t * t, D.z + 2.0 + (1 - t) * 3.4); }
+    ap.computeVertexNormals(); const foam = new THREE.Mesh(ap, new THREE.MeshStandardMaterial({color: 0xdfe8e6, roughness: 0.55, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false}));
+    foam.name = 'weir-foam'; root.add(foam);
+    for (const sd of [-1, 1]) { const ww = new THREE.Mesh(new THREE.BoxGeometry(1.2, 3.4, 7), dmM); ww.position.set(D.x + sd * (W / 2 + 0.4), rl + 0.4, D.z + 3.4); ww.castShadow = true; root.add(ww); } }
+  buildBridges(J.bridges);
+}
+/* clip 21: Gardiner St over the Forge River below King's dam was a short grey OSM 'bridge' block with jagged road pieces either side.
+   One stone bridge now carries the road (streets.js keeps the road at B.road across it): deck slab, parapets with a coping, abutments
+   into both banks and two piers standing on the banks, so the river runs freely underneath. */
+function buildBridges(L) {
+  for (const B of L || []) {
+    const g = new THREE.Group(), ry = Math.atan2(-B.tz, B.tx); g.position.set(B.x, 0, B.z); g.rotation.y = ry; root.add(g);
+    const sM = new THREE.MeshStandardMaterial({color: 0x9c9384, roughness: 0.88}), cM = new THREE.MeshStandardMaterial({color: 0xb7ae9c, roughness: 0.8});
+    const add = (w, h, d, x, y, z, m) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
+    const top = B.road, half = B.len / 2;
+    add(B.len + 2, 1.0, B.w, 0, top - 0.55, 0, sM);   // deck slab (the road ribbon lies on it)
+    for (const sd of [-1, 1]) { add(B.len + 2, 1.0, 0.45, 0, top + 0.45, sd * (B.w / 2 - 0.22), sM); add(B.len + 2.2, 0.14, 0.6, 0, top + 1.0, sd * (B.w / 2 - 0.22), cM);   // parapets + coping
+      add(0.25, 1.0, B.w + 0.4, 0, top - 0.55, 0, cM).position.x = sd * (half + 1.0); }
+    const yb = Math.min(terrainH(B.x - half, B.z), terrainH(B.x + half, B.z)) - 2.5;
+    for (const sd of [-1, 1]) { const ax = sd * (half - 0.5); add(3.0, top - 1.05 - yb, B.w + 1.2, ax, (top - 1.05 + yb) / 2, 0, sM);   // abutments
+      const px = sd * (half * 0.42); add(1.6, top - 1.05 - yb, B.w - 1.0, px, (top - 1.05 + yb) / 2, 0, sM); }   // piers on the banks, clear of the channel
+    g.name = 'bridge-' + (B.name || '');
+  }
 }
 function buildTrees(a) {
   const n = a.length / 4; const con = [], dec = [];
-  for (let i = 0; i < n; i++) { if (LITE && i % 5 > 1) continue; const x = a[i * 4], z = a[i * 4 + 1], s = a[i * 4 + 2], k = a[i * 4 + 3]; const y = terrainH(x, z); if (y < -5) continue; (k < 0.5 ? con : dec).push([x, y, z, s]); }
+  // clip 26: keep the brooks and rivers open - no tree stands on a river ribbon (coarse 10 m hash of every river point, core area only)
+  const rv = new Map(), RC = 10; for (const R of (W3D.water && W3D.water.rivers) || []) { const hw = (R.hw || 7) + 3; for (const [x, z] of R.pts) { if (Math.abs(x) > HALF || Math.abs(z) > HALF) continue; const k = Math.floor(x / RC) + ',' + Math.floor(z / RC); if (!rv.has(k)) rv.set(k, []); rv.get(k).push(x, z, hw); } }
+  const onRiver = (x, z) => { const cx = Math.floor(x / RC), cz = Math.floor(z / RC); for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const L = rv.get((cx + i) + ',' + (cz + j)); if (L) for (let k = 0; k < L.length; k += 3) { const dx = L[k] - x, dz = L[k + 1] - z; if (dx * dx + dz * dz < L[k + 2] * L[k + 2]) return true; } } return false; };
+  for (let i = 0; i < n; i++) { if (LITE && i % 5 > 1) continue; const x = a[i * 4], z = a[i * 4 + 1], s = a[i * 4 + 2], k = a[i * 4 + 3]; const y = terrainH(x, z); if (y < -5 || onRiver(x, z)) continue; (k < 0.5 ? con : dec).push([x, y, z, s]); }
   const mk = (geo, mat, list, yOff, sy, colors) => {
     const im = new THREE.InstancedMesh(geo, mat, list.length); const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), col = new THREE.Color();
     list.forEach((t, i) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (i * 2.39996) % 6.283); sv.set(t[3], t[3] * sy, t[3]); pv.set(t[0], t[1] - 0.35 + yOff * t[3], t[2]);   // sunk slightly so no tree base ever hovers on slopes m4.compose(pv, q, sv); im.setMatrixAt(i, m4);
@@ -559,21 +604,37 @@ function parkSetup(P) {
 function buildPark(P) {
   if (!P || !PARK) return;
   const K = PARK, TAU = Math.PI * 2, NB = 384, NR = 18, BS = 6;
-  const gcv = canvas(256, 256), gg = gcv.getContext('2d'); noiseFill(gg, 256, 256, '#5e8c3c', 0.16, 9000); const gt = tex(gcv);
-  const lawnM = new THREE.MeshLambertMaterial({map: gt});
-  const mesh = (pos, uv, idx, name, mat) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+  // clip 22: the deck was one flat lime-green canvas colour. Now the CC0 photo lawn (same texture as the terrain lawn, no extra GPU copy)
+  // at two scales with macro patches, tinted to the aerial photo's grass. The edge/boundary is unchanged (the blend hook stays off).
+  const grs = (W3D._extraTex && W3D._extraTex[2]) || pbr('grass_col', true), ringT = null;   // Josh: keep the park's boundary as it was - only the grass changes (no edge blend into the aerial photo)
+  const lawnM = new THREE.MeshLambertMaterial({map: grs});
+  lawnM.onBeforeCompile = sh => {
+    sh.uniforms.ringMap = {value: ringT || grs}; sh.uniforms.hasRing = {value: ringT ? 1 : 0};
+    sh.vertexShader = 'attribute float edgeF; varying float vEdge; varying vec3 vWp;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvWp = (modelMatrix * vec4(transformed, 1.0)).xyz; vEdge = edgeF;');
+    sh.fragmentShader = 'uniform sampler2D ringMap; uniform float hasRing; varying float vEdge; varying vec3 vWp;\n' + sh.fragmentShader.replace('#include <map_fragment>', [
+      'vec2 q2 = mat2(0.8, 0.6, -0.6, 0.8) * vWp.xz;',
+      'float mac = texture2D(map, vWp.xz / 157.0).g * 0.6 + texture2D(map, q2 / 61.0).g * 0.4;',
+      'vec3 gt = mix(texture2D(map, vWp.xz / 2.3).rgb, texture2D(map, q2 / 8.1).rgb, 0.35) * mix(vec3(1.0, 1.0, 0.88), vec3(0.84, 0.97, 0.92), smoothstep(0.25, 0.6, mac)) * vec3(0.6, 1.25, 2.6);',
+      'gt = mix(vec3(dot(gt, vec3(0.3, 0.59, 0.11))), gt, 0.75);',
+      'vec3 ph = texture2D(ringMap, vec2((vWp.x + 6144.0) / 12288.0, 1.0 - (vWp.z + 6144.0) / 12288.0)).rgb;',
+      'float nz = texture2D(map, vWp.xz / 47.0).g * 0.6 + texture2D(map, q2 / 19.0).r * 0.4;',
+      'float f = hasRing * smoothstep(0.32, 0.78, vEdge + (nz - 0.45) * 0.7);',
+      'diffuseColor.rgb *= mix(gt, ph, f);'].join('\n'));
+  };
+  lawnM.customProgramCacheKey = () => 'parklawn';
+  const mesh = (pos, uv, idx, name, mat, ef) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('edgeF', new THREE.Float32BufferAttribute(ef, 1)); g.setIndex(idx); g.computeVertexNormals();
     const nr = g.attributes.normal; for (let i = 0; i < nr.count; i++) if (nr.getY(i) < 0) nr.setXYZ(i, -nr.getX(i), -nr.getY(i), -nr.getZ(i)); const m = new THREE.Mesh(g, mat); m.name = name; m.receiveShadow = true; root.add(m); return m; };
   { // deck: polar grid out to the footprint edge (a plane, so every triangle is flat - no blobs)
-    const pos = [], uv = [], idx = [];
-    for (let r = 0; r <= NR; r++) for (let i = 0; i < NB; i++) { const a = i / NB * TAU, f = r / NR, e = K.edge(a), x = P.cx + (e[0] - P.cx) * f, z = P.cz + (e[1] - P.cz) * f; pos.push(x, K.deckY(x, z), z); uv.push(x / 12, z / 12); }
+    const pos = [], uv = [], idx = [], ef = [];
+    for (let r = 0; r <= NR; r++) for (let i = 0; i < NB; i++) { const a = i / NB * TAU, f = r / NR, e = K.edge(a), x = P.cx + (e[0] - P.cx) * f, z = P.cz + (e[1] - P.cz) * f; pos.push(x, K.deckY(x, z), z); uv.push(x / 12, z / 12); ef.push(Math.max(0, (f - 0.78) / 0.22) * 0.42); }
     for (let r = 0; r < NR; r++) for (let i = 0; i < NB; i++) { const a = r * NB + i, b = r * NB + (i + 1) % NB, c = a + NB, d = b + NB; idx.push(a, b, c, b, d, c); }
-    const m = mesh(pos, uv, idx, 'pyramid-park', lawnM); m.material.side = THREE.DoubleSide; }
+    const m = mesh(pos, uv, idx, 'pyramid-park', lawnM, ef); m.material.side = THREE.DoubleSide; }
   { // berm: deck edge down to the ground; in a highway notch it drops under the ground so the cutting is open
-    const pos = [], uv = [], idx = [];
+    const pos = [], uv = [], idx = [], ef = [];
     for (let i = 0; i < NB; i++) { const a = i / NB * TAU, e = K.edge(a), o = K.out(a);
-      for (let k = 0; k <= BS; k++) { const d = k / BS * K.BERM, x = e[0] + o[0] * d, z = e[1] + o[1] * d; let y = K.surf(x, z, true); if (k && K.notch(x, z)) y = terrainH(x, z) - 1.5; if (k === BS) y = Math.min(y, terrainH(x, z) - 0.4); pos.push(x, y, z); uv.push(x / 12, z / 12); } }
+      for (let k = 0; k <= BS; k++) { const d = k / BS * K.BERM, x = e[0] + o[0] * d, z = e[1] + o[1] * d; let y = K.surf(x, z, true); if (k && K.notch(x, z)) y = terrainH(x, z) - 1.5; if (k === BS) y = Math.min(y, terrainH(x, z) - 0.4); pos.push(x, y, z); uv.push(x / 12, z / 12); ef.push(0.42 + 0.58 * k / BS); } }
     for (let i = 0; i < NB; i++) for (let k = 0; k < BS; k++) { const a = i * (BS + 1) + k, b = ((i + 1) % NB) * (BS + 1) + k; idx.push(a, b, a + 1, b, b + 1, a + 1); }   // wound to face up
-    mesh(pos, uv, idx, 'park-berm', new THREE.MeshLambertMaterial({map: gt, side: THREE.DoubleSide})); }
+    const bm = mesh(pos, uv, idx, 'park-berm', lawnM, ef); }
   // cut-and-cover portals in the deck edge, one per carriageway, with retaining walls along the open cutting
   const dark = new THREE.MeshBasicMaterial({color: 0x0a0a0a, side: THREE.DoubleSide});
   for (const [x, z, a] of P.portals) { const gy = terrainH(x, z), D = K.deckY(x, z), hh = Math.max(4, D - gy + 1.2), g2 = new THREE.Group(); g2.position.set(x, gy, z); g2.rotation.y = a;
@@ -585,7 +646,7 @@ function buildPark(P) {
       wg.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); wg.setIndex(I); wg.computeVertexNormals(); const wm = new THREE.Mesh(wg, M.stone); wm.material.side = THREE.DoubleSide; g2.add(wm); }
     root.add(g2); }
   // gravel promenade rings + two crossing walks, on the deck
-  const path = new THREE.MeshLambertMaterial({color: 0xd9cba4, side: THREE.DoubleSide});
+  const path = new THREE.MeshLambertMaterial({color: 0xbfb08a, side: THREE.DoubleSide});
   const ribbonOn = (pts, w) => { const pp = [], ii = []; let k = 0; for (let i = 0; i < pts.length; i++) { const [x, z] = pts[i], [nx, nz] = pts[Math.min(pts.length - 1, i + 1)], [px, pz] = pts[Math.max(0, i - 1)]; let tx = nx - px, tz = nz - pz; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
       for (const sd of [-1, 1]) { const qx = x - tz * w / 2 * sd, qz = z + tx * w / 2 * sd; pp.push(qx, K.deckY(qx, qz) + 0.3, qz); } if (k) ii.push(2 * k - 2, 2 * k - 1, 2 * k, 2 * k - 1, 2 * k + 1, 2 * k); k++; }
     const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(pp, 3)); rg.setIndex(ii); rg.computeVertexNormals(); root.add(new THREE.Mesh(rg, path)); };
@@ -733,8 +794,7 @@ function buildBank() {
     box(0.3, 14, 1.5, 892.3, y0 + 0.5, zt - s * 3, M.gold, {collide: false}); // flagpole mast (gilded)
   }
   planarUV(box(6.4, 3, 12, 896, y0 + 14, zc, M.relief, {collide: false}), 6);    // lintel over gate (12 deep so it beds into both battered towers - no gaps); same world-aligned carving as the towers
-  const disk = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.3, 32), M.gold); disk.rotation.z = Math.PI / 2; disk.position.set(892.3, y0 + 15.5, zc); root.add(disk);
-  for (const s of [-1, 1]) { const wing = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.7, 3.2), new THREE.MeshStandardMaterial({color: 0x1f5fa8, roughness: 0.4})); wing.position.set(892.35, y0 + 15.6, zc + s * 2.6); root.add(wing); }
+  const disk = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.3, 32), M.gold); disk.rotation.z = Math.PI / 2; disk.position.set(892.3, y0 + 15.5, zc); root.add(disk);   // the gold sun disc (Josh: keep exactly); the winged sun, cornice and jamb framing around it are in bank.js gateFrame()
   floorOnly(8, 9, 896, y0 + 0.2, zc);
   // forecourt with colonnades
   box(26, 0.2, 40, 912, y0, zc, M.granite, {floor: true, collide: false});

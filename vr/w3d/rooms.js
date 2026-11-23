@@ -173,7 +173,7 @@ W3D.buildRooms = function (rootIn) {
   const pSlots = [[pr.x0, -406, 1], [pr.x0, -413.5, 1], [pr.x0, -421, 1], [pr.x1, -406, -1], [pr.x1, -413.5, -1], [pr.x1, -421, -1], ['N', pc.cx - 6.2], ['N', pc.cx + 6.2]];
   P.panels.forEach((p, i) => { const s = pSlots[i]; if (!s) return; const cv = panelCanvas(p);
     if (s[0] === 'N') panel(cv, 3.6, 1.8, s[1], fy + 2.0, Z1 + 0.06, 0);
-    else { panel(cv, 3.6, 1.8, s[0] + s[2] * 0.06, fy + 2.0, s[1], s[2] * Math.PI / 2); if (p.model) pedestal(s[0] + s[2] * 1.5, s[1] + 3.75, p.model, s[2] * Math.PI / 2); /* beside the panel, in the gap, so the text stays readable */ } });
+    else { panel(cv, 3.6, 1.8, s[0] + s[2] * 0.06, fy + 2.0, s[1], s[2] * Math.PI / 2); if (p.model) { const pg = pedestal(s[0] + s[2] * 1.5, s[1] + 3.75, p.model, s[2] * Math.PI / 2); if (p.model === 'ntr') padLink(pg, s[2] * Math.PI / 2); } /* beside the panel, in the gap, so the text stays readable */ } });
   panel(titleCanvas(P.title, P.subtitle), 7, 1.75, pc.cx, fy + 6.5, Z1 + 0.06, 0);
   panel(plaqueCanvas(P.plaque), 3.0, 1.5, pc.cx, fy + 1.8, Z1 + 0.06, 0);
   // centre piece: the model of any north-wall exhibit (the warp concept) at 1.6x on a round plinth
@@ -218,6 +218,29 @@ function saucer(x, z) {
   gg.fillStyle = '#f3e6c0'; gg.font = '26px Georgia, serif'; gg.textAlign = 'center'; gg.fillText('Roswell-era (1947) "flying saucer"', 256, 52); gg.fillText('illustrative model - not a real object', 256, 92);
   const lab = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.35), new THREE.MeshBasicMaterial({map: L.tex(c), toneMapped: false})); lab.position.set(x, fy + 0.6, z + 3.4); lab.rotation.x = -0.5; root.add(lab);
   L.box(1.5, 0.45, 0.2, x, fy, z + 3.5, M.granite, {collide: false});
+}
+/* Clip 23 + calls: the Propulsion-hall rocket is a pointer to the real one. Pointing at it and pulling the RIGHT trigger (or click / tap)
+   takes you to the Bridgewater launch pad (launch.js), where the full-size rocket flies you to Mars; no direct jump to another site here.
+   An invisible .btn proxy around the model makes it raycastable; hovering lights the rocket and the hint. */
+function padLink(g, ry) {
+  const hc = document.createElement('canvas'); hc.width = 512; hc.height = 96; const hg = hc.getContext('2d');
+  const draw = on => { hg.clearRect(0, 0, 512, 96); hg.fillStyle = on ? 'rgba(181,83,45,0.95)' : 'rgba(20,20,24,0.72)'; hg.beginPath(); hg.roundRect ? hg.roundRect(4, 4, 504, 88, 18) : hg.rect(4, 4, 504, 88); hg.fill();
+    hg.fillStyle = '#fff'; hg.font = 'bold 30px Arial, sans-serif'; hg.textAlign = 'center'; hg.textBaseline = 'middle'; hg.fillText('Pull trigger: go to the launch pad', 256, 50); ht.needsUpdate = true; };
+  const ht = new THREE.CanvasTexture(hc); ht.colorSpace = THREE.SRGBColorSpace;
+  const hint = new THREE.Mesh(new THREE.PlaneGeometry(1.25, 0.234), new THREE.MeshBasicMaterial({map: ht, transparent: true, toneMapped: false, depthWrite: false}));
+  hint.position.set(g.position.x, g.position.y + 2.95, g.position.z); hint.rotation.y = ry; hint.renderOrder = 6; root.add(hint); draw(false);
+  const mats = []; g.traverse(o => { if (o.isMesh && o.material && o.material.emissive) mats.push([o.material, o.material.emissive.getHex()]); });
+  const hover = on => { for (const [m, e] of mats) m.emissive.setHex(on ? 0x553322 : e); draw(on); };
+  anim.push(() => { const c = W3D._cam && W3D._cam.object3D; if (c) { const p = c.getWorldPosition(W3D._v2 || (W3D._v2 = new THREE.Vector3())); hint.rotation.y = Math.atan2(p.x - hint.position.x, p.z - hint.position.z); } });
+  const go = () => { if (W3D.spots && W3D.spots.launchpad) { if (window.goWorld) window.goWorld('launchpad'); else W3D.spots.launchpad(); JFVR.hud && JFVR.hud('Launch pad near Bridgewater - point at the rocket and pull the trigger to launch'); } };
+  const make = () => { const sc = document.querySelector('a-scene'); if (!sc || !sc.hasLoaded) return setTimeout(make, 200);
+    const wp = g.getWorldPosition(new THREE.Vector3()), e = document.createElement('a-entity');
+    e.setAttribute('class', 'btn'); e.setAttribute('id', 'mars-rocket'); e.setAttribute('position', wp.x + ' ' + (wp.y + 1.25) + ' ' + wp.z);
+    e.setAttribute('geometry', 'primitive: cylinder; radius: 0.42; height: 2.7'); e.setAttribute('material', 'shader: flat; transparent: true; opacity: 0; depthWrite: false');
+    e.addEventListener('mouseenter', () => hover(true)); e.addEventListener('mouseleave', () => hover(false));
+    e.addEventListener('click', ev => { const ce = ev.detail && ev.detail.cursorEl, lc = ce && ce.getAttribute && ce.getAttribute('laser-controls'); if (lc && /left/.test(typeof lc === 'string' ? lc : lc.hand)) return; go(); });   // right trigger, mouse or tap; the left hand keeps the menu
+    sc.appendChild(e); W3D.padLink = {el: e, go}; };
+  make();
 }
 W3D.tickRooms = function (t, dt) {
   const cam = W3D._cam || (W3D._cam = document.querySelector('[camera]'));

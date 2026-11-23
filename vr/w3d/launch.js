@@ -13,7 +13,6 @@
 const W3D = window.W3D = window.W3D || {};
 const LITE = !!window.JFVR_LITE;
 const BASE = '/vr/w3d/bw/';
-const FLIGHT_READY = false;   // item 16 (the Earth -> Mars flight) ships in the follow-up; until then the trigger says so
 const MARS_URL = 'https://redplanetlounge.pages.dev/?spot=pad&from=joshfreeman-vr';
 const PATCH = {cx: 9400, cz: -2350, S: 2400, n: 241};
 const PAD = {x: 9617.0, z: -2976.9, g: 11.4, R: 18, top: 12.2};
@@ -137,7 +136,7 @@ function unloadPatch() {
 function rocketProxy(rocket, pad) {
   const hc = document.createElement('canvas'); hc.width = 512; hc.height = 96; const hg = hc.getContext('2d'), ht = new THREE.CanvasTexture(hc); ht.colorSpace = THREE.SRGBColorSpace;
   const draw = on => { hg.clearRect(0, 0, 512, 96); hg.fillStyle = on ? 'rgba(181,83,45,0.95)' : 'rgba(20,20,24,0.75)'; hg.beginPath(); hg.roundRect ? hg.roundRect(4, 4, 504, 88, 18) : hg.rect(4, 4, 504, 88); hg.fill();
-    hg.fillStyle = '#fff'; hg.font = 'bold 36px Arial, sans-serif'; hg.textAlign = 'center'; hg.textBaseline = 'middle'; hg.fillText(FLIGHT_READY ? 'Pull trigger to launch to Mars' : 'Launch to Mars - coming soon', 256, 50); ht.needsUpdate = true; };
+    hg.fillStyle = '#fff'; hg.font = 'bold 36px Arial, sans-serif'; hg.textAlign = 'center'; hg.textBaseline = 'middle'; hg.fillText('Pull trigger to launch to Mars', 256, 50); ht.needsUpdate = true; };
   const hint = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.31), new THREE.MeshBasicMaterial({map: ht, transparent: true, toneMapped: false, depthWrite: false}));
   hint.position.set(PAD.x, PAD.top + 9, PAD.z + 5.5); hint.renderOrder = 6; patch.grp.add(hint); patch.hint = hint; draw(false);
   const mats = rocket.userData.mats, base = mats.map(m => m.emissive.getHex());
@@ -146,7 +145,7 @@ function rocketProxy(rocket, pad) {
   e.setAttribute('position', PAD.x + ' ' + (PAD.top + ROCKET_H / 2) + ' ' + PAD.z);
   e.setAttribute('geometry', 'primitive: cylinder; radius: ' + (0.3 * SC) + '; height: ' + ROCKET_H); e.setAttribute('material', 'shader: flat; transparent: true; opacity: 0; depthWrite: false');
   e.addEventListener('mouseenter', () => hover(true)); e.addEventListener('mouseleave', () => hover(false));
-  e.addEventListener('click', ev => { const ce = ev.detail && ev.detail.cursorEl, lc = ce && ce.getAttribute && ce.getAttribute('laser-controls'); if (lc && /left/.test(typeof lc === 'string' ? lc : lc.hand)) return; hover(false); if (FLIGHT_READY) startFlight(); else if (JFVR.hud) JFVR.hud('Launch coming soon - the flight to Mars is being built'); });
+  e.addEventListener('click', ev => { const ce = ev.detail && ev.detail.cursorEl, lc = ce && ce.getAttribute && ce.getAttribute('laser-controls'); if (lc && /left/.test(typeof lc === 'string' ? lc : lc.hand)) return; hover(false); startFlight(); });
   document.querySelector('a-scene').appendChild(e);
   return e;
 }
