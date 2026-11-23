@@ -1,4 +1,4 @@
-/* Josh Freeman's VR World - walkable/flyable 3D world (concept rendering).
+/* Fowling Pond - walkable/flyable 3D world (concept rendering).
    Terrain: USGS 3DEP elevation (public domain). Imagery: USGS National Map orthoimagery (public domain).
    Fowling Pond Restoration Plan v6 features drawn approximately from the plan's concept maps.
    Buildings, plants and animals are procedural concept models. Not a survey or engineering design. */

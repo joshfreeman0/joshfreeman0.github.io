@@ -1,4 +1,4 @@
-/* Multiplayer for Josh Freeman's VR World (joshfreeman.org/vr).
+/* Multiplayer for Fowling Pond (joshfreeman.org/vr).
    Free, serverless: peer-to-peer WebRTC (Trystero, bundled in mp-p2p.js) with
    public Nostr relays for matchmaking only. Anyone who opens the page joins one
    shared room, appears as a gold avatar (head + hands + guest name), and can

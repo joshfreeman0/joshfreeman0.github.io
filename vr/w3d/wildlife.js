@@ -1,4 +1,4 @@
-/* Wildlife for Josh's VR World: deer, wild turkeys, skunks, opossums (wandering on the ground),
+/* Wildlife for Fowling Pond: deer, wild turkeys, skunks, opossums (wandering on the ground),
    red-tailed hawks (circling overhead) and owls (perched in trees near the compound).
    Simple procedural animated models (concept), no external assets. */
 (function () {

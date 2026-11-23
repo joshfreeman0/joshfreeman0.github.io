@@ -1,4 +1,4 @@
-/* Thumbstick locomotion for Josh's VR World.
+/* Thumbstick locomotion for Fowling Pond.
    Left stick: move forward/back/strafe relative to where you look.
    Right stick: snap turn 30 degrees. Also WASD/arrow keys on desktop. */
 AFRAME.registerComponent('thumbstick-move', {

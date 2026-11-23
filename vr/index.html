@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Josh Freeman's VR World</title>
-<meta name="description" content="Walk or fly Josh Freeman's 3D world: a concept Egyptian bank compound above a restored Fowling Pond, on real USGS terrain. Works on Meta Quest, desktop and phone.">
-<link rel="manifest" href="/vr/manifest.webmanifest">
+<title>Fowling Pond</title>
+<meta name="description" content="Walk or fly Fowling Pond, Josh Freeman's 3D world: a concept Egyptian bank compound above a restored Fowling Pond, on real USGS terrain. Works on Meta Quest, desktop and phone.">
+<link rel="manifest" href="/vr/manifest.webmanifest?v=2">
+<meta name="apple-mobile-web-app-title" content="Fowling Pond">
+<meta name="application-name" content="Fowling Pond">
 <link rel="icon" href="/vr/icon-192.png">
 <link rel="apple-touch-icon" href="/vr/icon-192.png">
 <meta name="theme-color" content="#c9a24a">
@@ -27,17 +29,17 @@ window.JFVR_LITE = (function () {
   return !!(navigator.deviceMemory && navigator.deviceMemory <= 4);
 })();
 </script>
-<script src="locomotion.js?v=15"></script>
-<script src="hd.js?v=4"></script>
+<script src="locomotion.js?v=16"></script>
+<script src="hd.js?v=5"></script>
 <script src="w3d/sphinx.js?v=2"></script>
-<script src="w3d/world.js?v=19c"></script>
-<script src="w3d/rooms.js?v=4"></script>
+<script src="w3d/world.js?v=19d"></script>
+<script src="w3d/rooms.js?v=4b"></script>
 <script src="w3d/launch.js?v=1"></script>
 <script src="w3d/cities.js?v=1"></script>
-<script src="w3d/saucer.js?v=1"></script>
-<script src="w3d/bank.js?v=5"></script>
-<script src="w3d/showcase.js?v=2"></script>
-<script src="w3d/wildlife.js?v=3"></script>
+<script src="w3d/saucer.js?v=2"></script>
+<script src="w3d/bank.js?v=6"></script>
+<script src="w3d/showcase.js?v=3"></script>
+<script src="w3d/wildlife.js?v=4"></script>
 <script src="w3d/streets.js?v=8"></script>
 <script src="w3d/realism.js?v=1"></script>
 <script>
@@ -214,5 +216,5 @@ document.getElementById('hidebtn').onclick=()=>{ui.style.display='none';t.style.
 t.onclick=()=>{ui.style.display='';t.style.display='none';};
 document.getElementById('helpbtn').onclick=()=>ui.classList.toggle('help');})();
 </script>
-<script>/* ?nomp=1 (automated tests) skips joining the public voice room */ if (!/[?&]nomp=1/.test(location.search)) { const s = document.createElement('script'); s.src = 'mp.js?v=4'; document.body.appendChild(s); }</script>
+<script>/* ?nomp=1 (automated tests) skips joining the public voice room */ if (!/[?&]nomp=1/.test(location.search)) { const s = document.createElement('script'); s.src = 'mp.js?v=5'; document.body.appendChild(s); }</script>
 </body></html>

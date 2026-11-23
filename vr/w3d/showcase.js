@@ -1,4 +1,4 @@
-/* Josh Freeman's VR World - Wampum World Showcase gallery (public), a wing under the forecourt next to the banking-hall vault.
+/* Fowling Pond - Wampum World Showcase gallery (public), a wing under the forecourt next to the banking-hall vault.
    Reached by the "LIFT - Wampum World Showcase" pad in the banking hall, or "Wampum World showcase" in the menus.
    Products/texts/prices/links come from w3d/showcase/showcase.json (images are 512 px JPEG). Concept display; the shop is wampumworld.com. */
 (function () {

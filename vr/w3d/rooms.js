@@ -1,4 +1,4 @@
-/* Josh Freeman's VR World - exhibit rooms north of the banking hall.
+/* Fowling Pond - exhibit rooms north of the banking hall.
    Two rooms, entered through the doorways in the hall's north wall:
      Propulsion & Energy hall  (x 924-945, z -401..-428)
      UFO / UAP history room     (x 945-966, z -401..-428)

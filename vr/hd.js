@@ -1,4 +1,4 @@
-/* HD rendering helpers for Josh's VR World.
+/* HD rendering helpers for Fowling Pond.
    - hd-renderer (on <a-scene>): renders the headset view at a higher resolution
      (WebXR framebuffer scale) and turns off foveated (blurry-edge) rendering.
    - hd-sky (on an entity): a high-resolution 360 photo sphere with sharp texture

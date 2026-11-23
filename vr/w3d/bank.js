@@ -1,4 +1,4 @@
-/* Josh Freeman's VR World - the gold Egyptian bank ("central command"): quality pass, vault hall and account board.
+/* Fowling Pond - the gold Egyptian bank ("central command"): quality pass, vault hall and account board.
    Concept rendering only: not a real bank, account, balance or engineering design.
    Textures: procedural art (w3d/tex/*.jpg made with numpy, or drawn on canvas) plus CC0 photo PBR sets from ambientCG in w3d/tex/pbr. */
 (function () {

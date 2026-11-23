@@ -14,7 +14,7 @@ const W3D = window.W3D = window.W3D || {};
 const LITE = !!window.JFVR_LITE;
 const MARS_URL = 'https://redplanetlounge.pages.dev/?spot=pad&from=joshfreeman-vr';
 const HOME = {x: 1000, z: -447, yaw: 0};      // bank lawn north of the exhibit rooms (x 924-967, z -401..-428); flat terrain at y 34
-const RAD = 9, FLOOR = 2.02, NSEAT = 6, SEAT_R = 3.4, COUNT = 10000;
+const RAD = 9, FLOOR = 2.02, NSEAT = 6, SEAT_R = 3.4, COUNT = 3000;
 const v3 = new THREE.Vector3(), q4 = new THREE.Quaternion();
 const smooth = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -125,8 +125,8 @@ function makeModel() {
   consoleTop = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.75, 0.12, 32), M.console); consoleTop.position.y = FLOOR + 1.06; G.add(consoleTop);
   const holo = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.02, 6, 48), M.glowA); holo.rotation.x = Math.PI / 2; holo.position.y = FLOOR + 1.45; G.add(holo); G.userData.holo = holo;
   const ct = canvasTex(1024, 96, () => {}); ct.wrapS = THREE.RepeatWrapping; ct.repeat.set(3, 1);
-  cdBand = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.26, 48, 1, true), new THREE.MeshBasicMaterial({map: ct, transparent: true, side: THREE.DoubleSide, toneMapped: false, depthWrite: false}));
-  cdBand.position.y = FLOOR + 1.95; cdBand.visible = false; G.add(cdBand);
+  cdBand = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.42, 48, 1, true), new THREE.MeshBasicMaterial({map: ct, transparent: true, side: THREE.DoubleSide, toneMapped: false, depthWrite: false}));
+  cdBand.position.y = FLOOR + 1.5; cdBand.visible = false; G.add(cdBand);
   // 'Board saucer' sign above the ramp
   const st = canvasTex(512, 128, (c, w, h) => { c.fillStyle = 'rgba(8,30,40,0.82)'; c.beginPath(); c.roundRect ? c.roundRect(4, 4, w - 8, h - 8, 26) : c.rect(4, 4, w - 8, h - 8); c.fill(); c.strokeStyle = '#7ff3ff'; c.lineWidth = 6; c.stroke();
     c.fillStyle = '#e9ffff'; c.font = 'bold 60px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('Board saucer', w / 2, h / 2 + 2); });
@@ -211,7 +211,7 @@ function seatWorld(i) { return seatLocal(i).applyMatrix4(ent.object3D.matrixWorl
 function lockTo(p) { const rig = rigEl(), c = camEl(); if (!rig || !c) return; const rp = rig.object3D.position, cw = c.object3D.getWorldPosition(v3); rp.x += p.x - cw.x; rp.z += p.z - cw.z; rp.y = p.y;
   const ph = rig.components['w3d-physics']; if (ph) { ph.prev.copy(rp); ph.vy = 0; } }
 function placeInSeat() { if (mySeat < 0 || !ent) return; ent.object3D.updateMatrixWorld(true); const p = seatWorld(mySeat); lockTo(p);
-  const a = seatAng(mySeat), yaw = pose.yaw + a + Math.PI; const rig = rigEl(); if (rig) rig.object3D.rotation.y = yaw; const lc = camEl() && camEl().components['look-controls']; if (lc && lc.yawObject) lc.yawObject.rotation.y = 0; }
+  const a = seatAng(mySeat), yaw = pose.yaw + a; /* face the console (A-Frame looks down -z) */ const rig = rigEl(); if (rig) rig.object3D.rotation.y = yaw; const lc = camEl() && camEl().components['look-controls']; if (lc && lc.yawObject) lc.yawObject.rotation.y = 0; }
 function board() {
   if (mySeat >= 0) { openMenu(); return; }
   if (S.mode === 'fly' || S.mode === 'away') { hud('The saucer is in flight'); return; }
@@ -261,13 +261,15 @@ function btn(parent, label, w, h, x, y, col, fn, tw) {
   parent.appendChild(b); b.userData = {t}; return b;
 }
 function buildMenu() {
-  menu = document.createElement('a-entity'); menu.setAttribute('position', '0 -1000 0'); ent.appendChild(menu);
+  menu = document.createElement('a-entity'); menu.setAttribute('scale', '0.6 0.6 0.6'); menu.setAttribute('visible', false); ent.appendChild(menu);
   const bg = document.createElement('a-plane'); bg.setAttribute('width', 1.5); bg.setAttribute('height', 1.62); bg.setAttribute('material', 'shader:flat;color:#0b1d26;opacity:0.86;transparent:true'); bg.setAttribute('position', '0 0 -0.01'); menu.appendChild(bg);
   const title = document.createElement('a-text'); title.setAttribute('value', 'Choose a destination'); title.setAttribute('align', 'center'); title.setAttribute('color', '#9ffcff'); title.setAttribute('width', 2.6); title.setAttribute('position', '0 0.7 0'); menu.appendChild(title);
   menu.userData = {tabs: {}, items: [], title};
   [['space', 'Space', -0.47], ['earth', 'Earth', 0], ['here', 'Here', 0.47]].forEach(([id, l, x]) => { menu.userData.tabs[id] = btn(menu, l, 0.44, 0.16, x, 0.5, '#7fd3e0', () => { S.tab = id; renderMenu(); }); });
   for (let i = 0; i < 5; i++) menu.userData.items.push(btn(menu, '', 1.3, 0.15, 0, 0.29 - i * 0.18, '#d8f6ff', () => { const d = menu.userData.list[i]; if (!d || S.mode !== 'parked') return; if (d.id === S.at && d.kind !== 'mars') { hud('The saucer is already here'); return; } bump({dest: d.id}); renderMenu(); }));
-  menu.userData.launch = btn(menu, 'LAUNCH', 1.3, 0.22, 0, -0.66, '#ff9a3c', () => { if (S.mode === 'parked') { if (S.dest === S.at && D(S.dest).kind !== 'mars') { hud('Pick a destination first'); return; } bump({mode: 'count', t0: now()}); } else if (S.mode === 'count') bump({mode: 'parked'}); renderMenu(); }, 3.0);
+  menu.userData.launch = btn(menu, 'LAUNCH', 1.3, 0.22, 0, -0.66, '#ff9a3c', () => { if (mySeat < 0 && S.mode !== 'fly' && S.mode !== 'away') { board(); if (mySeat < 0) return; }
+    console.log('UFO launch press', S.mode, S.at, '->', S.dest, 'seat', mySeat);
+    if (S.mode === 'parked') { if (S.dest === S.at && D(S.dest).kind !== 'mars') { hud('Pick a destination first'); return; } bump({mode: 'count', t0: now()}); closeMenu(); return; } else if (S.mode === 'count') bump({mode: 'parked'}); renderMenu(); }, 3.0);
   menu.userData.leave = btn(menu, 'Leave saucer', 0.62, 0.13, -0.34, -0.9, '#ffd700', () => leave(false), 1.8);
   menu.userData.close = btn(menu, 'Close', 0.62, 0.13, 0.34, -0.9, '#bbbbbb', closeMenu, 1.8);
 }
@@ -284,12 +286,33 @@ function renderMenu() {
 function openMenu() {
   if (!ent) return; if (!menu) buildMenu(); if (S.mode === 'fly' || S.mode === 'away') return;
   const d = D(S.dest); S.tab = d.tab; renderMenu();
-  // above the console, turned towards whoever opened it
-  const cp = camPos(), lp = ent.object3D.worldToLocal(cp.clone()), a = Math.atan2(lp.x, lp.z);
-  menu.object3D.position.set(Math.sin(a) * 0.55, FLOOR + 1.5, Math.cos(a) * 0.55); menu.object3D.rotation.set(0, a, 0); menu.object3D.visible = true; menuOpen = true;
-  document.querySelectorAll('[raycaster]').forEach(r => r.components.raycaster && r.components.raycaster.refreshObjects());
+  // small panel ~1.3 m in front of the viewer, lower and to the right so the forward view stays clear
+  ent.object3D.updateMatrixWorld(true); const cp = camPos(), lp = ent.object3D.worldToLocal(cp.clone()), cam = document.querySelector('a-scene').camera;
+  const f = new THREE.Vector3(); cam.getWorldDirection(f); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize();
+  const iq = ent.object3D.getWorldQuaternion(new THREE.Quaternion()).invert(); f.applyQuaternion(iq); f.y = 0; f.normalize();
+  const r = new THREE.Vector3(-f.z, 0, f.x), P = lp.clone().addScaledVector(f, 1.3).addScaledVector(r, 0.42); P.y = lp.y - 0.45;
+  const a = Math.atan2(-f.x, -f.z);
+  menu.setAttribute('position', P.x + ' ' + P.y + ' ' + P.z); menu.setAttribute('rotation', '-12 ' + (a * 180 / Math.PI - 14) + ' 0'); menu.setAttribute('visible', true); menuOpen = true;
+  setProx(false);
 }
-function closeMenu() { if (!menu) return; menu.object3D.position.set(0, -1000, 0); menuOpen = false; }
+function closeMenu() { if (!menu) return; menu.setAttribute('visible', false); menu.setAttribute('position', '0 -1000 0'); menuOpen = false; setProx(true); }
+// the invisible console / hull click targets must not sit in front of the menu buttons while the menu is open
+function setProx(on) { ['ufo-console', 'ufo-hull'].forEach(id => { const e = document.getElementById(id); if (e) { if (on) e.classList.add('btn'); else e.classList.remove('btn'); } });
+  document.querySelectorAll('[raycaster]').forEach(r => r.components.raycaster && r.components.raycaster.refreshObjects()); }
+/* head-locked countdown (big number ~1.5 m ahead, a little below eye level) + a soft beep each second, for everyone aboard */
+let cdHead = null, actx = null;
+function headCount(n) { const cam = document.querySelector('a-scene') && document.querySelector('a-scene').camera; if (!cam) return;
+  if (!cdHead) { const t = canvasTex(512, 256, () => {}); cdHead = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.31), new THREE.MeshBasicMaterial({map: t, transparent: true, toneMapped: false, depthTest: false, depthWrite: false}));
+    cdHead.position.set(0, -0.18, -1.5); cdHead.renderOrder = 999; cdHead.frustumCulled = false; cam.add(cdHead); }
+  if (n == null) { cdHead.visible = false; return; }
+  const t = cdHead.material.map, c = t.userData.c, g = c.getContext('2d'); g.clearRect(0, 0, 512, 256);
+  g.fillStyle = 'rgba(5,22,30,0.8)'; g.beginPath(); g.roundRect ? g.roundRect(4, 4, 504, 248, 30) : g.rect(4, 4, 504, 248); g.fill(); g.strokeStyle = '#ff9a3c'; g.lineWidth = 6; g.stroke();
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffd27a'; g.font = 'bold 150px Arial, sans-serif'; g.fillText(String(n), 256, 112);
+  g.fillStyle = '#e9ffff'; g.font = 'bold 34px Arial, sans-serif'; g.fillText('Launch to ' + D(S.dest).name + ' in ' + n, 256, 214); t.needsUpdate = true; cdHead.visible = true; }
+function beep(hi) { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume();
+  const o = actx.createOscillator(), gn = actx.createGain(), t = actx.currentTime; o.type = 'sine'; o.frequency.value = hi ? 1320 : 880; gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(0.18, t + 0.02); gn.gain.exponentialRampToValueAtTime(0.0001, t + (hi ? 0.5 : 0.18));
+  o.connect(gn); gn.connect(actx.destination); o.start(t); o.stop(t + 0.55); } catch (e) {} }
+
 
 /* ---------- HTML overlay for phone / desktop while aboard ---------- */
 let ov = null;
@@ -346,8 +369,8 @@ function tick(t, dt) {
   G.userData.holo.rotation.z = ph * 0.8; G.userData.holo.position.y = FLOOR + 1.45 + 0.05 * Math.sin(ph * 1.7);
   sign.visible = mySeat < 0 && (S.mode === 'parked' || S.mode === 'count') && dist < 40 && dist > 5; if (sign.visible && cp) { const lp = ent.object3D.worldToLocal(cp.clone()); sign.rotation.y = Math.atan2(lp.x - sign.position.x, lp.z - sign.position.z); }
   // countdown + seat names
-  if (S.mode === 'count') { const n = Math.max(0, Math.ceil((COUNT - (T - S.t0)) / 1000)); if (n !== lastCount) { lastCount = n; drawBand('LAUNCH TO ' + D(S.dest).name.toUpperCase() + ' IN ' + n + '   '); if (mySeat >= 0) hud('Launch to ' + D(S.dest).name + ' in ' + n + ' s'); if (menuOpen) renderMenu(); if (ov) ov.info.textContent = 'Launch in ' + n + ' s'; } }
-  else if (lastCount !== -1) { lastCount = -1; drawBand(S.mode === 'fly' ? 'EN ROUTE: ' + D(S.to).name.toUpperCase() + '   ' : ''); if (ov) ov.info.textContent = S.mode === 'fly' ? 'Flying to ' + D(S.to).name : ''; if (menuOpen) renderMenu(); }
+  if (S.mode === 'count') { const n = Math.max(0, Math.ceil((COUNT - (T - S.t0)) / 1000)); if (n !== lastCount) { lastCount = n; drawBand('LAUNCH TO ' + D(S.dest).name.toUpperCase() + ' IN ' + n + '   '); if (mySeat >= 0) { headCount(n); beep(n === 0); if (menuOpen) closeMenu(); } if (menuOpen) renderMenu(); if (ov) ov.info.textContent = 'Launch in ' + n + ' s'; } }
+  else if (lastCount !== -1) { lastCount = -1; headCount(null); if (mySeat >= 0 && S.mode === 'fly') beep(true); drawBand(S.mode === 'fly' ? 'EN ROUTE: ' + D(S.to).name.toUpperCase() + '   ' : ''); if (ov) ov.info.textContent = S.mode === 'fly' ? 'Flying to ' + D(S.to).name : ''; if (menuOpen) renderMenu(); }
   if (ov) ov.leave.style.display = S.mode === 'fly' ? 'none' : '';
   if (T - lastSeatDraw > 700) { lastSeatDraw = T; const o = occupied(); for (let i = 0; i < NSEAT; i++) drawTag(seatTags[i], i === mySeat ? '' : o[i] || '', false); }
   if (!act && window.JFMP && JFMP.room) hookMP();
@@ -367,7 +390,7 @@ function build() {
   const prox = (id, geo, y, fn) => { const e = document.createElement('a-entity'); e.setAttribute('class', 'btn'); e.id = id; e.setAttribute('geometry', geo); e.setAttribute('position', '0 ' + y + ' 0');
     e.setAttribute('material', 'shader: flat; transparent: true; opacity: 0; depthWrite: false'); e.addEventListener('click', ev => { const ce = ev.detail && ev.detail.cursorEl, lc = ce && ce.getAttribute && ce.getAttribute('laser-controls'); if (lc && /left/.test(typeof lc === 'string' ? lc : lc.hand)) return; fn(); }); ent.appendChild(e); return e; };
   prox('ufo-hull', 'primitive: cylinder; radius: 9.1; height: 1.9', 1.65, board);
-  prox('ufo-console', 'primitive: cylinder; radius: 1.0; height: 1.6', FLOOR + 0.8, () => { if (mySeat < 0) board(); else openMenu(); });
+  prox('ufo-console', 'primitive: cylinder; radius: 1.0; height: 1.15', FLOOR + 0.575, () => { if (mySeat < 0) board(); else openMenu(); });
   const sg = prox('ufo-sign', 'primitive: plane; width: 3.2; height: 0.8', 5.2, board); sg.object3D.position.z = 11.2;
   sc.addEventListener('bbuttondown', () => { if (menuOpen) closeMenu(); });
 }
