@@ -176,7 +176,11 @@ function sky(grp, o) { const g = new THREE.SphereGeometry(20000, 32, 16), p = g.
   for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).normalize(); const e = v.y; if (e >= 0) col.copy(Hc).lerp(T, Math.pow(Math.min(1, e / 0.6), 0.7)); else col.copy(Hc).lerp(B, Math.min(1, -e * 6));
     if (sd) { const d = Math.max(0, v.dot(sd)); col.lerp(S, Math.min(1, Math.pow(d, 6) * (o.glow || 0.8))); } c[i * 3] = col.r; c[i * 3 + 1] = col.g; c[i * 3 + 2] = col.b; }
   g.setAttribute('color', new THREE.BufferAttribute(c, 3)); const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false})); m.renderOrder = -10; m.frustumCulled = false; grp.add(m);
-  m.onBeforeRender = (r, sc, cam) => { cam.getWorldPosition(v); m.position.copy(grp.worldToLocal(v)); m.updateMatrixWorld(); }; return m; }
+  // QUEST WHITEOUT FIX: never call cam.getWorldPosition() here. In immersive WebXR the renderer passes the per-eye XR camera, which has
+  // no parent; getWorldPosition() -> updateWorldMatrix() rebuilt its matrixWorld (and view matrix) from the bare headset pose, dropping the
+  // rig offset, so every city object after the sky was drawn as if the eye were at the world origin, 85 km away: only the pale sky/fog
+  // showed. Read the eye position straight from matrixWorld instead (no recompute).
+  m.onBeforeRender = (r, sc, cam) => { v.setFromMatrixPosition(cam.matrixWorld); m.position.copy(grp.worldToLocal(v)); m.updateMatrixWorld(); }; return m; }
 const Kit = {LITE, sky, tex, ctex, rnd, merge, xform, box, prism, cap, area, ccw, ribbon, inPoly, polyIndex, trees, lamb, std, water, pad, lights, label3d, dispose, rect, wins, winList, blocks, heightMesh};
 W3D.cities = {def, load, enter, leave, unload, isReady: id => !!(cur && cur.id === id && cur.ready), current: () => cur && cur.id, DEFS, Kit};
 })();

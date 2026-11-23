@@ -207,7 +207,7 @@ function setFloors(on, P) {
 }
 
 /* ---------- riding ---------- */
-let cutWait = 0; let pose = {x: HOME.x, y: 34, z: HOME.z, yaw: 0, tilt: 0, ax: 0, az: 1, ramp: 1, door: 0, fade: 0}, parkedAt = null, fadeM = null, clouds = null, savedFly = null, inCity = null, lastCut = false, navDone = false;
+let cutWait = 0, parkNR = 0; let pose = {x: HOME.x, y: 34, z: HOME.z, yaw: 0, tilt: 0, ax: 0, az: 1, ramp: 1, door: 0, fade: 0}, parkedAt = null, fadeM = null, clouds = null, savedFly = null, inCity = null, lastCut = false, navDone = false;
 const seatLocal = i => { const a = seatAng(i); return new THREE.Vector3(Math.sin(a) * (SEAT_R - 0.5), FLOOR, Math.cos(a) * (SEAT_R - 0.5)); };
 function seatWorld(i) { return seatLocal(i).applyMatrix4(ent.object3D.matrixWorld); }
 function lockTo(p) { const rig = rigEl(), c = camEl(); if (!rig || !c) return; const rp = rig.object3D.position, cw = c.object3D.getWorldPosition(v3); rp.x += p.x - cw.x; rp.z += p.z - cw.z; rp.y = p.y;
@@ -358,6 +358,12 @@ function tick(t, dt) {
     if (curPlan.kind === 'city' && pose.cut !== lastCut) { lastCut = pose.cut; if (pose.cut) { if (D(S.to).kind === 'city') W3D.cities.enter(S.to); else if (W3D.cities) W3D.cities.leave(); } }
     if (curPlan.kind === 'mars' && T - S.t0 > curPlan.dur - 150) goMars();
   }
+  // safety nets: no white fade or cloud deck outside a flight, and a city that never finished loading sends the saucer home
+  if (!(mySeat >= 0 && S.mode === 'fly')) { if (fadeM) fadeM.material.opacity = 0; if (clouds) clouds.visible = false; }
+  if (S.mode === 'parked' && D(S.at) && D(S.at).kind === 'city' && mySeat >= 0 && W3D.cities && !W3D.cities.isReady(S.at)) {
+    if (!parkNR) parkNR = performance.now(); else if (performance.now() - parkNR > 10000) { parkNR = 0; console.warn('saucer: city', S.at, 'not ready 10 s after landing - flying home');
+      hud(D(S.at).name + " didn't load - flying you home"); if (W3D.cities.leave) W3D.cities.leave(); try { bump({dest: 'home', mode: 'count', t0: now()}); } catch (e) { console.warn(e); } } }
+  else parkNR = 0;
   // seated but parked / counting: hop off by walking away, hop on by walking in
   const rp = rigEl() && rigEl().object3D.position;
   if (rp && S.mode !== 'fly' && S.mode !== 'away' && parkedAt) { const d = Math.hypot(rp.x - parkedAt.x, rp.z - parkedAt.z);
