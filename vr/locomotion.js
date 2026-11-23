@@ -19,19 +19,30 @@ AFRAME.registerComponent('thumbstick-move', {
     const fly = window.JFVR && JFVR.fly, up = (window.JFVR && (JFVR.touchUp || JFVR.upAxis)) || 0;
     const boost = gp && ((gp.buttons[0] && gp.buttons[0].value > 0.5) || (gp.buttons[1] && gp.buttons[1].value > 0.5));
     if (fly) {
-      if (!x && !y && Math.abs(up) < 0.2) return;
+      if (!x && !y && Math.abs(up) < 0.2) { this.vv = 0; return; }
       const q = cam.object3D.getWorldQuaternion(new THREE.Quaternion());
       const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q), r = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
       const mag = Math.min(1, Math.hypot(x, y) || Math.abs(up));
-      const p = rig.object3D.position, s = (40 + Math.max(p.y, 0) * 1.0) * (boost ? 15 : 1) * (0.3 + 0.7 * mag) * JFVR.speedMul() * dt / 1000;
+      const p = rig.object3D.position, GA = JFVR.groundAt || (window.W3D && W3D.active && W3D.groundAt) || null, y0 = p.y, gF = GA ? GA(p.x, p.z, y0) : 0;
+      // indoors = a floor slab somewhere above you, or within 10 m of the floor / ground below: slow, no boost
+      const indoor = !!GA && (GA(p.x, p.z, y0 + 30) > gF + 0.5 || y0 - gF < 10), boostOn = boost && !indoor;
+      const s = (40 + Math.max(p.y, 0) * 1.0) * (boostOn ? 15 : 1) * (0.3 + 0.7 * mag) * JFVR.speedMul() * dt / 1000;
       /* horizontal part of the stick always moves you at full speed along the ground plane (so forward/back still works at the height ceiling
          or when looking straight down); only the pitch part of 'forward' changes height */
       const rh = new THREE.Vector3(r.x, 0, r.z); if (rh.lengthSq() < 1e-6) rh.set(1, 0, 0); rh.normalize();
       const fh = new THREE.Vector3(rh.z, 0, -rh.x);
       p.addScaledVector(fh, -y * s).addScaledVector(rh, x * s);
-      p.y += -y * s * f.y;
-      if (Math.abs(up) >= 0.2) p.y += -up * s;
-      p.y = Math.min(Math.max(p.y, JFVR.groundAt ? JFVR.groundAt(p.x, p.z, p.y) + 0.3 : 0), JFVR.flyMaxY || 400);
+      /* vertical has its own, much slower speed (was the horizontal (40 + height) m/s, so ~10 m/s up/down even in the office):
+         ~1.5 m/s indoors / near floors, ~4 m/s in open air (faster only when well above the ground), x Speed setting, eased in */
+      const vin = Math.max(-1, Math.min(1, -y * f.y + (Math.abs(up) >= 0.2 ? -up : 0)));
+      const sc = JFVR.speedMul() / 0.25, hb = y0 - gF;
+      const vmax = indoor ? Math.min(3, 1.5 * sc) : 4 * sc * (1 + Math.max(0, hb - 30) / 30) * (boostOn ? 15 : 1);
+      this.vv = (this.vv || 0) + (vin * vmax - (this.vv || 0)) * Math.min(1, dt / 250);
+      let ny = y0 + this.vv * dt / 1000;
+      if (GA) { // floors and ceilings: no passing through a slab except where there is an opening (no floor rectangle there)
+        if (ny > y0) { const gH = GA(p.x, p.z, ny + 1.95 - 0.65); if (gH > gF + 0.5) { ny = Math.min(ny, Math.max(y0, gH - 1.6 - 1.95)); /* slab top - slab/roof thickness ~1.6 m - head room */ this.vv = 0; } }
+        const gB = GA(p.x, p.z, y0); if (ny < gB + 0.3) { ny = gB + 0.3; if (this.vv < 0) this.vv = 0; } }
+      p.y = Math.min(Math.max(ny, 0), JFVR.flyMaxY || 400);
       const R = JFVR.flyRadius || 400, hr = Math.hypot(p.x, p.z); if (hr > R) { p.x *= R / hr; p.z *= R / hr; }
       JFVR._alt = (JFVR._alt || 0) + dt;
       if (JFVR._alt > 500) { JFVR._alt = 0; JFVR.hud((boost ? 'BOOST - ' : 'Flying - ') + 'height ' + Math.round(p.y) + ' m'); }

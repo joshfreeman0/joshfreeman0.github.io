@@ -849,6 +849,7 @@ function buildOffice() { // top floor of the tower: polished modern-Egyptian, fu
   const ce = new THREE.Mesh(new THREE.PlaneGeometry(S, S), new THREE.MeshStandardMaterial({map: starCeilingTex(), roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2})); ce.rotation.x = Math.PI / 2; ce.position.set(x, fy + Hh - 0.08, z); /* below the roof slab: no flicker */ root.add(ce);
   box(S + 1, 0.8, S + 1, x, fy + Hh, z, M.stone, {collide: false});
   box(S + 2, 0.6, S + 2, x, fy + Hh + 0.8, z, M.stone, {collide: false});
+  floorOnly(S + 2, S + 2, x, fy + Hh + 1.4, z);   // roof top: a slab for fly mode (no flying up through the office ceiling)
   // walls: each side = 4 stone piers + sill + lintel, 5 windows 2.6 m wide
   for (const side of [0, 1, 2, 3]) for (let i = 0; i < 6; i++) {
     const t = -S / 2 + i * (S / 5); const px = side < 2 ? x + t : x + (side === 2 ? -S / 2 : S / 2), pz = side < 2 ? z + (side === 0 ? -S / 2 : S / 2) : z + t;
