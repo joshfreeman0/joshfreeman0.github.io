@@ -52,8 +52,8 @@ function buildMask() {
     const sx = bx.max.x - bx.min.x, sz = bx.max.z - bx.min.z; if (sx > 3000 || sz > 3000) return; rect(bx.min.x, bx.min.z, bx.max.x, bx.max.z, 25); });
   { const a = P(9617, -2976.9); g.beginPath(); g.arc(a[0], a[1], 260 * s, 0, 7); g.fill(); }        // launch pad + tower
   // feather ~3 px (36 m full / 24 m lite)
-  const c2 = document.createElement('canvas'); c2.width = c2.height = MN; const g2 = c2.getContext('2d'); g2.filter = 'blur(3px)'; g2.drawImage(c, 0, 0);
-  const t = new THREE.CanvasTexture(c2); t.generateMipmaps = false; t.minFilter = t.magFilter = THREE.LinearFilter; t.flipY = false; clipU.jfMask.value = t; RE.maskCanvas = c2;
+  const c2 = document.createElement('canvas'); c2.width = c2.height = MN; const g2 = c2.getContext('2d'); g2.filter = 'blur(2px)'; g2.drawImage(c, 0, 0);
+  const t = new THREE.CanvasTexture(c2); t.generateMipmaps = false; t.minFilter = t.magFilter = THREE.LinearFilter; t.flipY = false; clipU.jfMask.value = t; RE.maskCanvas = c2; maskPx = null;
 }
 // mode 1: drop inside the cutouts (Google tiles); mode 2: drop outside (our ground / roads / trees)
 function clipMat(mat, mode) {
@@ -66,7 +66,11 @@ function clipMat(mat, mode) {
       'float jfM() { vec2 u = (vJfW + jfMR) / (2.0 * jfMR); float m = 0.0; if (u.x > 0.0 && u.x < 1.0 && u.y > 0.0 && u.y < 1.0) m = texture2D(jfMask, u).r;\n' +
       ' for (int i = 0; i < 4; i++) { vec4 R = jfRect[i]; if (R.z > 0.0) { vec2 d = abs(vJfW - R.xy) - vec2(R.z); m = max(m, clamp(1.0 - max(d.x, d.y) / R.w, 0.0, 1.0)); } } return m; }\n' +
       'float jfD() { return fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715)))); }\n' +
-      sh.fragmentShader.replace(/void\s+main\s*\(\s*\)\s*\{/, 'void main() {\n if (jfOn > 0.5) { float jm = jfM(), jd = jfD() * 0.98 + 0.01; ' + (mode === 1 ? 'if (jm > jd) discard;' : 'if (jm < jd) discard;') + ' }\n');
+      (function (fs) { fs = fs.replace(/void\s+main\s*\(\s*\)\s*\{/, 'void main() {\n float jm = 0.0; if (jfOn > 0.5) { jm = jfM(); float jd = 0.5 + (jfD() - 0.5) * 0.08; ' + (mode === 1 ? 'if (jm > jd) discard;' : 'if (jm < jd) discard;') + ' }\n');
+        // our ground just inside a cutout edge eases toward the Google ground's colour, so a lawn doesn't read as a pasted-on square
+        if (mode === 2) { const tint = '\n if (jfOn > 0.5) { float je = smoothstep(0.5, 0.9, jm); gl_FragColor.rgb = mix(gl_FragColor.rgb * vec3(0.8, 0.84, 0.72) + vec3(0.015, 0.02, 0.0), gl_FragColor.rgb, je); }\n';
+          fs = fs.indexOf('#include <fog_fragment>') >= 0 ? fs.replace('#include <fog_fragment>', tint + '#include <fog_fragment>') : fs.replace(/\}\s*$/, tint + '}'); }
+        return fs; })(sh.fragmentShader);
   };
   mat.customProgramCacheKey = () => prevKey() + '|jfclip' + mode; mat.needsUpdate = true;
 }
@@ -178,6 +182,39 @@ function addButtons() {
   label();
 }
 
+
+/* ---------- simple collision with Google buildings (outside the cutouts): low-frequency raycasts against the loaded tile meshes ----------
+   ~8 Hz, below 400 m: a downward ray under you and 2 m ahead fills a 2 m height cache; walking treats a tile surface > 2.5 m above our
+   ground and above your knees as a wall (via W3D.cityBlocked, which the world's walk collision already consults); flying, a forward ray
+   along your motion stops you at a facade and a downward ray keeps you on top of a roof. */
+const HC = new Map(), _rc = new THREE.Raycaster(), _o = new THREE.Vector3(), _d = new THREE.Vector3(), _pr = new THREE.Vector3(); let colT = 0, havePrev = false, maskPx = null;
+function maskAt(x, z) { const c = RE.maskCanvas; if (!c) return 0; if (!maskPx) maskPx = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  const u = (x + MR) / (2 * MR), v = (z + MR) / (2 * MR); let m = 0; if (u > 0 && u < 1 && v > 0 && v < 1) m = maskPx[(Math.floor(v * c.height) * c.width + Math.floor(u * c.width)) * 4] / 255;
+  const R = clipU.jfRect.value[0]; if (R.z > 0 && Math.abs(x - R.x) < R.z && Math.abs(z - R.y) < R.z) m = 1; return m; }
+const key = (x, z) => Math.round(x / 2) + ',' + Math.round(z / 2);
+function topAt(x, z, now) { const T = RE.tiles; _rc.set(_o.set(x, 3000, z), _d.set(0, -1, 0)); _rc.far = 6000; const h = _rc.intersectObject(T.group, true)[0]; const y = h ? h.point.y : null;
+  HC.set(key(x, z), {y, t: now}); if (HC.size > 4000) { const it = HC.keys(); for (let i = 0; i < 1000; i++) HC.delete(it.next().value); } return y; }
+function tileBlocked(x, z, y) {
+  if (!oursOn || !RE.tiles) return false; const c = HC.get(key(x, z)); if (!c || c.y === null) return false;
+  const g = W3D.terrainH ? W3D.terrainH(x, z) : 0; return c.y > y + 0.6 && c.y - g > 2.5 && maskAt(x, z) < 0.5; }
+RE.tileBlocked = tileBlocked;
+(function hookCity() { let cb = W3D.cityBlocked || null; const comb = (x, z, y) => (cb ? cb(x, z, y) : false) || tileBlocked(x, z, y);
+  try { Object.defineProperty(W3D, 'cityBlocked', {configurable: true, get: () => comb, set: v => { cb = v; }}); } catch (e) {} })();
+function collide(t, sc) {
+  if (t - colT < 120) return; colT = t; const T = RE.tiles; if (!T || !oursOn) return;
+  const rig = document.getElementById('rig'); if (!rig) return; const P = rig.object3D.position; sc.camera.getWorldPosition(_c);
+  const gnd = W3D.groundAt ? W3D.groundAt(_c.x, _c.z, -1e4) : 0; if (_c.y - gnd > 400 || maskAt(_c.x, _c.z) >= 0.5) { havePrev = false; return; }
+  const yaw = rig.object3D.rotation.y, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  topAt(_c.x, _c.z, t); topAt(_c.x + fx * 2, _c.z + fz * 2, t);
+  if (window.JFVR && JFVR.fly) {
+    if (havePrev) { _d.subVectors(P, _pr); const L = _d.length();
+      if (L > 0.05 && L < 200) { _d.normalize(); const eye = _c.y - P.y; _rc.set(_o.set(_pr.x, _pr.y + eye, _pr.z), _d); _rc.far = L + 1.5;
+        const h = _rc.intersectObject(T.group, true)[0]; if (h && h.point.y - (W3D.terrainH ? W3D.terrainH(h.point.x, h.point.z) : 0) > 2.5) { P.copy(_pr); RE.bumps = (RE.bumps || 0) + 1; } } }
+    const top = HC.get(key(_c.x, _c.z)); if (top && top.y !== null && _c.y < top.y + 1.6 && top.y - gnd > 2.5) P.y += top.y + 1.6 - _c.y;   // stand on the roof
+    _pr.copy(P); havePrev = true;
+  } else havePrev = false;
+}
+
 /* ---------- per frame ---------- */
 const _c = new THREE.Vector3(); let calT = 0, calTries = 0;
 AFRAME.registerSystem('w3d-realearth', {
@@ -206,6 +243,7 @@ AFRAME.registerSystem('w3d-realearth', {
       const f = sc.object3D.fog; if (f && f.far !== undefined) { f.near = Math.max(f.near, (LITE ? 6000 : 14000) + alt * 4); f.far = Math.max(f.far, (LITE ? 20000 : 45000) + alt * 16); }
       const cf = Math.min(4e6, Math.max(60000, 60000 + alt * 40)); if (Math.abs(sc.camera.far - cf) > 2000) { sc.camera.far = cf; sc.camera.updateProjectionMatrix(); }
       const gg = sc.object3D.getObjectByName('globalGround'); if (gg) gg.visible = false;
+      collide(t, sc);
       if (!RE.calDone && RE.anchor !== 'free' && t - calT > 4000 && calTries < 8 && T.visibleTiles && T.visibleTiles.size > 20) { calT = t; calTries++; calibrate(); }
     }
     if (t - attrT > 1500 || !show) { attrT = t; attribution(show); }
