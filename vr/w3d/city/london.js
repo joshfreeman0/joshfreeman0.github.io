@@ -1,6 +1,7 @@
 /* London saucer landing (item 20): the open recreation-ground field beside a hospital campus in east London.
-   All 3D and open data: building footprints, roads, paths, fences, hedges, trees and land use from OpenStreetMap
-   (c) OpenStreetMap contributors, ODbL; ground elevation from EU-DEM 25 m (Copernicus, via OpenTopoData).
+   All 3D and open data: building footprints and heights from Overture Maps Foundation (buildings theme, release 2026-11-18, ODbL),
+   which combines OpenStreetMap footprints and Microsoft Global ML Building Footprints (ODbL); roads, paths, fences, hedges, trees and
+   land use from OpenStreetMap (c) OpenStreetMap contributors, ODbL; ground elevation from EU-DEM 25 m (Copernicus, via OpenTopoData).
    Buildings are extruded footprints with modelled window frames, sills and roofs; terraced houses fill residential
    streets where OSM has no footprints. No names are shown anywhere in the scene. Local frame: pad centre = (0, 0, 0). */
 (function () {
