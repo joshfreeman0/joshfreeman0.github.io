@@ -60,8 +60,16 @@ function build(grp, K, D) {
   // ---------- buildings ----------
   const bbox = P => { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const q of P) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); } return [x0, x1, z0, z1]; };
   const nearRoad = (x, z, m) => { for (const rd of roads) { const w = W[rd.k]; if (w < 2.5) continue; for (let i = 1; i < rd.p.length; i++) { const a = rd.p[i - 1], b = rd.p[i], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / l2)); if (Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t) < w / 2 + m) return true; } } return false; };
-  const blds = D.b.map(b => ({p: b.p, k: b.k, lv: b.lv, h: b.h})), occ = blds.map(b => bbox(b.p));
-  const free = P => { const bb = bbox(P), c = [(bb[0] + bb[1]) / 2, (bb[2] + bb[3]) / 2]; for (let i = 0; i < occ.length; i++) { const o = occ[i]; if (bb[0] < o[1] + 1 && bb[1] > o[0] - 1 && bb[2] < o[3] + 1 && bb[3] > o[2] - 1) { if (i >= D.b.length) return false; if (K.inPoly(c[0], c[1], blds[i].p) || P.some(q => K.inPoly(q[0], q[1], blds[i].p))) return false; } } return true; };
+  // roof blink fix: 58 of the 100 OSM footprints overlap another one (building + building:part outlines, none height-tagged), so both
+  // got the same default height and their roof caps / parapets were coplanar and z-fought (log depth makes polygonOffset useless).
+  // Drop a footprint that lies mostly inside a bigger one with no height of its own, and give every building a tiny distinct
+  // roof-height step so no two caps can ever share a plane.
+  const ovl = (a, c) => Math.max(0, Math.min(a[1], c[1]) - Math.max(a[0], c[0])) * Math.max(0, Math.min(a[3], c[3]) - Math.max(a[2], c[2]));
+  const bbs = D.b.map(b => bbox(b.p)), bar = bb => (bb[1] - bb[0]) * (bb[3] - bb[2]);
+  const keep = D.b.map((b, i) => !(b.h || b.lv) ? !bbs.some((o, j) => j !== i && bar(o) > bar(bbs[i]) && ovl(o, bbs[i]) > 0.6 * bar(bbs[i]) && K.inPoly((bbs[i][0] + bbs[i][1]) / 2, (bbs[i][2] + bbs[i][3]) / 2, D.b[j].p)) : true);
+  const blds = D.b.filter((b, i) => keep[i]).map((b, i) => ({p: b.p, k: b.k, lv: b.lv, h: b.h, eps: (i % 9) * 0.07})), occ = blds.map(b => bbox(b.p));
+  const nOSM = blds.length; W3D.londonDeduped = D.b.length - nOSM;
+  const free = P => { const bb = bbox(P), c = [(bb[0] + bb[1]) / 2, (bb[2] + bb[3]) / 2]; for (let i = 0; i < occ.length; i++) { const o = occ[i]; if (bb[0] < o[1] + 1 && bb[1] > o[0] - 1 && bb[2] < o[3] + 1 && bb[3] > o[2] - 1) { if (i >= nOSM) return false; if (K.inPoly(c[0], c[1], blds[i].p) || P.some(q => K.inPoly(q[0], q[1], blds[i].p))) return false; } } return true; };
   // terraced houses along residential streets where OSM has no footprints
   const resPolys = D.a.filter(a => a.k === 'residential').map(a => a.p); let nh = 0; const HMAX = L ? 170 : 380;
   roads.filter(rd => rd.k === 'residential' || rd.k === 'unclassified').forEach(rd => { for (let i = 1; i < rd.p.length && nh < HMAX; i++) { const a = rd.p[i - 1], b = rd.p[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (l < 12) continue; const dx = (b[0] - a[0]) / l, dz = (b[1] - a[1]) / l;
@@ -76,10 +84,13 @@ function build(grp, K, D) {
     let y0 = 1e9; for (const q of P) y0 = Math.min(y0, H(q[0], q[1])); y0 -= 0.3;
     const modern = !b.gen && A > 300 && P.some(q => Math.hypot(q[0] - ENT[0], q[1] - ENT[1]) < 60), old = !b.gen && !modern && (b.k === 'hospital' || A > 420);
     if (b.k === 'roof') { geo.flat.push(K.cap(P, y0 + 3.4, 4)); for (const q of [P[0], P[Math.floor(P.length / 2)]]) geo.render.push(K.box(0.25, 3.4, 0.25, q[0], y0, q[1])); return; }
-    const lv = b.lv || (b.k === 'storage_tank' ? 0 : b.k === 'hospital' ? 3 : A > 420 && !modern ? 3 : 2), h = b.h || (lv ? lv * 3.1 + 0.6 : 9);
+    const lv = b.lv || (b.k === 'storage_tank' ? 0 : b.k === 'hospital' ? 3 : A > 420 && !modern ? 3 : 2), h = (b.h || (lv ? lv * 3.1 + 0.6 : 9)) + (b.eps || 0);
     const wm = b.gen ? 'brown' : modern ? 'buff' : old ? 'red' : 'brown';
-    geo[wm].push(K.prism(P, y0, h + 0.3, {su: 1.2, sv: 1.2}));
-    if (modern) geo.render.push(K.prism(P, y0 + h - 0.2, 1.0, {su: 1, sv: 1}));   // rendered parapet band
+    // ROOF BLINK FIX: the white rendered parapet band of the modern blocks used to overlap the top 0.5 m of the brick wall and the
+    // brick parapet on the very same faces (coplanar), so the roof line flickered white / brick. The wall now stops where the band
+    // starts, and modern blocks get no second parapet prism.
+    geo[wm].push(K.prism(P, y0, modern ? h - 0.2 : h + 0.3, {su: 1.2, sv: 1.2}));
+    if (modern) geo.render.push(K.prism(P, y0 + h - 0.2, 1.0, {su: 1, sv: 1}));   // rendered parapet band (cap sits 0.5 m below its top)
     coll.push({p: P, y0: y0, top: y0 + h + 2});
     const bb = bbox(P);
     if (b.gen || (A < 320 && P.length <= 6)) {   // pitched (gable) roof
@@ -91,7 +102,7 @@ function build(grp, K, D) {
       const uvs = rg.attributes.uv; for (let i = 0; i < uvs.count; i++) uvs.setXY(i, uvs.getX(i) * 0.5, uvs.getY(i) * 0.5);
       const mu = (u0 + u1) / 2, mv = (v0 + v1) / 2; rg.rotateY(Math.PI / 2 - ang); rg.translate(cx + mu * ca - mv * sa, y0 + h + 0.3, cz + mu * sa + mv * ca);
       geo[old ? 'slate' : 'tiles'].push(rg);
-    } else { geo.flat.push(K.cap(P, y0 + h + 0.3, 6)); geo[wm].push(K.prism(P, y0 + h + 0.3, 0.7, {su: 1.2, sv: 1.2})); }
+    } else { geo.flat.push(K.cap(P, y0 + h + 0.3, 6)); if (!modern) geo[wm].push(K.prism(P, y0 + h + 0.3, 0.7, {su: 1.2, sv: 1.2})); }
     if (!lv || Math.min(...P.map(q => Math.hypot(q[0], q[1]))) > winR) return;
     for (const w of K.winList(P, y0 + 0.15, lv, {step: winStep, fh: 3.1, sx: modern ? 1.6 : 1})) win.push(w);
   });

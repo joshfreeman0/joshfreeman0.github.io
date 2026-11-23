@@ -36,7 +36,7 @@ AFRAME.registerComponent('thumbstick-move', {
          ~1.5 m/s indoors / near floors, ~4 m/s in open air (faster only when well above the ground), x Speed setting, eased in */
       const vin = Math.max(-1, Math.min(1, -y * f.y + (Math.abs(up) >= 0.2 ? -up : 0)));
       const sc = JFVR.speedMul() / 0.25, hb = y0 - gF;
-      const vmax = indoor ? Math.min(3, 1.5 * sc) : 4 * sc * (1 + Math.max(0, hb - 30) / 30) * (boostOn ? 15 : 1);
+      const vmax = indoor ? Math.min(3, 1.5 * sc) : 4 * sc * (1 + Math.min(1.5, Math.max(0, hb - 150) / 200)) * (boostOn ? 15 : 1);
       this.vv = (this.vv || 0) + (vin * vmax - (this.vv || 0)) * Math.min(1, dt / 250);
       let ny = y0 + this.vv * dt / 1000;
       if (GA) { // floors and ceilings: no passing through a slab except where there is an opening (no floor rectangle there)

@@ -7,7 +7,7 @@
 const W3D = window.W3D = window.W3D || {};
 const LITE = !!window.JFVR_LITE;
 const DEFS = {   // origin = landing pad centre (local 0,0,0); yaw = direction the saucer ramp faces (rad)
-  london:    {name: 'London',        x: 60000,  z: 60000, yaw: Math.PI, v: 1},
+  london:    {name: 'London',        x: 60000,  z: 60000, yaw: Math.PI, v: 2},
   saintjohn: {name: 'Saint John NB', x: 80000,  z: 60000, yaw: 0, v: 1},
   boston:    {name: 'Boston',        x: 100000, z: 60000, yaw: 0, v: 1},
   bangkok:   {name: 'Bangkok',       x: 120000, z: 60000, yaw: 0, v: 1},
