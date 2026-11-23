@@ -15,7 +15,7 @@ const floors = [];   // {x0,x1,z0,z1,y}
 const walls = [];    // {x0,x1,z0,z1,y0,y1}
 W3D.floors = floors; W3D.walls = walls;
 
-const RINGS = {mid: {n: 193, R: 6144, img: LITE ? 'ring_mid_lite.jpg?v=2' : 'ring_mid.jpg?v=2', name: 'ring-mid', h: null}, far: {n: 129, R: 16384, img: LITE ? 'ring_far_lite.jpg?v=2' : 'ring_far.jpg?v=2', name: 'ring-far', h: null}};
+const RINGS = {mid: {n: 193, R: 6144, img: LITE ? 'ring_mid_lite.jpg?v=3' : 'ring_mid.jpg?v=2', name: 'ring-mid', h: null}, far: {n: 129, R: 16384, img: LITE ? 'ring_far_lite.jpg?v=2' : 'ring_far.jpg?v=2', name: 'ring-far', h: null}};
 function ringH(x, z) {
   for (const L of [RINGS.mid, RINGS.far]) {
     if (!L.h || Math.abs(x) > L.R || Math.abs(z) > L.R) continue;
@@ -284,6 +284,21 @@ const _shrunk = new WeakMap();
 W3D.liteTex = liteTex;
 function liteTextures(obj) { obj.traverse(o => { for (const m of o.material ? [].concat(o.material) : []) for (const k in m) if (m[k] && m[k].isTexture) liteTex(m[k], (k === 'map' || k === 'emissiveMap') && m[k].wrapS !== THREE.RepeatWrapping ? 1024 : 512); }); }   // signs/text 1024 px, tiling art and normal/roughness maps 512 px   // colour 1024 px, normal/roughness 512 px
 W3D.liteTextures = liteTextures;
+/* Item 15 (lite): once a texture is on the GPU and has stayed unchanged for 20 s, drop its CPU-side source (canvas backing store,
+   ImageBitmap, decoded <img>) and keep a 1x1 stand-in. Dynamic textures (uploaded more than once, or flagged userData.keep) and small
+   canvases (< 256x256, e.g. labels that redraw) are left alone. */
+const _fr = {seen: new Map(), freed: 0, bytes: 0, last: 0}; W3D.freeStats = _fr;
+function freeSources(renderer, scene3, now) {
+  if (now - _fr.last < 4000) return; _fr.last = now; const P = renderer.properties, one = document.createElement('canvas'); one.width = one.height = 1;
+  scene3.traverse(o => { for (const m of o.material ? [].concat(o.material) : []) for (const k in m) { const t = m[k]; if (!t || !t.isTexture || t.userData.keep || t.userData.freed || t.isCubeTexture || t.isDataTexture || t.isVideoTexture || t.isRenderTargetTexture) continue;
+    const im = t.image; if (!im || Array.isArray(im)) continue; const isBmp = typeof ImageBitmap !== 'undefined' && im instanceof ImageBitmap, isCan = im.tagName === 'CANVAS', isImg = im.tagName === 'IMG';
+    if (!isBmp && !isCan && !isImg) continue; const w = im.width || 0, h = im.height || 0; if (isCan && w * h < 256 * 256) continue;
+    const pr = P.get(t); if (!pr || !pr.__webglTexture || pr.__version !== t.version) continue;
+    if (t.version > 1 && !isImg && !isBmp) { t.userData.keep = 1; continue; }   // redrawn canvas: keep
+    const s0 = _fr.seen.get(t.uuid); if (!s0 || s0.v !== t.version) { _fr.seen.set(t.uuid, {v: t.version, t: now}); continue; } if (now - s0.t < 20000) continue;
+    t.userData.freed = {w, h}; _fr.freed++; _fr.bytes += w * h * 4; _fr.seen.delete(t.uuid);
+    if (isBmp && im.close) im.close(); if (isCan) { im.width = 1; im.height = 1; } t.image = one; } }); }
+W3D.freeSources = freeSources;
 if (LITE) { const ld = THREE.TextureLoader.prototype.load; THREE.TextureLoader.prototype.load = function (url, onLoad, onProgress, onError) {
   return ld.call(this, url, t => { if (!/ortho_|ring_/.test(url)) { const c = liteShrink(t.image, /_nrm|_rgh/.test(url) ? 512 : 1024); if (c) { t.image = c; t.needsUpdate = true; } } t.anisotropy = Math.min(t.anisotropy || 1, 4); t.userData.lite = 1; if (onLoad) onLoad(t); }, onProgress, onError); }; }
 W3D.build = function (scene3, sceneEl) {
@@ -358,6 +373,7 @@ function buildTerrain() {
   const p = geo.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, heights[i]);
   geo.computeVertexNormals();
   const t = new THREE.TextureLoader().load(BASE + (LITE ? 'ortho_t_lite.jpg?v=7' : 'ortho_t.jpg?v=6')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = LITE ? 4 : 16;
+  if (LITE) { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; }   // item 15: no mip chain on the big lite photo (-25% of its GPU memory)
   // sharper ground near the compound and pond: 0.5 m/px USGS tile (x -324..1724, z -1249..799) + fine detail texture that fades in within ~200 m
   const hi = LITE ? t : new THREE.TextureLoader().load(BASE + 'ortho_hi_t.jpg?v=6'); hi.colorSpace = THREE.SRGBColorSpace; if (!LITE) hi.anisotropy = 16;   // lite: no 0.5 m tile (hiRect moved off the map)
   const det = detailTex(), grs = pbr('grass_col', true), grn = LITE ? null : pbr('grass_nrm');   // photo lawn (CC0) instead of the drawn blades
@@ -406,7 +422,7 @@ function ringLayer(L, inner) {
   // clip 22: until its photo has loaded (a 4096 px JPEG takes a while to decode on the Quest) a ring tile drew with an empty texture,
   // i.e. black / dark purple slabs in the distance. It now shows a neutral land colour and switches to the photo once it is ready.
   const mat = new THREE.MeshLambertMaterial({color: 0x6d7a5a}); mat.name = 'ring-placeholder';
-  const t = new THREE.TextureLoader().load(BASE + L.img, tx => { mat.map = tx; mat.color.set(0xffffff); mat.name = ''; mat.needsUpdate = true; });
+  const t = new THREE.TextureLoader().load(BASE + L.img, tx => { if (LITE && L.name === 'ring-mid') { tx.generateMipmaps = false; tx.minFilter = THREE.LinearFilter; } mat.map = tx; mat.color.set(0xffffff); mat.name = ''; mat.needsUpdate = true; });
   t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   const m = new THREE.Mesh(g, mat); m.name = L.name; m.userData.photo = t; root.add(m); return m;
 }
@@ -1015,7 +1031,7 @@ const keys = {};
 document.addEventListener('keydown', e => { keys[e.code] = true; }); document.addEventListener('keyup', e => { keys[e.code] = false; });
 AFRAME.registerComponent('w3d-keys', { tick: function (t, dt) { if (!W3D.active || !JFVR.fly || !dt) return; const p = this.el.object3D.position, s = (W3D.flyVSpeed || 30) * dt / 1000; if (keys.Space) p.y += s; if (keys.ShiftLeft || keys.ShiftRight) p.y -= s; if (W3D.waterNormal) {} } });
 const _cp = new THREE.Vector3(); let _sf = 0;
-AFRAME.registerComponent('w3d-anim', { tick: function (t, dt) { if (W3D.waterU) W3D.waterU.wT.value = t / 1000; if (!W3D.active) return; if (W3D.tickWildlife) W3D.tickWildlife(t, dt); if (W3D.tickRooms) W3D.tickRooms(t, dt);
+AFRAME.registerComponent('w3d-anim', { tick: function (t, dt) { if (W3D.waterU) W3D.waterU.wT.value = t / 1000; if (LITE && this.el.sceneEl.renderer) freeSources(this.el.sceneEl.renderer, this.el.sceneEl.object3D, t); if (!W3D.active) return; if (W3D.tickWildlife) W3D.tickWildlife(t, dt); if (W3D.tickRooms) W3D.tickRooms(t, dt);
   const r = this.el.renderer, N = r && r.xr && r.xr.isPresenting ? (W3D.xrSlow ? 0 : 90) : 12; if (r && N && ++_sf % N === 0) r.shadowMap.needsUpdate = true; /* headset: rare shadow refreshes, none while frames run late */
   if (W3D.sky && this.el.camera) { this.el.camera.getWorldPosition(_cp); W3D.sky.position.copy(_cp); } } });
 // lifts between hall and office
