@@ -6,7 +6,8 @@
    streets where OSM has no footprints. No names are shown anywhere in the scene. Local frame: pad centre = (0, 0, 0). */
 (function () {
 'use strict';
-W3D.cityModules.london = (grp, K) => fetch('/vr/w3d/city/london.json?v=2').then(r => r.json()).then(D => build(grp, K, D));
+W3D.cityModules.london = (grp, K) => Promise.all([fetch('/vr/w3d/city/london.json?v=2').then(r => r.json()), fetch('/vr/w3d/city/london_out.json?v=1').then(r => r.ok ? r.json() : null).catch(() => null)])
+  .then(([D, O]) => { const out = build(grp, K, D); if (O) { try { buildOuter(grp, K, O, out, out.ground); } catch (e) { console.warn('london outer', e); } } return out; });
 function build(grp, K, D) {
   const L = K.LITE, R = 470, out = {R: 3000, fog: L ? [0xc3c9cf, 90, 560] : [0xc3c9cf, 120, 680], sky: 0xc6ccd2};
   const r = K.rnd(42), UP = new THREE.Vector3(0, 1, 0);
@@ -158,5 +159,156 @@ function build(grp, K, D) {
   K.lights(grp, {sky: 0xe3e8ee, ground: 0x5d6450, hi: 1.25, si: 0.55, dx: -60, dy: 200, dz: 120});
   W3D.londonInfo = out.info = {buildings: D.b.length, fromOSM: D.b.filter(b => b.src === 'osm').length, fromML: D.b.filter(b => b.src === 'ml').length, heightTagged: D.b.filter(b => b.h).length, courtyards: holes.length, terraces: nh, trees: trees.length, lamps: lamps.length, cars: cars.length, windows: win.length, walk: D.walk, lat: D.lat, lon: D.lon};
   return out;
+}
+/* Outer London around the hospital field (Goodmayes plan, Nov 23): ground 470 m - 2.4 km from EU-DEM 25 m (Copernicus, via OpenTopoData)
+   with a land-use tint (OpenStreetMap, ODbL) - never Google imagery; Tier 2 buildings 470 m - 1.2 km (Overture Maps 2026-11-18, ODbL:
+   footprints, heights, hipped roofs on terraces, unlabelled shopfront bands along the High Road); Tier 3 1.2 - 2 km as blocks (desktop,
+   fewer on Quest, none on lite); the main line ~1 km south (4 tracks, ballast, overhead line portals and wires, platforms and canopies,
+   a station footbridge, two looping 9-car white/purple trains); parks with trees, lakes; unlabelled landmarks (a water tower, spires,
+   domes and minarets at places of worship from OSM). Nothing is named. Merged by material: ~14 draw calls. */
+function buildOuter(grp, K, O, out, Hin) {
+  const L = K.LITE, QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent) || /[?&]quest=1/.test(location.search), RIN = 470, GE = 2400, UP = new THREE.Vector3(0, 1, 0), r = K.rnd(77);
+  const g = O.g, n = g.n, cheb = (x, z) => Math.max(Math.abs(x), Math.abs(z));
+  const rawO = (x, z) => { const fx = Math.max(0, Math.min(n - 1.001, (x - g.x0) / g.s)), fz = Math.max(0, Math.min(n - 1.001, (z - g.z0) / g.s)), i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, h = (a, b) => g.h[b * n + a];
+    return (h(i, j) * (1 - u) + h(i + 1, j) * u) * (1 - v) + (h(i, j + 1) * (1 - u) + h(i + 1, j + 1) * u) * v; };
+  const H = (x, z) => { const c = cheb(x, z); if (c <= RIN - 40) return Hin(x, z); if (c >= RIN + 40) return rawO(x, z); const k = (c - RIN + 40) / 80, s = k * k * (3 - 2 * k), xi = Math.max(-RIN, Math.min(RIN, x)), zi = Math.max(-RIN, Math.min(RIN, z)); return Hin(xi, zi) * (1 - s) + rawO(x, z) * s; };
+  out.ground = H;
+  // remove the old flat skirt
+  grp.children.slice().forEach(o => { if (o.geometry && o.geometry.type === 'RingGeometry') { grp.remove(o); o.geometry.dispose(); } });
+  const waters = (O.w || []).filter(w => w.p.length >= 3).map(w => { let y = 1e9; w.p.forEach(p => { y = Math.min(y, rawO(p[0], p[1])); }); return {p: w.p, y: y + 0.1}; });
+  const inWater = (x, z) => { for (const w of waters) if (K.inPoly(x, z, w.p)) return w; return null; };
+  // ---------- ground ring + tint ----------
+  const GS = L ? 80 : 40, GN = Math.round(2 * GE / GS) + 1, gp = [], guv = [], gi = [], vid = new Int32Array(GN * GN).fill(-1);
+  for (let j = 0; j < GN; j++) for (let i = 0; i < GN; i++) { const x = -GE + i * GS, z = -GE + j * GS; if (cheb(x, z) < RIN - GS - 1) continue; const w = inWater(x, z);
+    vid[j * GN + i] = gp.length / 3; gp.push(x, w ? w.y - 0.8 : cheb(x, z) <= RIN + 1 ? Math.min(H(x, z), Hin(Math.max(-RIN, Math.min(RIN, x)), Math.max(-RIN, Math.min(RIN, z)))) - 0.15 : H(x, z), z); guv.push((x + GE) / (2 * GE), 1 - (z + GE) / (2 * GE)); }
+  for (let j = 1; j < GN; j++) for (let i = 1; i < GN; i++) { const a = vid[(j - 1) * GN + i - 1], b = vid[(j - 1) * GN + i], c = vid[j * GN + i - 1], d = vid[j * GN + i]; if (a < 0 || b < 0 || c < 0 || d < 0) continue;
+    const cx = -GE + (i - 0.5) * GS, cz = -GE + (j - 0.5) * GS; if (cheb(cx, cz) < RIN - 2) continue; gi.push(a, c, b, b, c, d); }
+  const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3)); gg.setAttribute('uv', new THREE.Float32BufferAttribute(guv, 2)); gg.setIndex(gi); gg.computeVertexNormals();
+  const TS = L ? 1024 : 2048, P2 = p => [(p[0] + GE) / (2 * GE) * TS, (p[1] + GE) / (2 * GE) * TS], px = TS / (2 * GE);
+  const COL = {park: '#7d9955', grass: '#83995a', pitch: '#6c9a49', wood: '#4d6334', scrub: '#6a7640', cemetery: '#76885a', allotments: '#8a8c55', retail: '#8d8a84', railway: '#7b7466'};
+  const ord = ['retail', 'railway', 'grass', 'park', 'cemetery', 'allotments', 'scrub', 'wood', 'pitch'];
+  const land = K.ctex(TS, TS, c => { c.fillStyle = '#8b9270'; c.fillRect(0, 0, TS, TS);
+    const poly = (p) => { c.beginPath(); p.forEach((q, i) => { const s = P2(q); i ? c.lineTo(s[0], s[1]) : c.moveTo(s[0], s[1]); }); c.closePath(); };
+    O.a.slice().sort((a, b) => ord.indexOf(a.k) - ord.indexOf(b.k)).forEach(a => { if (!COL[a.k]) return; c.fillStyle = COL[a.k]; poly(a.p); c.fill(); });
+    c.strokeStyle = '#5c5f61'; c.lineCap = c.lineJoin = 'round';
+    for (const rd of O.r) { c.lineWidth = Math.max(1, ({trunk: 13, primary: 11, secondary: 9, tertiary: 8, residential: 6.5, service: 4}[rd.k] || 5.5) * px); c.beginPath(); rd.p.forEach((q, i) => { const s = P2(q); i ? c.lineTo(s[0], s[1]) : c.moveTo(s[0], s[1]); }); c.stroke(); }
+    c.strokeStyle = '#6d665c'; c.lineWidth = Math.max(1, 4 * px); for (const t of O.rail) { c.beginPath(); t.p.forEach((q, i) => { const s = P2(q); i ? c.lineTo(s[0], s[1]) : c.moveTo(s[0], s[1]); }); c.stroke(); }
+    c.fillStyle = '#4b6470'; waters.forEach(w => { poly(w.p); c.fill(); });
+    const rr = K.rnd(9); for (let i = 0; i < TS * 4; i++) { c.fillStyle = 'rgba(' + (rr() < 0.5 ? '40,50,20' : '170,170,140') + ',' + (rr() * 0.06) + ')'; c.fillRect(rr() * TS, rr() * TS, 2, 2); } });
+  land.wrapS = land.wrapT = THREE.ClampToEdgeWrapping; land.anisotropy = 8;
+  const ground = new THREE.Mesh(gg, K.lamb({map: land})); ground.name = 'london-outer-ground'; grp.add(ground);
+  const far = new THREE.Mesh(new THREE.RingGeometry(GE * 1.414 - 60, 9000, L ? 64 : 128, L ? 10 : 24), K.lamb({color: 0x7f8f5e})); far.rotation.x = -Math.PI / 2; far.position.y = rawO(0, -GE) - 1.5; grp.add(far);
+  let gmin = 1e9; for (let i = 1; i < gp.length; i += 3) gmin = Math.min(gmin, gp[i]);   // fill plane under the grid; subdivided (huge triangles fog to a flat colour with the log depth buffer)
+  const sq = new THREE.Mesh(new THREE.PlaneGeometry(2 * GE + 200, 2 * GE + 200, L ? 16 : 40, L ? 16 : 40), K.lamb({color: 0x7f8f5e})); sq.rotation.x = -Math.PI / 2; sq.position.y = gmin - 2; grp.add(sq);
+  // water
+  if (waters.length) { const wv = []; for (const w of waters) { const P = K.ccw(w.p), tr = THREE.ShapeUtils.triangulateShape(P.map(p => new THREE.Vector2(p[0], p[1])), []); for (const t of tr) for (const k of [t[0], t[2], t[1]]) wv.push(P[k][0], w.y, P[k][1]); }
+    const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wv, 3)); wg.computeVertexNormals(); const wm = new THREE.Mesh(wg, K.std({color: 0x4f6b74, roughness: 0.35, metalness: 0.0})); wm.name = 'london-lakes'; grp.add(wm); }
+  // ---------- buildings ----------
+  const wp = [], wn = [], wu = [], wc = [], rp = [], rn = [], rc = [], col = new THREE.Color(), coll = [];
+  const PAL = {h: ['#b39a70', '#a05a43', '#d2c8b2', '#e4ded0', '#8a6048', '#c4a27a', '#9b6a4e'], o: ['#bdb4a4', '#9c8f80', '#c9c2b5', '#a7765c'], c: ['#a9adb0', '#c3c0b8', '#8f969c'], m: ['#d9d2c4', '#c8b8a0'], w: ['#c9b79a'], s: ['#8d8f91']};
+  const RPAL = {pitch: ['#575c63', '#8a4a36', '#6b4a3e', '#4e5257'], flat: ['#76797c', '#8a8c8e', '#6a6e70']};
+  const pick = a => a[Math.floor(r() * a.length)];
+  const pushC = (arr, hex, k) => { col.set(hex); for (let i = 0; i < k; i++) arr.push(col.r, col.g, col.b); };
+  function walls(P, y0, h, hex, tex) { P = K.ccw(P); let u = 0; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], Lw = Math.hypot(b[0] - a[0], b[1] - a[1]); if (Lw < 0.3) continue; const nx = (b[1] - a[1]) / Lw, nz = -(b[0] - a[0]) / Lw;
+      const q = [[a[0], y0, a[1], u, 0], [b[0], y0, b[1], u + Lw, 0], [b[0], y0 + h, b[1], u + Lw, h], [a[0], y0 + h, a[1], u, h]];
+      for (const k of [0, 2, 1, 0, 3, 2]) { wp.push(q[k][0], q[k][1], q[k][2]); wn.push(nx, 0, nz); wu.push(tex ? q[k][3] / 3.2 : 0.02, tex ? q[k][4] / 3 : 0.02); } u += Lw; pushC(wc, hex, 6); } }
+  function flat(P, y, hex) { P = K.ccw(P); const tri = THREE.ShapeUtils.triangulateShape(P.map(p => new THREE.Vector2(p[0], p[1])), []); for (const t of tri) for (const k of [t[0], t[2], t[1]]) { rp.push(P[k][0], y, P[k][1]); rn.push(0, 1, 0); } pushC(rc, hex, tri.length * 3); }
+  const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
+  function tri(A, B, C, hex) { _a.set(B[0] - A[0], B[1] - A[1], B[2] - A[2]); _b.set(C[0] - A[0], C[1] - A[1], C[2] - A[2]); _c.crossVectors(_a, _b).normalize(); if (_c.y < 0) { const t = B; B = C; C = t; _c.negate(); }
+    rp.push(...A, ...B, ...C); for (let i = 0; i < 3; i++) rn.push(_c.x, _c.y, _c.z); pushC(rc, hex, 3); }
+  function hip(o, y, hex) { let [cx, cz, e1, e2, ang] = o; if (e2 > e1) { const t = e1; e1 = e2; e2 = t; ang += Math.PI / 2; } const a = e1 / 2 + 0.3, b = e2 / 2 + 0.3, rr2 = Math.max(0, a - b), hh = b * 0.72, su = Math.sin(ang), cu = Math.cos(ang);
+    const W = (l, s, yy) => [cx + l * su + s * cu, y + yy, cz + l * cu - s * su]; const c1 = W(-a, -b, 0), c2 = W(a, -b, 0), c3 = W(a, b, 0), c4 = W(-a, b, 0), R1 = W(-rr2, 0, hh), R2 = W(rr2, 0, hh);
+    tri(c1, c2, R2, hex); tri(c1, R2, R1, hex); tri(c3, c4, R1, hex); tri(c3, R1, R2, hex); tri(c2, c3, R2, hex); tri(c4, c1, R1, hex); }
+  const sfp = [], sfn = [], sfc = [];
+  function band(P, y0, y1, off, hexf) { P = K.ccw(P); for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], Lw = Math.hypot(b[0] - a[0], b[1] - a[1]); if (Lw < 3) continue; const nx = (b[1] - a[1]) / Lw, nz = -(b[0] - a[0]) / Lw, ox = nx * off, oz = nz * off;
+      const q = [[a[0] + ox, y0, a[1] + oz], [b[0] + ox, y0, b[1] + oz], [b[0] + ox, y1, b[1] + oz], [a[0] + ox, y1, a[1] + oz]]; for (const k of [0, 2, 1, 0, 3, 2]) { sfp.push(...q[k]); sfn.push(nx, 0, nz); } pushC(sfc, hexf(), 6); } }
+  const SHOP = ['#c0392b', '#1f5f99', '#2e7d4f', '#d9a520', '#6c3483', '#222831', '#e67e22', '#117a8b'];
+  let b2 = O.b2; if (L) b2 = b2.filter(b => cheb(b.p[0][0], b.p[0][1]) < 850 && Math.abs(K.area(b.p)) > 40); else if (QUEST) b2 = b2.filter(b => cheb(b.p[0][0], b.p[0][1]) < 1000 && Math.abs(K.area(b.p)) > 30);
+  for (const b of b2) { let cx = 0, cz = 0; b.p.forEach(p => { cx += p[0]; cz += p[1]; }); cx /= b.p.length; cz /= b.p.length; const y0 = H(cx, cz);
+    const hex = pick(PAL[b.k] || PAL.o); walls(b.p, y0 - 0.6, b.h + 0.6, hex, true);
+    if (b.o && !L && !(QUEST && cheb(b.p[0][0], b.p[0][1]) > 700)) hip(b.o, y0 + b.h, pick(RPAL.pitch)); else flat(b.p, y0 + b.h, b.k === 'h' ? pick(RPAL.pitch) : pick(RPAL.flat));
+    if (b.sf) { band(b.p, y0 + 0.2, y0 + 2.9, 0.06, () => '#1d2328'); const sh = pick(SHOP); band(b.p, y0 + 2.9, y0 + 3.6, 0.1, () => sh); }
+    coll.push({p: b.p, y0: y0 - 0.6, top: y0 + b.h}); }
+  let b3 = L ? [] : O.b3; if (QUEST) b3 = b3.filter(b => b[2] * b[3] > 140 || b[5] >= 10).slice(0, 1200);
+  for (const b of b3) { const [cx, cz, e1, e2, ang, h, , res] = b, su = Math.sin(ang), cu = Math.cos(ang), a = e1 / 2, bb = e2 / 2, y0 = H(cx, cz);
+    const P = [[-a, -bb], [a, -bb], [a, bb], [-a, bb]].map(([l, s]) => [cx + l * su + s * cu, cz + l * cu - s * su]);
+    walls(P, y0 - 0.6, h + 0.6, pick(res ? PAL.h : PAL.o), true); if (res && h < 12) hip([cx, cz, e1, e2, ang], y0 + h, pick(RPAL.pitch)); else flat(P, y0 + h, pick(RPAL.flat)); }
+  const winT = K.ctex(64, 64, c => { c.fillStyle = '#ffffff'; c.fillRect(0, 0, 64, 64); c.fillStyle = '#2b3238'; c.fillRect(17, 16, 30, 30); c.fillStyle = '#e8e4dc'; c.fillRect(17, 46, 30, 3); c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(0, 62, 64, 2); });
+  winT.wrapS = winT.wrapT = THREE.RepeatWrapping; winT.anisotropy = 4;
+  const mk = (p, n2, c, uv) => { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(n2, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(c, 3)); if (uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.computeBoundingSphere(); return geo; };
+  const wallM = new THREE.Mesh(mk(wp, wn, wc, wu), K.lamb({map: winT, vertexColors: true})); wallM.name = 'london-outer-walls'; grp.add(wallM);
+  const roofM = new THREE.Mesh(mk(rp, rn, rc), K.lamb({vertexColors: true, side: THREE.DoubleSide})); roofM.name = 'london-outer-roofs'; grp.add(roofM);
+  if (sfp.length) { const s = new THREE.Mesh(mk(sfp, sfn, sfc), K.lamb({vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2})); grp.add(s); }
+  // ---------- roads (ribbons for the main roads; the rest are painted into the ground tint) ----------
+  const RW = {trunk: 13, primary: 11, secondary: 9, tertiary: 8, residential: 6.5, unclassified: 6, living_street: 5};
+  const roads = O.r.filter(rd => RW[rd.k] && (!L || rd.k !== 'residential' && rd.k !== 'unclassified') && rd.p.some(p => cheb(p[0], p[1]) < (L ? 1300 : 2100)));
+  if (roads.length) { const rg = K.merge(roads.map(rd => K.ribbon(rd.p, RW[rd.k], (x, z) => H(x, z), {y: 0.12, su: 6}))); const rm = new THREE.Mesh(rg, K.lamb({color: 0x55585b, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1})); rm.name = 'london-outer-roads'; grp.add(rm); }
+  // ---------- railway ----------
+  const SP = (O.spine || []).filter(p => cheb(p[0], p[1]) < GE + 200);
+  const mains = O.rail.filter(t => t.p.some(p => cheb(p[0], p[1]) < GE));
+  if (mains.length) {
+    const bal = K.merge(mains.map(t => K.ribbon(t.p, 3.6, (x, z) => H(x, z), {y: 0.22, su: 4}))); grp.add(new THREE.Mesh(bal, K.lamb({color: 0x77706a, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2})));
+    if (!L) { const rails = []; mains.forEach(t => { rails.push(K.ribbon(t.p, 0.14, (x, z) => H(x, z), {y: 0.42, off: -0.72}), K.ribbon(t.p, 0.14, (x, z) => H(x, z), {y: 0.42, off: 0.72})); });
+      grp.add(new THREE.Mesh(K.merge(rails), K.std({color: 0x8a8d90, metalness: 0.8, roughness: 0.35, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3}))); }
+  }
+  // spine helpers (arc length), OLE portals + wires, trains
+  const S = []; let tot = 0; for (let i = 0; i < SP.length; i++) { if (i) tot += Math.hypot(SP[i][0] - SP[i - 1][0], SP[i][1] - SP[i - 1][1]); S.push(tot); }
+  const at = (s, off) => { s = Math.max(0, Math.min(tot - 0.01, s)); let i = 1; while (i < S.length - 1 && S[i] < s) i++; const a = SP[i - 1], b = SP[i], k = (s - S[i - 1]) / ((S[i] - S[i - 1]) || 1), dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1;
+    const x = a[0] + dx * k - dz / l * off, z = a[1] + dz * k + dx / l * off; return {x, z, y: H(x, z), yaw: Math.atan2(dx, dz)}; };
+  if (SP.length > 2) {
+    const ole = [], wires = []; let prev = null;
+    for (let s = 20; s < tot - 20; s += 60) { const c = at(s, 0); const parts = [K.box(0.35, 7.6, 0.35, -9.5, 0, 0), K.box(0.35, 7.6, 0.35, 9.5, 0, 0), K.box(19.4, 0.4, 0.3, 0, 7.2, 0)];
+      const pg = K.merge(parts); pg.rotateY(c.yaw + Math.PI / 2); pg.translate(c.x, c.y, c.z); ole.push(pg);
+      const now = [-6, -2, 2, 6].map(o => at(s, o)); if (prev) for (let k = 0; k < 4; k++) wires.push(prev[k].x, prev[k].y + 5.6, prev[k].z, now[k].x, now[k].y + 5.6, now[k].z); prev = now; }
+    if (ole.length && !L) grp.add(new THREE.Mesh(K.merge(ole), K.lamb({color: 0x6f7378})));
+    if (wires.length) { const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(wires, 3)); grp.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({color: 0x2a2d30}))); }
+  }
+  // platforms + canopies (near station nodes), footbridge at the station due south of the field
+  const sts = O.lm.filter(m => m.k === 'st'), plats = [], cans = [];
+  for (const p of O.plat) { const closed = p.length > 3 && Math.hypot(p[0][0] - p[p.length - 1][0], p[0][1] - p[p.length - 1][1]) < 1; let cx = 0, cz = 0; p.forEach(q => { cx += q[0]; cz += q[1]; }); cx /= p.length; cz /= p.length; if (cheb(cx, cz) > GE) continue; const y = H(cx, cz);
+    if (closed) { const P = p.slice(0, -1); plats.push(K.cap(P, y + 1.0, 4)); const wg = K.prism(P, y - 0.3, 1.3, {}); plats.push(wg); if (sts.some(s => Math.hypot(s.x - cx, s.z - cz) < 220)) cans.push(K.cap(P, y + 4.3, 4)); }
+    else plats.push(K.ribbon(p, 4, () => y + 1.0, {y: 0})); }
+  if (plats.length) grp.add(new THREE.Mesh(K.merge(plats), K.lamb({color: 0xa29e96})));
+  if (cans.length) grp.add(new THREE.Mesh(K.merge(cans), K.lamb({color: 0x9aa3ab, side: THREE.DoubleSide})));
+  if (SP.length > 2 && sts.length) { const st = sts.reduce((a, b) => Math.hypot(a.x, a.z) < Math.hypot(b.x, b.z) ? a : b); let bs = 0, bd = 1e9; for (let s = 0; s < tot; s += 10) { const c = at(s, 0), d = Math.hypot(c.x - st.x, c.z - st.z); if (d < bd) { bd = d; bs = s; } }
+    const c = at(bs, 0), fb = K.merge([K.box(3, 0.5, 34, 0, 7, 0), K.box(3, 1.2, 0.12, 0, 7.5, 0).translate(1.45, 0, 0), K.box(3.4, 8, 3.4, 0, 0, -17), K.box(3.4, 8, 3.4, 0, 0, 17)]); fb.rotateY(c.yaw + Math.PI / 2); fb.translate(c.x, c.y, c.z);
+    grp.add(new THREE.Mesh(fb, K.lamb({color: 0x5d6a74}))); }
+  // trains: 2 x 9 cars, instanced, looping (one each way)
+  let trains = null;
+  if (SP.length > 2) { const cg = (() => { const parts = []; const add = (w, h, d, x, y, z, hex) => { const b = K.box(w, h, d, x, y, z).toNonIndexed(); const cc = new THREE.Color(hex), a = new Float32Array(b.attributes.position.count * 3); for (let i = 0; i < a.length; i += 3) { a[i] = cc.r; a[i + 1] = cc.g; a[i + 2] = cc.b; } b.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(b); };
+      add(2.8, 3.1, 22.4, 0, 0.9, 0, 0xe9eaec); add(2.84, 0.9, 21.6, 0, 2.15, 0, 0x22282e); add(2.86, 0.18, 22.4, 0, 1.3, 0, 0x6950a1); add(2.86, 2.0, 1.3, 0, 1.0, -5.5, 0x6950a1); add(2.86, 2.0, 1.3, 0, 1.0, 5.5, 0x6950a1); add(2.2, 0.6, 20, 0, 0.3, 0, 0x2a2a2a); return K.merge(parts); })();
+    const NC = 9, im = new THREE.InstancedMesh(cg, K.lamb({vertexColors: true}), NC * 2); im.frustumCulled = false; im.name = 'london-trains'; grp.add(im);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
+    trains = {im, place(t) { const V = 24, cyc = tot + 900; for (let k = 0; k < 2; k++) { const s0 = ((t / 1000 * V + k * cyc * 0.45) % cyc) - 300;
+        for (let i = 0; i < NC; i++) { const s = k ? tot - (s0 - i * 23.4) : s0 - i * 23.4, inside = s > 0 && s < tot; const c = at(s, k ? -2 : 2), c2 = at(s + 3, k ? -2 : 2);
+          q.setFromAxisAngle(UP, Math.atan2(c2.x - c.x, c2.z - c.z) || c.yaw); m4.compose(v.set(c.x, (c.y + c2.y) / 2 + 0.45, c.z), q, inside ? one : v.clone().set(0.0001, 0.0001, 0.0001)); im.setMatrixAt(k * NC + i, m4); } }
+      im.instanceMatrix.needsUpdate = true; }}; trains.place(0); }
+  // ---------- parks: trees ----------
+  const TMAX = L ? 250 : QUEST ? 600 : 1500, tl = [];
+  const tps = O.a.filter(a => a.k === 'park' || a.k === 'wood' || a.k === 'scrub' || a.k === 'cemetery');
+  for (const a of tps) { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; a.p.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); z0 = Math.min(z0, p[1]); z1 = Math.max(z1, p[1]); });
+    const st2 = a.k === 'wood' ? 14 : 30; for (let x = x0; x < x1; x += st2) for (let z = z0; z < z1; z += st2) { if (tl.length >= TMAX * 3) break; const xx = x + (r() - 0.5) * st2, zz = z + (r() - 0.5) * st2; if (cheb(xx, zz) < RIN + 5 || !K.inPoly(xx, zz, a.p) || inWater(xx, zz) || r() < (a.k === 'wood' ? 0.1 : 0.45)) continue; tl.push([xx, H(xx, zz), zz, 0.8 + r() * 0.6]); } }
+  for (let i = tl.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = tl[i]; tl[i] = tl[j]; tl[j] = t; }
+  const TL = tl.slice(0, TMAX);
+  if (TL.length) { const crown = new THREE.IcosahedronGeometry(3.4, 0); crown.translate(0, 6.2, 0); const trunk = new THREE.CylinderGeometry(0.25, 0.35, 3.6, 5); trunk.translate(0, 1.8, 0);
+    const ci = new THREE.InstancedMesh(crown, K.lamb({color: 0x4f6e35, flatShading: true}), TL.length), ti = new THREE.InstancedMesh(trunk, K.lamb({color: 0x5a4632}), TL.length), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), s3 = new THREE.Vector3(), cc = new THREE.Color();
+    TL.forEach((t, i) => { q.setFromAxisAngle(UP, r() * 6.28); m4.compose(v.set(t[0], t[1], t[2]), q, s3.set(t[3], t[3] * (0.85 + r() * 0.4), t[3])); ci.setMatrixAt(i, m4); ti.setMatrixAt(i, m4); ci.setColorAt(i, cc.setHSL(0.24 + r() * 0.06, 0.35 + r() * 0.15, 0.25 + r() * 0.1)); });
+    grp.add(ci, ti); }
+  // ---------- landmarks (unlabelled) ----------
+  const lmk = [], gold = [];
+  for (const m of O.lm) { if (cheb(m.x, m.z) < RIN) continue; const y = H(m.x, m.z);
+    if (m.k === 'wt') { lmk.push(K.xform(new THREE.CylinderGeometry(2.4, 3, 26, 10), m.x, y + 13, m.z), K.xform(new THREE.CylinderGeometry(7.5, 6, 8, 16), m.x, y + 30, m.z), K.xform(new THREE.CylinderGeometry(7.8, 7.8, 0.6, 16), m.x, y + 34.3, m.z)); }
+    else if (m.k === 'w') {
+      if (m.rel === 'c') lmk.push(K.box(4.5, 16, 4.5, m.x, y, m.z), K.xform(new THREE.ConeGeometry(3, 14, 8), m.x, y + 23, m.z));
+      else if (m.rel === 'm') { gold.push(K.xform(new THREE.SphereGeometry(5.5, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), m.x, y + 9, m.z)); lmk.push(K.xform(new THREE.CylinderGeometry(0.9, 1.1, 26, 8), m.x + 8, y + 13, m.z), K.xform(new THREE.ConeGeometry(1.2, 3.5, 8), m.x + 8, y + 27.7, m.z)); }
+      else if (m.rel === 's') gold.push(K.xform(new THREE.SphereGeometry(4.5, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), m.x, y + 9, m.z));
+      else if (m.rel === 'h') lmk.push(K.xform(new THREE.ConeGeometry(4, 13, 6), m.x, y + 14, m.z)); } }
+  if (lmk.length) grp.add(new THREE.Mesh(K.merge(lmk), K.lamb({color: 0xb7ab98})));
+  if (gold.length) grp.add(new THREE.Mesh(K.merge(gold), K.std({color: 0xd9cfae, roughness: 0.45, metalness: 0.25})));
+  // ---------- collision, fog, tick ----------
+  const ob = K.polyIndex(coll, 25), inner = out.blocked; out.blocked = inner ? (x, z, y) => inner(x, z, y) || (cheb(x, z) > RIN - 30 && ob(x, z, y)) : ob;
+  out.fog = L ? [0xc3c9cf, 250, 1500] : QUEST ? [0xc3c9cf, 350, 2300] : [0xc3c9cf, 450, 2900];
+  const prevTick = out.tick; out.tick = (t, dt) => { if (prevTick) prevTick(t, dt); if (trains) trains.place(t); };
+  out.outer = {b2: b2.length, b3: b3.length, roads: roads.length, trees: TL.length, lakes: waters.length, landmarks: O.lm.length};
 }
 })();

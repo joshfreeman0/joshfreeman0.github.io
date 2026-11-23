@@ -49,7 +49,7 @@ AFRAME.registerSystem('w3d-roam', {
     if (!W3D.active || !sc.camera) { if (ground) ground.visible = false; return; }
     sc.camera.getWorldPosition(_cp);
     const gnd = W3D.groundAt ? W3D.groundAt(_cp.x, _cp.z, -1e4) : 0, alt = Math.max(0, _cp.y - (isFinite(gnd) ? gnd : 0)), far = Math.hypot(_cp.x, _cp.z);
-    if (ground) ground.visible = !W3D.spaceView && (alt > 400 || far > 9000);   // spaceView: rocket trip in deep space (launch.js / transit.js)
+    if (ground) ground.visible = !W3D.spaceView && !(W3D.root && W3D.root.visible === false) && (alt > 400 || far > 9000);   // hidden inside a city (its own far ground)   // spaceView: rocket trip in deep space (launch.js / transit.js)
     // fog / far plane stretch with height (only touch them when the height changed noticeably)
     if (sc.object3D.fog === W3D.fog && W3D.fog && !W3D.launchFlight && (Math.abs(alt - lastAlt) > 20 || t - (this.fogT || 0) > 500)) { lastAlt = alt; this.fogT = t;
       // near the edge of the 16 km terrain at low height keep the old edge haze; higher up the fog opens out with height
