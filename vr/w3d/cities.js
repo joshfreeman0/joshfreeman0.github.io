@@ -43,11 +43,12 @@ function load(id) {
   return c.p;
 }
 let saved = null;
+const _cv = new THREE.Vector3();
 function enterScene() {
   const s3 = document.querySelector('a-scene').object3D, m = cur.mod;
   if (!saved) saved = {fog: s3.fog, bg: s3.background, env: s3.environment, R: JFVR.flyRadius, Y: JFVR.flyMaxY}; s3.environment = null;
   if (W3D.root) W3D.root.visible = false;
-  cur.fog = new THREE.Fog(m.fog ? m.fog[0] : 0xb9c2cc, m.fog ? m.fog[1] : 150, m.fog ? m.fog[2] : 900);
+  cur.fog = new THREE.Fog(m.fog ? m.fog[0] : 0xb9c2cc, m.fog ? m.fog[1] : 150, m.fog ? m.fog[2] : 900); cur.fog0 = [cur.fog.near, cur.fog.far];
   s3.fog = cur.fog; s3.background = new THREE.Color(m.sky || (m.fog ? m.fog[0] : 0xb9c2cc));
   JFVR.flyRadius = 1e7; JFVR.flyMaxY = 1e5; cur.grp.visible = true;
 }
@@ -59,7 +60,12 @@ function exitScene() {
 function enter(id) { if (!cur || cur.id !== id) load(id); cur.entered = true; if (cur.ready) enterScene(); }
 function leave() { unload(); }
 // moved far away from the city (menu teleport, etc.): dispose it
-AFRAME.registerSystem('w3d-cities', { tick: function (t, dt) { if (cur && cur.entered && cur.ready && cur.mod.tick) cur.mod.tick(t, Math.min(dt || 16, 100)); if (!cur || !cur.entered || t - (this.lt || 0) < 1000) return; this.lt = t;
+AFRAME.registerSystem('w3d-cities', { tick: function (t, dt) { if (cur && cur.entered && cur.ready && cur.mod.tick) cur.mod.tick(t, Math.min(dt || 16, 100));
+  // London whiteout fix: the city fog (e.g. London 120..680 m) is a street-level haze. Seen from the saucer's descent (up to ~1.5 km up) or
+  // flying, everything was further than the fog's far distance and the whole view was the flat fog colour. Open the fog with height.
+  if (cur && cur.entered && cur.ready && cur.fog && cur.fog0) { const c = document.querySelector('[camera]'); if (c) { const p = c.object3D.getWorldPosition(_cv), d = DEFS[cur.id];
+    const gy = cur.mod.ground ? (cur.mod.ground(p.x - d.x, p.z - d.z) || 0) : 0, alt = Math.max(0, p.y - gy - 25);
+    cur.fog.near = cur.fog0[0] + alt * 1.2; cur.fog.far = cur.fog0[1] + alt * 3.2; } } if (!cur || !cur.entered || t - (this.lt || 0) < 1000) return; this.lt = t;
   const c = document.querySelector('[camera]'); if (!c) return; const p = c.object3D.getWorldPosition(new THREE.Vector3()), d = DEFS[cur.id];
   const dd = Math.hypot(p.x - d.x, p.z - d.z); if (dd < 2500) cur.near = true; else if (cur.near && dd > 3000 && !(W3D.saucer && W3D.saucer.seat() >= 0 && W3D.saucer.S.mode === 'fly')) unload(); } });
 

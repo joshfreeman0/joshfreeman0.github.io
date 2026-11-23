@@ -174,12 +174,14 @@ function plan(fromId, toId) {
     at(t) { const s = t / 1000; let y = A.y; if (s > 3) y += 40 * smooth((s - 3) / 4); if (s > 7) y += 4000 * Math.pow((s - 7) / 12, 2.2);
       return {x: A.x, y, z: A.z, yaw: A.yaw, tilt: 0, ax: 0, az: 1, ramp: s < 2 ? 1 - s / 2 : 0, door: smooth((s - 1.2) / 1.6), fade: smooth((s - 16.5) / 2.3), fadeCol: 0x000000, dark: smooth((s - 9) / 8), cut: false}; } };
   if (dk === 'city' || fk === 'city') {
-    const hd = Math.atan2(B.x - A.x, B.z - A.z), dx = Math.sin(hd), dz = Math.cos(hd), H = 1600, run = 1300;
-    return {kind: 'city', dur: 36000, A, B,
-      at(t) { const s = t / 1000; let x, y, z, yaw, tilt = 0, cut = s >= 18, fade = 0;
-        if (!cut) { const c = smooth((s - 8) / 10); x = A.x + dx * run * c; z = A.z + dz * run * c; y = A.y + (s > 3 ? 50 * smooth((s - 3) / 5) : 0) + (H - 50) * Math.pow(Math.max(0, (s - 8) / 10), 1.6); yaw = A.yaw; tilt = 0.12 * Math.sin(Math.PI * Math.min(1, Math.max(0, (s - 7) / 11))); fade = smooth((s - 16.4) / 1.6); }
-        else { const c = smooth((s - 18) / 12); x = B.x - dx * run * (1 - c); z = B.z - dz * run * (1 - c); y = B.y + 2 + (H - 2) * Math.pow(1 - smooth((s - 18) / 14), 1.3); yaw = B.yaw; tilt = 0.1 * Math.max(0, 1 - (s - 18) / 10); fade = 1 - smooth((s - 18) / 1.6); if (s > 32) y = B.y + 2 * (1 - smooth((s - 32) / 2)); }
-        return {x, y, z, yaw, tilt, ax: dz, az: -dx, ramp: s < 2 ? 1 - s / 2 : s > 34 ? (s - 34) / 2 : 0, door: s < 34 ? smooth((s - 1.2) / 1.6) : 1 - smooth((s - 34) / 1.2), fade, fadeCol: 0xf2f4f7, cloud: true, cut}; } };
+    // 15 s city flights (Josh, 1:26 AM): ramp up 0-1 s, climb 1.5-3 s, rise + run out 3-7 s (white cloud fade 6.2-7 s), cut, descent 7-12.6 s,
+    // settle 12.6-13.3 s, ramp down 13.3-15 s
+    const hd = Math.atan2(B.x - A.x, B.z - A.z), dx = Math.sin(hd), dz = Math.cos(hd), H = 1400, run = 900;
+    return {kind: 'city', dur: 15000, A, B,
+      at(t) { const s = t / 1000; let x, y, z, yaw, tilt = 0, cut = s >= 7, fade = 0;
+        if (!cut) { const c = smooth((s - 3) / 4); x = A.x + dx * run * c; z = A.z + dz * run * c; y = A.y + (s > 1.5 ? 50 * smooth((s - 1.5) / 1.5) : 0) + (H - 50) * Math.pow(Math.max(0, (s - 3) / 4), 1.6); yaw = A.yaw; tilt = 0.12 * Math.sin(Math.PI * Math.min(1, Math.max(0, (s - 2.5) / 4.5))); fade = smooth((s - 6.2) / 0.8); }
+        else { const c = smooth((s - 7) / 5); x = B.x - dx * run * (1 - c); z = B.z - dz * run * (1 - c); y = B.y + 2 + (H - 2) * Math.pow(1 - smooth((s - 7) / 5.6), 1.3); yaw = B.yaw; tilt = 0.1 * Math.max(0, 1 - (s - 7) / 4); fade = 1 - smooth((s - 7) / 0.9); if (s > 12.6) y = B.y + 2 * (1 - smooth((s - 12.6) / 0.7)); }
+        return {x, y, z, yaw, tilt, ax: dz, az: -dx, ramp: s < 1 ? 1 - s : s > 13.3 ? Math.min(1, (s - 13.3) / 1.7) : 0, door: s < 13.3 ? smooth((s - 0.5) / 1.0) : 1 - smooth((s - 13.3) / 1.0), fade, fadeCol: 0xf2f4f7, cloud: true, cut}; } };
   }
   const dist = Math.hypot(B.x - A.x, B.z - A.z), Tc = Math.min(30, Math.max(6, dist / 110)), hd = Math.atan2(B.x - A.x, B.z - A.z), dx = Math.sin(hd), dz = Math.cos(hd);
   const T1 = 3, T2 = T1 + 5, T3 = T2 + Tc, T4 = T3 + 6, dur = (T4 + 2.2) * 1000, hop = Math.min(220, 30 + dist * 0.12);
@@ -205,7 +207,7 @@ function setFloors(on, P) {
 }
 
 /* ---------- riding ---------- */
-let pose = {x: HOME.x, y: 34, z: HOME.z, yaw: 0, tilt: 0, ax: 0, az: 1, ramp: 1, door: 0, fade: 0}, parkedAt = null, fadeM = null, clouds = null, savedFly = null, inCity = null, lastCut = false, navDone = false;
+let cutWait = 0; let pose = {x: HOME.x, y: 34, z: HOME.z, yaw: 0, tilt: 0, ax: 0, az: 1, ramp: 1, door: 0, fade: 0}, parkedAt = null, fadeM = null, clouds = null, savedFly = null, inCity = null, lastCut = false, navDone = false;
 const seatLocal = i => { const a = seatAng(i); return new THREE.Vector3(Math.sin(a) * (SEAT_R - 0.5), FLOOR, Math.cos(a) * (SEAT_R - 0.5)); };
 function seatWorld(i) { return seatLocal(i).applyMatrix4(ent.object3D.matrixWorld); }
 function lockTo(p) { const rig = rigEl(), c = camEl(); if (!rig || !c) return; const rp = rig.object3D.position, cw = c.object3D.getWorldPosition(v3); rp.x += p.x - cw.x; rp.z += p.z - cw.z; rp.y = p.y;
@@ -350,7 +352,7 @@ function tick(t, dt) {
   // passenger: seat lock, fades, clouds, city hand-over, Mars
   if (mySeat >= 0 && S.mode === 'fly' && curPlan) {
     ent.object3D.updateMatrixWorld(true); lockTo(seatWorld(mySeat));
-    if (fadeM) { let f = pose.fade || 0; if (pose.cut && curPlan.kind === 'city' && D(S.to).kind === 'city' && !W3D.cities.isReady(S.to)) f = 1; fadeM.material.color.setHex(pose.fadeCol || 0); fadeM.material.opacity = f; }
+    if (fadeM) { let f = pose.fade || 0; if (pose.cut && curPlan.kind === 'city' && D(S.to).kind === 'city' && !W3D.cities.isReady(S.to)) { if (!cutWait) cutWait = performance.now(); f = performance.now() - cutWait < 5000 ? 1 : 0; if (f === 0) hud('Still loading ' + D(S.to).name + '...'); } else cutWait = 0; fadeM.material.color.setHex(pose.fadeCol || 0); fadeM.material.opacity = f; }
     if (pose.dark) darkSky(pose.dark);
     if (clouds) { const ref = pose.cut ? curPlan.B : curPlan.A; clouds.position.set(pose.x, ref.y + 1250, pose.z); clouds.visible = pose.y - ref.y > 700; }
     if (curPlan.kind === 'city' && pose.cut !== lastCut) { lastCut = pose.cut; if (pose.cut) { if (D(S.to).kind === 'city') W3D.cities.enter(S.to); else if (W3D.cities) W3D.cities.leave(); } }

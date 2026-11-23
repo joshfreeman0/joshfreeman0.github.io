@@ -225,10 +225,15 @@ function startFlight() {
   const yAt = t => { const base = PAD.top + 0.6 + DECK; if (t < T.count) return base; const u = t - T.count; return base + 0.5 * 9 * u * u + (u > 6 ? 0.5 * 40 * (u - 6) * (u - 6) : 0); }; // smooth, increasing acceleration
   if (patch && patch.rocket) patch.rocket.visible = false;
   function finish(toMars) {
-    if (done) return; done = true; const tEnd = performance.now();
-    const fadeOut = () => { const k = Math.min(1, (performance.now() - tEnd) / 700); fade.material.opacity = Math.max(fade.material.opacity, k); if (k < 1) return requestAnimationFrame(fadeOut); toMars ? goMars() : restore(); };
-    fadeOut();
+    // Quest fix: window.requestAnimationFrame does not fire during an immersive WebXR session (only the session's rAF does), so the old
+    // rAF-driven fade froze on its first frame and goMars()/restore() never ran. The fade now steps from the A-Frame tick (which runs on
+    // the XR session's frame loop) with a setTimeout fallback that always completes it.
+    if (done) return; done = true; ending = {t: performance.now(), toMars, fin: false};
+    stepEnd(); setTimeout(endNow, 900);
   }
+  let ending = null;
+  function stepEnd() { if (!ending || ending.fin) return; const k = Math.min(1, (performance.now() - ending.t) / 700); fade.material.opacity = Math.max(fade.material.opacity, k); if (k >= 1) endNow(); }
+  function endNow() { if (!ending || ending.fin) return; ending.fin = true; fade.material.opacity = 1; ending.toMars ? goMars() : restore(); }
   function restore() {
     rig.removeAttribute('w3d-ride'); sc.removeEventListener('bbuttondown', onB); window.removeEventListener('keydown', onKey);
     [bSkip, bCancel].forEach(b => b.parentNode && b.parentNode.removeChild(b)); ov.remove();
@@ -240,7 +245,7 @@ function startFlight() {
   }
   const black = new THREE.Color(0x000004), fogC = new THREE.Color(saved.fogCol), tan = new THREE.Color(0xc99a73);
   flight = {tick: () => {
-    if (done) return;
+    if (done) { stepEnd(); return; }
     const t = (performance.now() - t0) / 1000, cw = cam.getWorldPosition(new THREE.Vector3());
     // fade in at start, a short fade at the space -> Mars-descent cut, fade out at touchdown
     let fo = t < 0.8 ? 1 - t / 0.8 : 0; if (t > T.cruise - 0.8 && t < T.cruise + 0.8) fo = 1 - Math.abs(t - T.cruise) / 0.8; fade.material.opacity = fo;

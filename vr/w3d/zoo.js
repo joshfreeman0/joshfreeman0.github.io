@@ -111,9 +111,16 @@ function loadAnimals() {
   if (loading || !THREE.GLTFLoader) return; loading = true; const loader = new THREE.GLTFLoader(), cache = {};
   const get = f => cache[f] || (cache[f] = fetch('/vr/w3d/zoo/' + f + '.glb?v=1').then(r => r.arrayBuffer()));
   const place = (e, file, n, h) => get(file).then(buf => { for (let i = 0; i < n; i++) loader.parse(buf.slice(0), '', gl => {
-    const o = gl.scene, box = new THREE.Box3().setFromObject(o), sz = box.getSize(new THREE.Vector3()), s = h / (sz.y || 1); o.scale.setScalar(s);
+    // size from the skinned pose: these rigs (Quaternius AnimalArmature / Armature) keep ~3 cm bind-space meshes under a x100 armature, so
+    // the bounding box has to come from the posed vertices after the bones' world matrices exist (the old un-updated, non-precise box
+    // was ~400x too big, which shrank every animal to ~1 cm). Then ground the posed feet on the terrain.
+    const o = gl.scene; o.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(o, true), sz = box.getSize(new THREE.Vector3());
+    let s = sz.y > 1e-4 ? h / sz.y : 1; if (!(s > 0.02 && s < 50)) s = 1;
+    o.scale.setScalar(s);
     const p = e.poly, u = (Math.random() * 2 - 1) * 6 - 1, v = (Math.random() * 2 - 1) * 10, x = p.cx + p.ux * u + p.vx * v, z = p.cz + p.uz * u + p.vz * v;
-    o.position.set(x, gh(x, z) - box.min.y * s, z); o.rotation.y = Math.random() * Math.PI * 2;
+    o.rotation.y = Math.random() * Math.PI * 2; o.position.set(x, 0, z); o.updateMatrixWorld(true);
+    const b2 = new THREE.Box3().setFromObject(o, true); o.position.y = gh(x, z) - b2.min.y + 0.02; o.userData.zooH = +(b2.max.y - b2.min.y).toFixed(2);
     o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.frustumCulled = false; } });
     W3D.zoo.root.add(o); W3D.zoo.animals++;
     const clips = gl.animations || [], pick = clips.find(c => /Eating/.test(c.name) && Math.random() < 0.4) || clips.find(c => /(^|\|)Idle$/.test(c.name)) || clips.find(c => /Idle/.test(c.name)) || clips[0];
