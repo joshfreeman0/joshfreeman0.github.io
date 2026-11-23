@@ -15,7 +15,8 @@ const LITE = !!window.JFVR_LITE, QUEST = /OculusBrowser|Quest/i.test(navigator.u
 const LON0 = -71.06797286566898, LAT0 = 41.928658149882345, KX = 82938.7775, KY = 111071.9356, D2R = Math.PI / 180;
 const ANCH = {
   home:   {lat: LAT0, lon: LON0, x: 0, z: 0, yOff: 28.8, kx: KX, ky: KY},                       // geoid ~ -28.8 m at Raynham
-  london: {lat: 51.575359, lon: 0.111801, x: 60000, z: 60000, yOff: -(45.4 + 20.75)}             // geoid ~ +45.4 m, pad at 20.75 m
+  london: {lat: 51.575359, lon: 0.111801, x: 60000, z: 60000, yOff: -(45.4 + 20.75)},
+  dubai: {lat: 25.19515, lon: 55.27315, x: 160000, z: 60000, yOff: -(-33.5 + 6)}                // geoid ~ -33.5 m, pad ~6 m             // geoid ~ +45.4 m, pad at 20.75 m
 };
 const CAP = 32, LS = 'jfvr.gtiles', LSR = 'jfvr.gtiles.root', PREF = 'jfvr.realEarth';
 const q = location.search, forced = /[?&]realearth=1/.test(q) ? true : /[?&]realearth=0/.test(q) ? false : null;
@@ -125,13 +126,14 @@ function start() {
 /* ECEF -> our local frame for anchor A: local = T(A.x, yOff, A.z) * P * ENU(lat, lon)^-1 */
 const _m = new THREE.Matrix4(), _p = new THREE.Matrix4().set(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
 function kxy(lat) { const p = lat * D2R; return {kx: 111412.84 * Math.cos(p) - 93.5 * Math.cos(3 * p), ky: 111132.954 - 559.822 * Math.cos(2 * p) + 1.175 * Math.cos(4 * p)}; }
+const REAL_CITY = {london: 480, dubai: 1650};   // hand-built square half-size kept over the Google tiles
 function setAnchor(name, A) {
   A = A || ANCH[name]; if (!A.kx) Object.assign(A, kxy(A.lat)); RE.anchor = name; RE.A = A; const T = RE.tiles; if (!T) return;
   const cal = +localStorage.getItem('jfvr.gtiles.cal.' + name) || 0; A.cal = A.cal != null ? A.cal : cal;
   window.JF3DTiles.WGS84_ELLIPSOID.getEastNorthUpFrame(A.lat * D2R, A.lon * D2R, _m); _m.invert();
   const M = new THREE.Matrix4().makeTranslation(A.x, A.yOff + (A.cal || 0), A.z).multiply(_p).multiply(_m);
   T.group.matrix.copy(M); T.group.matrixWorldNeedsUpdate = true; T.group.updateMatrixWorld(true);
-  const isCity = name === 'london'; clipU.jfRect.value[0].set(60000, 60000, isCity ? 480 : -1, 40);
+  const RC = REAL_CITY[name]; clipU.jfRect.value[0].set(A.x, A.z, RC ? RC : -1, 40);
 }
 function geoOf(x, z) { const A = RE.A; return {lat: A.lat - (z - A.z) / A.ky, lon: A.lon + (x - A.x) / A.kx}; }
 RE.geoOf = geoOf;
@@ -227,12 +229,12 @@ AFRAME.registerSystem('w3d-realearth', {
     const T = RE.tiles, sc = this.el; if (!T || !sc.camera) return;
     const city = W3D.cities && W3D.cities.current && W3D.cities.current(), D = W3D.cities && W3D.cities.DEFS;
     if ((!clipU.jfMask.value || !RE.mask2 && t > 20000) && W3D.water) { if (clipU.jfMask.value) RE.mask2 = true; buildMask(); }
-    if (city === 'london' && show0()) { const cg = sc.object3D.getObjectByName('city-london'); if (cg && !cg.userData.jfClip) { cg.userData.jfClip = 1; cg.traverse(o => { if (o.isMesh && !/saucer/i.test(o.name || '')) [].concat(o.material).forEach(m => clipMat(m, 2)); }); } }
+    if (REAL_CITY[city] && show0()) { const cg = sc.object3D.getObjectByName('city-' + city); if (cg && !cg.userData.jfClip) { cg.userData.jfClip = 1; cg.traverse(o => { if (o.isMesh && !/saucer/i.test(o.name || '')) [].concat(o.material).forEach(m => clipMat(m, 2)); }); } }
     const xr = sc.renderer.xr && sc.renderer.xr.isPresenting, cam = xr ? sc.renderer.xr.getCamera() : sc.camera;
     sc.camera.getWorldPosition(_c);
     let want = 'home', show = RE.on && !!W3D.active && !W3D.spaceView && !(W3D.arrival && W3D.arrival.active) && !W3D.launchFlight;
     const nearCity = D && Object.keys(D).find(k => Math.hypot(_c.x - D[k].x, _c.z - D[k].z) < 3500);
-    if (city === 'london' || nearCity === 'london') want = 'london';
+    if (REAL_CITY[city] || REAL_CITY[nearCity]) want = REAL_CITY[city] ? city : nearCity;
     else if (nearCity || city) show = false;                                      // stylised cities have no real place under them
     else if (Math.hypot(_c.x, _c.z) > 30000 || RE.anchor === 'free' && RE.pin) want = 'free';
     if (RE.pin && Math.hypot(_c.x, _c.z) < 30000) RE.pin = false;

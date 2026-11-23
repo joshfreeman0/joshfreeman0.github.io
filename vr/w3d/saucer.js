@@ -32,6 +32,7 @@ const rigEl = () => document.querySelector('#rig');
 const DEST = [
   {id: 'mars', tab: 'space', name: 'Mars', kind: 'mars'},
   {id: 'london', tab: 'earth', name: 'London', kind: 'city'},
+  {id: 'dubai', tab: 'earth', name: 'Dubai', kind: 'city'},
   {id: 'saintjohn', tab: 'earth', name: 'Saint John NB', kind: 'city'},
   {id: 'boston', tab: 'earth', name: 'Boston', kind: 'city'},
   {id: 'bangkok', tab: 'earth', name: 'Bangkok', kind: 'city'},
