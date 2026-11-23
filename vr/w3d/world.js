@@ -40,6 +40,7 @@ W3D.terrainH = terrainH;
 function groundAt(x, z, y) {
   let g = terrainH(x, z);
   const P = W3D.water && W3D.water.pond; if (P && g < WATER - 0.2 && x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1) g = WATER - 0.2; // walk on the pond surface rather than its bed
+  if (W3D.patchH) { const ph = W3D.patchH(x, z); if (ph !== null) g = ph; }   // Bridgewater detail patch (launch.js), when loaded
   const t0 = g; let u = null; // floors flagged under:true are below the terrain (bank vault) and only count when you are below ground
   if (PARK && Math.abs(x - PARK.P.cx) < PARK.P.ax + 60 && Math.abs(z - PARK.P.cz) < PARK.P.az + 60) { const s = PARK.surf(x, z); if (s !== null && s > g) g = s; }
   for (const f of floors) if (x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1 && f.y <= y + 0.65) { if (f.under) { if (y < t0 - 1 && (u === null || f.y > u)) u = f.y; } else if (f.y > g) g = f.y; }
