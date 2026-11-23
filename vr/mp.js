@@ -190,7 +190,10 @@
         const p = MP.peers[id]; if (!p.tp) continue;
         const show = p.scene === me;
         p.el.object3D.visible = show;
-        if (p.sound) p.sound.setVolume(show && !p.localMute ? 1 : 0);
+        if (p.sound) { /* voice range (w3d/friends.js): Auto = audible anywhere, full within 10 m, 35% floor past 30 m (panning kept); Near only = old fall-off */
+          const F = window.W3D && W3D.friends, v = show && F ? F.volume(Math.hypot(p.hp.x - camPos.x, p.hp.z - camPos.z)) : null, ro = v === null ? 1.2 : 0;
+          if (p._ro !== ro) { p._ro = ro; p.sound.setRolloffFactor(ro); }
+          p.sound.setVolume(show && !p.localMute ? (v === null ? 1 : v) : 0); }
         if (!show) continue;
         p.hp.lerp(p.tp, k); p.hq.slerp(p.tq, k);
         p.head.object3D.position.copy(p.hp); p.head.object3D.quaternion.copy(p.hq);
