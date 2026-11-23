@@ -305,20 +305,18 @@ function buildExterior() {
   const dc = doorCanvas(); const dmat = std({map: ctex(dc.map, true), normalMap: rectNormal(dc.h, 256, 768, 3), metalness: 1, roughness: 0.32, envMapIntensity: 1.1});
   const leaf = (w, h, x, y, z) => { const g = new THREE.BoxGeometry(w, h, 0.2); const m = mesh(g, dmat, x, y + h / 2, z, null, {cast: true}); return m; };
   // working gate: two leaves hung on stone jamb posts in the pylon passage; they swing open when you come near (or click them)
-  W3D.gateDoors = [];
+  const gateLeaves = [];
   for (const s of [-1, 1]) {
     vbox(1.2, 14, 1.3, 893.6, y0, zc + s * 4.45, M.stone, {collide: false, shadow: true, T: 2});   // jamb post: fills the battered towers' gap
     const piv = new THREE.Group(); piv.position.set(893.6, y0 + 0.25, zc + s * 3.8); (P || root).add(piv);
     const lf = new THREE.Mesh(new THREE.BoxGeometry(0.32, 13.4, 3.78), dmat); lf.position.set(0, 6.7, -s * 1.89); lf.castShadow = true; lf.receiveShadow = true; piv.add(lf);
     for (const hy of [1.5, 6.7, 11.9]) { const hb = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.8, 10), M.gold); hb.position.set(0, hy, 0); piv.add(hb); } // hinge barrels
-    W3D.gateDoors.push({piv: piv, s: s, a: 0});
+    gateLeaves.push({piv: piv, closed: 0, open: -s * 1.5});
   }
   // gate collision (door audit): the shut leaves block the 7.6 m passage; once they swing open (> ~15 deg) it is passable
-  W3D.gateDoorWall = {x0: 893.6 - 0.2, x1: 893.6 + 0.2, z0: zc - 3.8, z1: zc + 3.8, y0: y0, y1: y0 + 13.6, Y1: y0 + 13.6}; L.walls.push(W3D.gateDoorWall);
-  { const hit = document.createElement('a-box'); hit.setAttribute('class', 'btn'); hit.setAttribute('position', `893.6 ${y0 + 7} ${zc}`); hit.setAttribute('width', 0.6); hit.setAttribute('height', 13.4); hit.setAttribute('depth', 7.6);
-    hit.setAttribute('material', 'shader: flat; opacity: 0; transparent: true; depthWrite: false');
-    hit.addEventListener('click', () => { W3D.gateManual = !W3D.gateOpenNow; W3D.gateManualT = performance.now(); });
-    document.querySelector('a-scene').appendChild(hit); }
+  // (now on the shared w3d/doors.js registry: proximity ~14 m, click / trigger toggles for 20 s, same swing as every other door)
+  W3D.gateDoorWall = {x0: 893.6 - 0.2, x1: 893.6 + 0.2, z0: zc - 3.8, z1: zc + 3.8, y0: y0, y1: y0 + 13.6};
+  W3D.addDoor({name: 'gate', leaves: gateLeaves, at: {x: 894, y: y0, z: zc}, near: 14, dy: 16, hit: {x: 893.6, y: y0 + 7, z: zc, w: 0.6, h: 13.4, d: 7.6}, shut: W3D.gateDoorWall});
   try { gateFrame(y0, zc, corn, roll); } catch (e) { console.warn('gate frame', e); }
   // banking hall: cornice + torus rolls + carved frieze + base course + steps and open gilded doors at the west door
   const hx0 = 924.25, hx1 = 965.75, hz0 = zc - 20.75, hz1 = zc + 20.75, ht = y0 + 16;
@@ -343,17 +341,19 @@ function buildExterior() {
     for (const s of [-1, 1]) vbox(fw + 0.1, 10, 0.55, fxc, y0, zc + s * 2.725, M.stone, {collide: true, shadow: true, T: 2});   // jambs (opening 4.9 m)
     vbox(fw + 0.1, 0.62, 6, fxc, top - 0.02, zc, M.stone, {collide: false, shadow: true, T: 2});                                 // lintel tight under the wall's head
     vbox(fw, thr - y0, 4.9, fxc, y0, zc, M.granite, {collide: false, T: 2});                                                      // threshold, flush with the landing
-    W3D.hallDoors = []; const lh = top - thr - 0.04, lw = 2.43;
+    const hallLeaves = [], lh = top - thr - 0.04, lw = 2.43;
+    // grounding (door audit 2): the leaves hang at threshold height (landing level, y0 + 0.66) but swing INTO the hall, whose floor is
+    // 0.36 m lower - so when open they floated. A granite inner landing at threshold height now fills the swing, with one step down.
+    vbox(2.45, thr - (y0 + 0.3), 5.4, fx1 + 1.225, y0 + 0.3, zc, M.granite, {collide: false, shadow: true, T: 2}); L.floors.push({x0: fx1, x1: fx1 + 2.45, z0: zc - 2.7, z1: zc + 2.7, y: thr});
+    vbox(0.45, 0.18, 5.4, fx1 + 2.675, y0 + 0.3, zc, M.granite, {collide: false, shadow: true, T: 2}); L.floors.push({x0: fx1 + 2.45, x1: fx1 + 2.9, z0: zc - 2.7, z1: zc + 2.7, y: y0 + 0.48});
+    for (const [x, yy] of [[fx1 + 2.45, thr], [fx1 + 2.9, y0 + 0.48]]) vbox(0.06, 0.04, 5.4, x - 0.03, yy - 0.03, zc, M.gold, {collide: false});
     for (const s of [-1, 1]) {
       const piv = new THREE.Group(); piv.position.set(fx1 - 0.2, thr + 0.02, zc + s * 2.45); (P || root).add(piv);
       const lf = new THREE.Mesh(new THREE.BoxGeometry(0.32, lh, lw), dmat); lf.position.set(0, lh / 2, -s * lw / 2); lf.castShadow = true; lf.receiveShadow = true; piv.add(lf);
       for (const hy of [1.2, lh / 2, lh - 1.2]) { const hb = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.7, 10), M.gold); hb.position.set(0, hy, 0); piv.add(hb); }
-      W3D.hallDoors.push({piv: piv, s: s, a: 0}); }
-    W3D.hallDoorWall = {x0: fx1 - 0.4, x1: fx1, z0: zc - 2.45, z1: zc + 2.45, y0: thr, y1: top, on: true, Y1: top}; L.walls.push(W3D.hallDoorWall);
-    const hit = document.createElement('a-box'); hit.setAttribute('class', 'btn'); hit.setAttribute('position', `${fx1 - 0.2} ${(thr + top) / 2} ${zc}`); hit.setAttribute('width', 0.5); hit.setAttribute('height', lh); hit.setAttribute('depth', 4.9);
-    hit.setAttribute('material', 'shader: flat; opacity: 0; transparent: true; depthWrite: false');
-    hit.addEventListener('click', () => { W3D.hallManual = !W3D.hallOpenNow; W3D.hallManualT = performance.now(); });
-    document.querySelector('a-scene').appendChild(hit); W3D.hallDoorHit = hit; }
+      hallLeaves.push({piv: piv, closed: 0, open: -s * 1.5}); }
+    W3D.hallDoorWall = {x0: fx1 - 0.4, x1: fx1, z0: zc - 2.45, z1: zc + 2.45, y0: thr, y1: top};
+    W3D.addDoor({name: 'hall', leaves: hallLeaves, at: {x: 925, y: L.HQ.y + 5, z: zc}, near: 10, dy: 7, hit: {x: fx1 - 0.2, y: (thr + top) / 2, z: zc, w: 0.5, h: lh, d: 4.9}, shut: W3D.hallDoorWall}); }
   // column bases + gilded neck rings for every papyrus column (one InstancedMesh each)
   const cols = []; root.traverse(o => { if (o.isMesh && o.material === M.column && o.parent && o.parent.isGroup) cols.push({p: o.parent.position, r: o.geometry.parameters.radiusBottom, h: o.geometry.parameters.height}); });
   if (cols.length) {
@@ -582,18 +582,7 @@ W3D.buildBankPlus = function (rootIn) {
 };
 W3D.tickBank = function (t) { // the vault is only drawn when you are below ground near it (saves ~120k triangles everywhere else)
   const cam = W3D._cam || (W3D._cam = document.querySelector('[camera]')); if (!cam) return; const p = cam.object3D.getWorldPosition(W3D._bv || (W3D._bv = new THREE.Vector3()));
-  if (W3D.gateDoors) { // gate leaves: open when you are within ~14 m of the gate, close when you leave; a click overrides for 20 s
-    const near = Math.hypot(p.x - 894, p.z - L.HQ.z) < 14 && p.y < L.HQ.y + 16; let open = near;
-    if (W3D.gateManualT && performance.now() - W3D.gateManualT < 20000) open = W3D.gateManual; W3D.gateOpenNow = open;
-    let amax = 0; for (const d of W3D.gateDoors) { const tgt = open ? -d.s * 1.5 : 0; d.a += Math.max(-0.035, Math.min(0.035, tgt - d.a)); d.piv.rotation.y = d.a; amax = Math.max(amax, Math.abs(d.a)); }
-    if (W3D.gateDoorWall) W3D.gateDoorWall.y1 = amax < 0.25 ? W3D.gateDoorWall.Y1 : -1e6;
-  }
-  if (W3D.hallDoors) { // hall doors: same rules as the gate (near = within ~10 m of the doorway, at hall level)
-    const near = Math.hypot(p.x - 925, p.z - L.HQ.z) < 10 && p.y < L.HQ.y + 12 && p.y > L.HQ.y - 2; let open = near;
-    if (W3D.hallManualT && performance.now() - W3D.hallManualT < 20000) open = W3D.hallManual; W3D.hallOpenNow = open;
-    let amax = 0; for (const d of W3D.hallDoors) { const tgt = open ? -d.s * 1.5 : 0; d.a += Math.max(-0.035, Math.min(0.035, tgt - d.a)); d.piv.rotation.y = d.a; amax = Math.max(amax, Math.abs(d.a)); }
-    const w = W3D.hallDoorWall; w.y1 = amax < 0.25 ? w.Y1 : -1e6;   // leaves shut (or nearly) = solid; swung open = passable
-  }
+  // pylon gate and hall doors are driven by w3d/doors.js (system tick)
   if (!vaultG) return;
   const inside = p.y < 33.5 && p.x > 920 && p.x < 985 && p.z > -405 && p.z < -355; if (++frames > 3) vaultG.visible = inside; if (inside) for (const f of anim) f(t);
 };
