@@ -8,6 +8,25 @@ const BASE = '/vr/w3d/';
 /* Lite tier (phones/tablets, <=4 GB devices; never the Quest): see JFVR_LITE in index.html. Smaller photos, no 0.5 m tile,
    40% of the trees, 1024 px cap on every texture, smaller shadow map - keeps iPhone Safari under its WebGL memory limit. */
 const LITE = W3D.lite = !!window.JFVR_LITE;
+/* Quality pass (Nov 2026, toward a Quest 'Iceland'-home look; content and layout unchanged): a gentle colour grade after ACES,
+   height-based haze (low ground hazier than hill tops and towers), warmer sun + cooler sky/warm-earth hemisphere, shadows that follow
+   the player, slow swells + stronger fresnel on the water, fine relief on the ground up close (desktop) and grass tufts near you.
+   ?classic=1 keeps the previous look. */
+const CLASSIC = W3D.classic = /[?&]classic=1/.test(location.search);
+const QUEST = W3D.quest = /OculusBrowser|Quest/i.test(navigator.userAgent) || /[?&]quest=1/.test(location.search);
+function qualityChunks() {
+  const C = THREE.ShaderChunk, tp = C.tonemapping_pars_fragment, i = tp.indexOf('vec3 ACESFilmicToneMapping'), R = 'return saturate( color );', j = i < 0 ? -1 : tp.indexOf(R, i);
+  if (j > 0) C.tonemapping_pars_fragment = tp.slice(0, i) +
+    'vec3 jfGrade( vec3 c ) { float l = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) ); c = max( mix( vec3( l ), c, 1.07 ), 0.0 );\n' +
+    '  c *= mix( vec3( 0.975, 0.99, 1.035 ), vec3( 1.025, 1.0, 0.96 ), smoothstep( 0.04, 0.5, l ) ); return mix( c, c * c * ( 3.0 - 2.0 * c ), 0.16 ); }\n' +
+    tp.slice(i, j) + 'return jfGrade( saturate( color ) );' + tp.slice(j + R.length);
+  C.fog_pars_vertex = C.fog_pars_vertex.replace('varying float vFogDepth;', 'varying float vFogDepth; varying float vFogH;');
+  C.fog_vertex = C.fog_vertex.replace('#ifdef USE_FOG', '#ifdef USE_FOG\n\tvFogH = cameraPosition.y + dot( viewMatrix[ 1 ].xyz, mvPosition.xyz );');
+  C.fog_pars_fragment = C.fog_pars_fragment.replace('varying float vFogDepth;', 'varying float vFogDepth; varying float vFogH;');
+  C.fog_fragment = C.fog_fragment.replace('gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );',
+    'float jfH = exp( - max( vFogH - 20.0, 0.0 ) / 220.0 );\n\tfogFactor = max( fogFactor * mix( 0.8, 1.0, jfH ), ( 1.0 - exp( - vFogDepth / 2400.0 ) ) * jfH * 0.3 );\n\tgl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );');
+}
+if (!CLASSIC) qualityChunks();
 const N = 385, SIZE = 4096, HALF = 2048, WATER = 16.5;
 const HQ = {x: 920, y: 34, z: -380};
 let heights = null;
@@ -178,6 +197,7 @@ function waterMat(alphaMap, river) {
     sh.fragmentShader = 'uniform sampler2D wN; uniform float wT; uniform float wNi; varying vec3 vWw;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', [
       'vec2 wp = vWw.xz;',
       'vec3 n1 = texture2D(wN, wp / 30.0 + vec2(0.011, 0.007) * wT).xyz * 2.0 - 1.0;',
+      CLASSIC ? '' : 'vec3 n0 = texture2D(wN, mat2(0.6, 0.8, -0.8, 0.6) * wp / 140.0 + vec2(0.004, -0.003) * wT).xyz * 2.0 - 1.0; n1.xy += n0.xy * 0.7;',   // quality: slow broad swells
       'float wd = length(vWw - cameraPosition);',
       LITE ? 'vec2 sl = n1.xy * 0.26 * mix(1.0, 0.1, smoothstep(60.0, 450.0, wd));'
         : 'vec3 n2 = texture2D(wN, mat2(0.8, -0.6, 0.6, 0.8) * wp / 7.5 + vec2(-0.017, 0.012) * wT).xyz * 2.0 - 1.0;\n' +
@@ -188,10 +208,10 @@ function waterMat(alphaMap, river) {
       '  float fr = 0.02 + 0.98 * pow(1.0 - cth, 5.0);',
       '  vec3 rw = inverseTransformDirection(reflect(-vd, normal), viewMatrix);',
       '  vec3 sky = mix(vec3(0.62, 0.72, 0.80), vec3(0.27, 0.45, 0.70), clamp(rw.y * 1.6, 0.0, 1.0)) * mix(1.0, 0.07, wNi);',  // night layer (daynight.js); 1.0 by day
-      '  outgoingLight = mix(outgoingLight, sky, clamp(fr, 0.0, 0.55)); }',
+      CLASSIC ? '  outgoingLight = mix(outgoingLight, sky, clamp(fr, 0.0, 0.55)); }' : '  outgoingLight = mix(outgoingLight * mix(1.0, 0.8, fr), sky, clamp(fr * 1.15, 0.0, 0.7)); }',
       '#include <opaque_fragment>'].join('\n'));
   };
-  mat.customProgramCacheKey = () => 'jfwater2' + (alphaMap ? 'a' : '') + (river ? 'r' : '') + (LITE ? 'l' : '');
+  mat.customProgramCacheKey = () => 'jfwater2' + (CLASSIC ? 'c' : 'q') + (alphaMap ? 'a' : '') + (river ? 'r' : '') + (LITE ? 'l' : '');
   return mat;
 }
 
@@ -299,6 +319,17 @@ function freeSources(renderer, scene3, now) {
     t.userData.freed = {w, h}; _fr.freed++; _fr.bytes += w * h * 4; _fr.seen.delete(t.uuid);
     if (isBmp && im.close) im.close(); if (isCan) { im.width = 1; im.height = 1; } t.image = one; } }); }
 W3D.freeSources = freeSources;
+/* quality: the sun's 260 m shadow box follows you (snapped to 8 m so shadows don't crawl), so trees, people and buildings near you cast
+   soft shadows anywhere at home, not only around the compound. Near the compound it stays on its original centre. */
+const _sv = new THREE.Vector3();
+function followSun(sceneEl) {
+  const R = W3D.sunRig, cam = sceneEl.camera; if (!cam || !W3D.root || !W3D.root.visible) return; cam.getWorldPosition(_sv);
+  let cx = Math.round(_sv.x / 8) * 8, cz = Math.round(_sv.z / 8) * 8, cy = W3D.terrainH ? W3D.terrainH(cx, cz) : R.home.y;
+  if (Math.hypot(_sv.x - R.home.x, _sv.z - R.home.z) < 70 || !isFinite(cy)) { cx = R.home.x; cz = R.home.z; cy = R.home.y; }
+  if (Math.abs(cx - R.c.x) + Math.abs(cz - R.c.z) < 20) return;
+  R.c.set(cx, cy, cz); R.sun.target.position.copy(R.c); R.sun.position.copy(R.c).add(R.off); R.sun.target.updateMatrixWorld(); R.sun.updateMatrixWorld();
+  if (sceneEl.renderer) sceneEl.renderer.shadowMap.needsUpdate = true;
+}
 if (LITE) { const ld = THREE.TextureLoader.prototype.load; THREE.TextureLoader.prototype.load = function (url, onLoad, onProgress, onError) {
   return ld.call(this, url, t => { if (!/ortho_|ring_/.test(url)) { const c = liteShrink(t.image, /_nrm|_rgh/.test(url) ? 512 : 1024); if (c) { t.image = c; t.needsUpdate = true; } } t.anisotropy = Math.min(t.anisotropy || 1, 4); t.userData.lite = 1; if (onLoad) onLoad(t); }, onProgress, onError); }; }
 W3D.build = function (scene3, sceneEl) {
@@ -313,10 +344,10 @@ W3D.build = function (scene3, sceneEl) {
   // radial (not view-depth) fog so the 16 km edge is fully hazed in every direction, even at the corners of the view
   THREE.ShaderChunk.fog_vertex = THREE.ShaderChunk.fog_vertex.replace('vFogDepth = - mvPosition.z;', 'vFogDepth = length( mvPosition.xyz );');
   W3D.fog = new THREE.Fog(0xcfdde8, 2000, 8200); W3D.bg = new THREE.Color(0xcfdde8); // anything past the far plane shows haze, never black
-  const hemi = new THREE.HemisphereLight(0xe3ecff, 0x5b6440, 0.85); root.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff0d8, 1.55); sun.position.set(HQ.x - 260, HQ.y + 360, HQ.z + 210); sun.target.position.set(HQ.x + 20, HQ.y, HQ.z - 10);
+  const hemi = new THREE.HemisphereLight(CLASSIC ? 0xe3ecff : 0xd3e2ff, CLASSIC ? 0x5b6440 : 0x6b6243, 0.85); root.add(hemi);
+  const sun = new THREE.DirectionalLight(CLASSIC ? 0xfff0d8 : 0xffe2b8, CLASSIC ? 1.55 : 1.68); sun.position.set(HQ.x - 260, HQ.y + 360, HQ.z + 210); sun.target.position.set(HQ.x + 20, HQ.y, HQ.z - 10);
   sun.castShadow = true; sun.shadow.mapSize.set(LITE ? 1024 : 2048, LITE ? 1024 : 2048); const sc = sun.shadow.camera; sc.left = -130; sc.right = 130; sc.top = 130; sc.bottom = -130; sc.near = 50; sc.far = 900; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.05;
-  root.add(sun); root.add(sun.target);
+  root.add(sun); root.add(sun.target); W3D.sunRig = {sun: sun, off: sun.position.clone().sub(sun.target.position), home: sun.target.position.clone(), c: sun.target.position.clone()};
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = LITE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true; // sun is fixed: redraw shadows ~6x/s, not every frame
   // materials
   const ash = ashlarTex();
@@ -401,6 +432,9 @@ function buildTerrain() {
       'vec3 gg = gt * tint; gg = mix(vec3(dot(gg, vec3(0.3, 0.59, 0.11))), gg, 0.72) * vec3(0.97, 0.9, 0.8);',   // real lawn in sun: yellower, less saturated than the photo tile
       'texelColor.rgb = mix(texelColor.rgb, gg, gn * mix(0.35, 0.8, veg)); gNear = gn * veg;',
       'diffuseColor *= texelColor;'].join('\n'));
+    if (!CLASSIC && !LITE && !QUEST) sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' +   // quality: fine ground relief within ~90 m
+      '{ float bn = (1.0 - smoothstep(6.0, 90.0, dd)) * (1.0 - 0.6 * gNear); vec2 bq = vWp.xz / 1.7; float h0 = texture2D(detMap, bq).r, h1 = texture2D(detMap, bq + vec2(0.004, 0.0)).r, h2 = texture2D(detMap, bq + vec2(0.0, 0.004)).r;\n' +
+      '  normal = normalize(normal + (viewMatrix * vec4((h0 - h1) * 7.0, 0.0, (h0 - h2) * 7.0, 0.0)).xyz * bn); }');
     if (grn) { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n{ vec3 gN = texture2D(grsN, vWp.xz / 2.2).xyz * 2.0 - 1.0; normal = normalize(normal + (viewMatrix * vec4(gN.x, 0.0, -gN.y, 0.0)).xyz * 0.9 * gNear); }'); }
   };
   const mesh = new THREE.Mesh(geo, tm); mesh.receiveShadow = true; mesh.name = 'terrain'; root.add(mesh);
@@ -1032,6 +1066,7 @@ document.addEventListener('keydown', e => { keys[e.code] = true; }); document.ad
 AFRAME.registerComponent('w3d-keys', { tick: function (t, dt) { if (!W3D.active || !JFVR.fly || !dt) return; const p = this.el.object3D.position, s = (W3D.flyVSpeed || 30) * dt / 1000; if (keys.Space) p.y += s; if (keys.ShiftLeft || keys.ShiftRight) p.y -= s; if (W3D.waterNormal) {} } });
 const _cp = new THREE.Vector3(); let _sf = 0;
 AFRAME.registerComponent('w3d-anim', { tick: function (t, dt) { if (W3D.waterU) W3D.waterU.wT.value = t / 1000; if (LITE && this.el.sceneEl.renderer) freeSources(this.el.sceneEl.renderer, this.el.sceneEl.object3D, t); if (!W3D.active) return; if (W3D.tickWildlife) W3D.tickWildlife(t, dt); if (W3D.tickRooms) W3D.tickRooms(t, dt);
+  if (!CLASSIC && W3D.sunRig && _sf % 30 === 0) followSun(this.el.sceneEl);
   const r = this.el.renderer, N = r && r.xr && r.xr.isPresenting ? (W3D.xrSlow ? 0 : 90) : 12; if (r && N && ++_sf % N === 0) r.shadowMap.needsUpdate = true; /* headset: rare shadow refreshes, none while frames run late */
   if (W3D.sky && this.el.camera) { this.el.camera.getWorldPosition(_cp); W3D.sky.position.copy(_cp); } } });
 // lifts between hall and office
