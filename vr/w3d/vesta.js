@@ -98,9 +98,13 @@ function build() {
     const wo = new THREE.CylinderGeometry(WR_OUT, WR_OUT, wallH, seg * 2, 1, true, door + Math.PI / 2, Math.PI * 2 - 2 * door); const wi = new THREE.CylinderGeometry(WR_IN, WR_IN, wallH, seg * 2, 1, true, door + Math.PI / 2, Math.PI * 2 - 2 * door);
     const mo = new THREE.Mesh(wo, white), mi = new THREE.Mesh(wi, white.clone()); mi.material.side = THREE.BackSide; for (const m of [mo, mi]) { m.position.set(C.x, yb + wallH / 2, C.z); m.castShadow = m.receiveShadow = true; root.add(m); }
     for (let i = 0; i < 40; i++) { const a = (i + 0.5) / 40 * Math.PI * 2; if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) < door + 0.04) continue; const r = (WR_IN + WR_OUT) / 2, x = C.x + Math.cos(a) * r, z = C.z + Math.sin(a) * r; L.walls.push({x0: x - 0.38, x1: x + 0.38, z0: z - 0.38, z1: z + 0.38, y0: yb, y1: yb + wallH}); }
-    const dw = 2 * WR_IN * Math.sin(door), dh = 4.4;   // door jambs + lintel + two bronze leaves standing open
+    const dw = 2 * WR_IN * Math.sin(door), dh = 4.4; let vLeaves = null;   // door jambs + lintel + two bronze leaves standing open
     for (const s of [-1, 1]) { const j = new THREE.Mesh(new THREE.BoxGeometry(WR_OUT - WR_IN + 0.1, wallH, 0.3), white); j.position.set(C.x + (WR_IN + WR_OUT) / 2 * Math.cos(door), yb + wallH / 2, C.z + s * (dw / 2 + 0.1)); root.add(j);
-      const lf = new THREE.Mesh(new THREE.BoxGeometry(dw / 2, dh, 0.08), bronze); lf.position.set(C.x + WR_IN - dw / 4 - 0.05, yb + dh / 2, C.z + s * (dw / 2 - 0.06)); root.add(lf); }   // leaves stand open against the reveals
+      // door audit: the leaves now hang on hinges at the inner reveals and swing shut across the doorway (open = against the reveal)
+      const piv = new THREE.Group(); piv.position.set(C.x + WR_IN - 0.05, yb, C.z + s * (dw / 2 - 0.06)); root.add(piv);
+      const lf = new THREE.Mesh(new THREE.BoxGeometry(dw / 2, dh, 0.08), bronze); lf.position.set(-dw / 4, dh / 2, 0); piv.add(lf); (vLeaves = vLeaves || []).push({piv, closed: -s * Math.PI / 2, open: 0}); }
+    if (W3D.addDoor && vLeaves) W3D.addDoor({name: 'vesta', leaves: vLeaves, at: {x: C.x + WR_OUT, y: yb + 1.6, z: C.z}, near: 11, start: 1,
+      hit: {x: C.x + WR_IN - 0.1, y: yb + dh / 2, z: C.z, w: 0.4, h: dh, d: dw}, shut: {x0: C.x + WR_IN - 0.15, x1: C.x + WR_IN + 0.05, z0: C.z - dw / 2, z1: C.z + dw / 2, y0: yb, y1: yb + dh}});
     const lt = new THREE.Mesh(new THREE.BoxGeometry(WR_OUT - WR_IN + 0.15, wallH - dh, dw + 0.6), white); lt.position.set(C.x + (WR_IN + WR_OUT) / 2, yb + dh + (wallH - dh) / 2, C.z); root.add(lt);
     const pil = new THREE.CylinderGeometry(0.2, 0.22, CH - 0.4, 10); pil.translate(0, (CH - 0.4) / 2, 0);   // engaged half-columns inside
     instRing(pil, white, 20, WR_IN - 0.06, yb, root, 0, a => Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) < door + 0.1);

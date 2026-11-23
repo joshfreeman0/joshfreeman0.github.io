@@ -313,6 +313,8 @@ function buildExterior() {
     for (const hy of [1.5, 6.7, 11.9]) { const hb = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.8, 10), M.gold); hb.position.set(0, hy, 0); piv.add(hb); } // hinge barrels
     W3D.gateDoors.push({piv: piv, s: s, a: 0});
   }
+  // gate collision (door audit): the shut leaves block the 7.6 m passage; once they swing open (> ~15 deg) it is passable
+  W3D.gateDoorWall = {x0: 893.6 - 0.2, x1: 893.6 + 0.2, z0: zc - 3.8, z1: zc + 3.8, y0: y0, y1: y0 + 13.6, Y1: y0 + 13.6}; L.walls.push(W3D.gateDoorWall);
   { const hit = document.createElement('a-box'); hit.setAttribute('class', 'btn'); hit.setAttribute('position', `893.6 ${y0 + 7} ${zc}`); hit.setAttribute('width', 0.6); hit.setAttribute('height', 13.4); hit.setAttribute('depth', 7.6);
     hit.setAttribute('material', 'shader: flat; opacity: 0; transparent: true; depthWrite: false');
     hit.addEventListener('click', () => { W3D.gateManual = !W3D.gateOpenNow; W3D.gateManualT = performance.now(); });
@@ -496,7 +498,13 @@ function buildVault() {
   // big hinge: arm + barrel
   mesh(new THREE.BoxGeometry(0.45, 2.4, DOOR.r * 0.9), steelSide, -(T / 2 + 0.1), 0, DOOR.r * 0.65, door);
   mesh(new THREE.CylinderGeometry(0.35, 0.35, 3.2, 24), steelSide, 0, 0, 0, hinge); mesh(new THREE.BoxGeometry(0.4, 3.0, 0.6), steelSide, 0.5, 0, 0.25, null).position.set(DOOR.x - 0.3, DOOR.y, zc + DOOR.r + 0.35);
-  L.walls.push({x0: 955.4, x1: 962.6, z0: zc + 1.9, z1: zc + 4.2, y0: y, y1: V.top}); // the open door itself
+  // the vault door works (door audit): open 80 deg near it / on a click, shut when you walk away; the open-door footprint and the
+  // shut-door plug each collide only in their own position
+  if (W3D.addDoor) W3D.addDoor({name: 'vault', leaves: [{piv: hinge, closed: 0, open: THREE.MathUtils.degToRad(80)}], at: {x: DOOR.x - 0.75, y: DOOR.y - 3, z: zc}, near: 34, start: 1,
+    hit: {x: DOOR.x - 0.75, y: DOOR.y, z: zc, w: 1.6, h: DOOR.r * 2, d: DOOR.r * 2},
+    shut: {x0: DOOR.x - 1.3, x1: DOOR.x - 0.2, z0: zc - DOOR.r, z1: zc + DOOR.r, y0: y, y1: V.top},
+    opened: {x0: 955.4, x1: 962.6, z0: zc + 1.9, z1: zc + 4.2, y0: y, y1: V.top}});
+  else L.walls.push({x0: 955.4, x1: 962.6, z0: zc + 1.9, z1: zc + 4.2, y0: y, y1: V.top}); // the open door itself
 
   // pillars along the aisle, ceiling lamps, warm lights
   for (const x of [940, 948, 956]) for (const s of [-1, 1]) { const z = zc + s * 4.8; vbox(1.2, H - 0.6, 1.2, x, y, z, granV, {T: 2}); vbox(1.5, 0.35, 1.5, x, y, z, goldV, {collide: false}); vbox(1.6, 0.6, 1.6, x, V.top - 0.6, z, goldV, {collide: false}); }
@@ -577,7 +585,8 @@ W3D.tickBank = function (t) { // the vault is only drawn when you are below grou
   if (W3D.gateDoors) { // gate leaves: open when you are within ~14 m of the gate, close when you leave; a click overrides for 20 s
     const near = Math.hypot(p.x - 894, p.z - L.HQ.z) < 14 && p.y < L.HQ.y + 16; let open = near;
     if (W3D.gateManualT && performance.now() - W3D.gateManualT < 20000) open = W3D.gateManual; W3D.gateOpenNow = open;
-    for (const d of W3D.gateDoors) { const tgt = open ? -d.s * 1.5 : 0; d.a += Math.max(-0.035, Math.min(0.035, tgt - d.a)); d.piv.rotation.y = d.a; }
+    let amax = 0; for (const d of W3D.gateDoors) { const tgt = open ? -d.s * 1.5 : 0; d.a += Math.max(-0.035, Math.min(0.035, tgt - d.a)); d.piv.rotation.y = d.a; amax = Math.max(amax, Math.abs(d.a)); }
+    if (W3D.gateDoorWall) W3D.gateDoorWall.y1 = amax < 0.25 ? W3D.gateDoorWall.Y1 : -1e6;
   }
   if (W3D.hallDoors) { // hall doors: same rules as the gate (near = within ~10 m of the doorway, at hall level)
     const near = Math.hypot(p.x - 925, p.z - L.HQ.z) < 10 && p.y < L.HQ.y + 12 && p.y > L.HQ.y - 2; let open = near;
