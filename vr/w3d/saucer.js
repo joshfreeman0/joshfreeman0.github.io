@@ -15,6 +15,9 @@ const LITE = !!window.JFVR_LITE;
 const MARS_URL = 'https://redplanetlounge.pages.dev/?spot=pad&from=joshfreeman-vr';
 const HOME = {x: 1000, z: -447, yaw: 0};      // bank lawn north of the exhibit rooms (x 924-967, z -401..-428); flat terrain at y 34
 const RAD = 9, FLOOR = 2.02, NSEAT = 6, SEAT_R = 3.4, COUNT = 3000;
+// seats stand on a 0.35 m riser (cushion top FLOOR + 0.86); a seated rider's eyes go SEAT_EYE above the cabin floor, i.e. ~1.1 m above
+// the cabin lip / window sill (2.6) - was: rig on the floor 0.5 m in front of the seat, eye = floor + head height (~1.15 m seated in VR)
+const SEAT_UP = 0.35, SEAT_EYE = 1.68;
 const v3 = new THREE.Vector3(), q4 = new THREE.Quaternion();
 const smooth = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -33,12 +36,12 @@ const DEST = [
   {id: 'boston', tab: 'earth', name: 'Boston', kind: 'city'},
   {id: 'bangkok', tab: 'earth', name: 'Bangkok', kind: 'city'},
   {id: 'hongkong', tab: 'earth', name: 'Hong Kong', kind: 'city'},
+  {id: 'lake', tab: 'here', name: 'Fowling Pond', kind: 'here'},   // was 'Lake' (same pond-shore landing spot Josh liked); top of Here, also the way home from a city
   {id: 'launchpad', tab: 'here', name: 'Launch pad', kind: 'here'},
   {id: 'home', tab: 'here', name: 'Bank', kind: 'here'},
-  {id: 'pyramid', tab: 'here', name: 'Pyramid park', kind: 'here'},
-  {id: 'lake', tab: 'here', name: 'Lake', kind: 'here'}
+  {id: 'pyramid', tab: 'here', name: 'Pyramid park', kind: 'here'}
 ];
-const D = id => DEST.find(d => d.id === id) || DEST[7];
+const D = id => DEST.find(d => d.id === id) || DEST.find(d => d.id === 'home');
 const spotCache = {};
 // a flat, open landing spot near (cx, cz): ground varies < 0.7 m over the saucer + ramp, no walls / floors, dry
 function findFlat(cx, cz, maxR, dry) {
@@ -116,10 +119,11 @@ function makeModel() {
   for (const s of [-1, 1]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, RL), M.glowA); rail.position.set(s * 0.82, 0.03, RL / 2); ramp.add(rail); }
   ramp.rotation.x = ramp.userData.down;
   // seats around the console (facing it)
-  const seatG = new THREE.BoxGeometry(0.62, 0.1, 0.58), backG = new THREE.BoxGeometry(0.62, 0.75, 0.08), postG = new THREE.CylinderGeometry(0.07, 0.11, 0.42, 8);
+  const seatG = new THREE.BoxGeometry(0.62, 0.1, 0.58), backG = new THREE.BoxGeometry(0.62, 0.75, 0.08), postG = new THREE.CylinderGeometry(0.07, 0.11, 0.42 + SEAT_UP, 8), footG = new THREE.BoxGeometry(0.5, 0.05, 0.16);
   for (let i = 0; i < NSEAT; i++) { const a = seatAng(i), sg = new THREE.Group(); sg.position.set(Math.sin(a) * SEAT_R, FLOOR, Math.cos(a) * SEAT_R); sg.rotation.y = a + Math.PI;
-    const s1 = new THREE.Mesh(seatG, M.seat); s1.position.y = 0.46; const s2 = new THREE.Mesh(backG, M.seat); s2.position.set(0, 0.86, 0.27); s2.rotation.x = -0.12; const s3 = new THREE.Mesh(postG, M.dark); s3.position.y = 0.21; sg.add(s1, s2, s3);
-    const tg = tagMesh(); tg.position.set(0, 1.42, 0.3); tg.rotation.y = Math.PI; tg.visible = false; sg.add(tg); seatTags.push(tg); G.add(sg); }
+    const s1 = new THREE.Mesh(seatG, M.seat); s1.position.y = 0.46 + SEAT_UP; const s2 = new THREE.Mesh(backG, M.seat); s2.position.set(0, 0.86 + SEAT_UP, 0.27); s2.rotation.x = -0.12; const s3 = new THREE.Mesh(postG, M.dark); s3.position.y = (0.42 + SEAT_UP) / 2;
+    const s4 = new THREE.Mesh(footG, M.dark); s4.position.set(0, 0.2, -0.36); sg.add(s1, s2, s3, s4);   // foot rest
+    const tg = tagMesh(); tg.position.set(0, 1.42 + SEAT_UP, 0.3); tg.rotation.y = Math.PI; tg.visible = false; sg.add(tg); seatTags.push(tg); G.add(sg); }
   // console: pedestal, glowing top ring, holographic ring, countdown band visible from every seat
   const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.85, 1.0, 24), M.dark); ped.position.y = FLOOR + 0.5; G.add(ped);
   consoleTop = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.75, 0.12, 32), M.console); consoleTop.position.y = FLOOR + 1.06; G.add(consoleTop);
@@ -208,11 +212,17 @@ function setFloors(on, P) {
 
 /* ---------- riding ---------- */
 let cutWait = 0, parkNR = 0; let pose = {x: HOME.x, y: 34, z: HOME.z, yaw: 0, tilt: 0, ax: 0, az: 1, ramp: 1, door: 0, fade: 0}, parkedAt = null, fadeM = null, clouds = null, savedFly = null, inCity = null, lastCut = false, navDone = false;
-const seatLocal = i => { const a = seatAng(i); return new THREE.Vector3(Math.sin(a) * (SEAT_R - 0.5), FLOOR, Math.cos(a) * (SEAT_R - 0.5)); };
-function seatWorld(i) { return seatLocal(i).applyMatrix4(ent.object3D.matrixWorld); }
-function lockTo(p) { const rig = rigEl(), c = camEl(); if (!rig || !c) return; const rp = rig.object3D.position, cw = c.object3D.getWorldPosition(v3); rp.x += p.x - cw.x; rp.z += p.z - cw.z; rp.y = p.y;
+// rider's eye point on seat i (centred over the cushion, just forward of the backrest)
+const seatLocal = i => { const a = seatAng(i); return new THREE.Vector3(Math.sin(a) * (SEAT_R - 0.05), FLOOR + SEAT_EYE, Math.cos(a) * (SEAT_R - 0.05)); };
+// seated reference: rig y = seat eye - the head height above the rig measured when you sit (VR local-floor: your real head height,
+// standing or seated; desktop: the 1.6 m camera). Measured once per sit so leaning still moves your head.
+let headY = 1.6;
+function measureHead() { const rig = rigEl(), cam = document.querySelector('a-scene').camera; if (!rig || !cam) return; rig.object3D.updateMatrixWorld(true);
+  const h = cam.getWorldPosition(new THREE.Vector3()).y - rig.object3D.position.y; headY = h > 0.5 && h < 2.3 ? h : 1.6; }
+function seatWorld(i) { const p = seatLocal(i).applyMatrix4(ent.object3D.matrixWorld); p.y -= headY; return p; }
+function lockTo(p) { const rig = rigEl(), c = document.querySelector('a-scene').camera; if (!rig || !c) return; const rp = rig.object3D.position, cw = c.getWorldPosition(v3); rp.x += p.x - cw.x; rp.z += p.z - cw.z; rp.y = p.y;
   const ph = rig.components['w3d-physics']; if (ph) { ph.prev.copy(rp); ph.vy = 0; } }
-function placeInSeat() { if (mySeat < 0 || !ent) return; ent.object3D.updateMatrixWorld(true); const p = seatWorld(mySeat); lockTo(p);
+function placeInSeat() { if (mySeat < 0 || !ent) return; ent.object3D.updateMatrixWorld(true); measureHead(); sitOff = false; const p = seatWorld(mySeat); lockTo(p);
   const a = seatAng(mySeat), yaw = pose.yaw + a; /* face the console (A-Frame looks down -z) */ const rig = rigEl(); if (rig) rig.object3D.rotation.y = yaw; const lc = camEl() && camEl().components['look-controls']; if (lc && lc.yawObject) lc.yawObject.rotation.y = 0; }
 function board() {
   if (mySeat >= 0) { openMenu(); return; }
@@ -228,6 +238,7 @@ function leave(walk) {
   hud('You left the saucer');
 }
 function beginRide() { // I'm aboard and the flight starts: seat lock, no steering
+  measureHead();
   savedFly = {fly: JFVR.fly, R: JFVR.flyRadius, Y: JFVR.flyMaxY}; JFVR.fly = false; closeMenu();
   const cam = document.querySelector('a-scene').camera;
   fadeM = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 8), new THREE.MeshBasicMaterial({color: 0x000000, side: THREE.BackSide, transparent: true, opacity: 0, depthTest: false, depthWrite: false, fog: false})); fadeM.renderOrder = 1e4; cam.add(fadeM);
@@ -340,7 +351,7 @@ function tick(t, dt) {
   if (S.mode === 'fly') { const key = S.from + '>' + S.to; if (key !== curPlanKey) { curPlan = plan(S.from, S.to); curPlanKey = key; if (mySeat >= 0 && !fadeM) beginRide(); }
     if (T - S.t0 >= curPlan.dur) { const k = curPlan.kind; S.s++; S.t0 += curPlan.dur;
       if (k === 'mars') { S.mode = 'away'; S.at = 'home'; } else { S.mode = 'parked'; S.at = S.to; }
-      if (mySeat >= 0) { endRide(); if (k === 'mars') { mySeat = -1; hideOverlay(); } else { placeInSeat(); hud('Landed - ' + D(S.at).name + '. Walk down the ramp or choose Leave saucer'); } }
+      if (mySeat >= 0) { endRide(); if (k === 'mars') { mySeat = -1; hideOverlay(); } else { placeInSeat(); if (ov) ov.info.textContent = ''; hud('Landed - ' + D(S.at).name + '. Walk down the ramp or choose Leave saucer'); } }
       curPlanKey = ''; S.dest = S.at === 'home' ? 'mars' : 'home'; } }
   if (S.mode === 'away' && T - S.t0 > 20000) { S.s++; S.mode = 'parked'; S.at = 'home'; S.t0 = T; }
   // pose
@@ -368,7 +379,7 @@ function tick(t, dt) {
   const rp = rigEl() && rigEl().object3D.position;
   if (rp && S.mode !== 'fly' && S.mode !== 'away' && parkedAt) { const d = Math.hypot(rp.x - parkedAt.x, rp.z - parkedAt.z);
     if (mySeat >= 0 && (d > 13 || (d > 6.2 && rp.y < parkedAt.y + 1.2))) leave(true);
-    else if (mySeat < 0 && d < 5.7 && rp.y > parkedAt.y + 1.8 && rp.y < parkedAt.y + 3) { const f = freeSeat(); if (f >= 0) { mySeat = f; send(); hud('Aboard the saucer - point at the console to choose a destination'); showOverlay(); } } }
+    else if (mySeat < 0 && d < 5.7 && rp.y > parkedAt.y + 1.8 && rp.y < parkedAt.y + 3) { const f = freeSeat(); if (f >= 0) { mySeat = f; sitOff = true; send(); hud('Aboard the saucer - point at the console to choose a destination'); showOverlay(); } } }
   // lights: soft pulse, brighter when someone approaches; sign only for people outside
   const cp = camPos(), dist = cp ? Math.hypot(cp.x - pose.x, cp.z - pose.z) : 999, near = S.mode !== 'fly' && dist < 30 ? 1 : 0;
   const ph = T / 1000, k = 0.55 + 0.45 * Math.sin(ph * 2.2), boost = near ? 1.6 : 1;
@@ -388,7 +399,13 @@ function tick(t, dt) {
     for (const id in (window.JFMP && JFMP.peers) || {}) { const p = JFMP.peers[id]; if (p.tp && Math.hypot(p.tp.x - P.x, p.tp.z - P.z) < 3000) anyone = true; }
     if (anyone) S.idle = T; else if (T - (S.idle || T) > 60000) { S.s++; S.at = 'home'; S.dest = 'mars'; S.idle = T; } else if (!S.idle) S.idle = T; }
 }
-function tock() { if (ent && mySeat >= 0 && S.mode === 'fly' && W3D.active) { ent.object3D.updateMatrixWorld(true); lockTo(seatWorld(mySeat)); } }
+function tock() { if (!ent || mySeat < 0 || !W3D.active) return; ent.object3D.updateMatrixWorld(true); const p = seatWorld(mySeat);
+  if (S.mode === 'fly') { lockTo(p); return; }
+  // parked / counting: keep the seated height while you stay on the seat; walk off it (> 0.7 m) and you stand on the cabin floor again
+  const rig = rigEl(), cam = document.querySelector('a-scene').camera; if (!rig || !cam || sitOff) return; const cw = cam.getWorldPosition(v3);
+  if (Math.hypot(cw.x - p.x, cw.z - p.z) > 0.7) { sitOff = true; return; }
+  rig.object3D.position.y = p.y; const ph = rig.components['w3d-physics']; if (ph) { ph.prev.y = p.y; ph.vy = 0; } }
+let sitOff = false;
 
 /* ---------- build ---------- */
 function build() {
