@@ -196,7 +196,7 @@ function addButtons() {
 const HC = new Map(), _rc = new THREE.Raycaster(), _o = new THREE.Vector3(), _d = new THREE.Vector3(), _pr = new THREE.Vector3(); let colT = 0, havePrev = false, maskPx = null;
 function maskAt(x, z) { const c = RE.maskCanvas; if (!c) return 0; if (!maskPx) maskPx = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
   const u = (x + MR) / (2 * MR), v = (z + MR) / (2 * MR); let m = 0; if (u > 0 && u < 1 && v > 0 && v < 1) m = maskPx[(Math.floor(v * c.height) * c.width + Math.floor(u * c.width)) * 4] / 255;
-  const R = clipU.jfRect.value[0]; if (R.z > 0 && Math.abs(x - R.x) < R.z && Math.abs(z - R.y) < R.z) m = 1; return m; }
+  for (const R of clipU.jfRect.value) if (R.z > 0 && Math.abs(x - R.x) < R.z && Math.abs(z - R.y) < R.z) m = 1; return m; }   // every cutout rect (slot 3 = Walker Memorial)
 const key = (x, z) => Math.round(x / 2) + ',' + Math.round(z / 2);
 function topAt(x, z, now) { const T = RE.tiles; _rc.set(_o.set(x, 3000, z), _d.set(0, -1, 0)); _rc.far = 6000; const h = _rc.intersectObject(T.group, true)[0]; const y = h ? h.point.y : null;
   HC.set(key(x, z), {y, t: now}); if (HC.size > 4000) { const it = HC.keys(); for (let i = 0; i < 1000; i++) HC.delete(it.next().value); } return y; }

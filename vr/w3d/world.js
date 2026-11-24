@@ -65,11 +65,13 @@ function groundAt(x, z, y) {
   if (PARK && Math.abs(x - PARK.P.cx) < PARK.P.ax + 60 && Math.abs(z - PARK.P.cz) < PARK.P.az + 60) { const s = PARK.surf(x, z); if (s !== null && s > g) g = s; }
   for (const f of floors) if (x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1 && f.y <= y + 0.65) { if (f.under) { if (y < t0 - 1 && (u === null || f.y > u)) u = f.y; } else if (f.y > g) g = f.y; }
   if (u !== null) g = u;
+  if (W3D.gHooks) for (const h of W3D.gHooks) { const v = h(x, z, y, g); if (v !== null && v !== undefined) g = v; }   // rotated / multi-level sites (walker.js)
   return g;
 }
 W3D.groundAt = groundAt;
 function blocked(x, z, y) {
   if (W3D.cityBlocked && W3D.cityBlocked(x, z, y)) return true;
+  if (W3D.bHooks) for (const h of W3D.bHooks) if (h(x, z, y)) return true;
   for (const w of walls) if (x > w.x0 - 0.3 && x < w.x1 + 0.3 && z > w.z0 - 0.3 && z < w.z1 + 0.3 && w.y1 > y + 0.35 && w.y0 < y + 1.7) return true;
   return false;
 }
