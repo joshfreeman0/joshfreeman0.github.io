@@ -158,18 +158,20 @@ function calibrate() {
 /* ---------- attribution ---------- */
 let attrEl = null, vrAttr = null, attrT = 0;
 function attribution(show) {
+  const vis = !!(show && RE.tiles && RE.tiles.group.visible && RE.tiles.visibleTiles && RE.tiles.visibleTiles.size > 0);   // only while Google tiles actually render
   if (!attrEl) { attrEl = document.createElement('div'); attrEl.id = 'gattr';
-    attrEl.style.cssText = 'position:fixed;left:8px;top:8px;z-index:12;font:11px system-ui,sans-serif;color:#fff;background:rgba(0,0,0,.45);padding:3px 7px;border-radius:6px;pointer-events:none;max-width:60vw';
+    attrEl.style.cssText = 'position:fixed;left:8px;bottom:3px;z-index:12;font:10px/1.2 system-ui,sans-serif;color:#fff;opacity:.55;background:none;padding:0;text-shadow:0 0 2px #000,0 0 3px #000;pointer-events:none;max-width:60vw;display:none';
     document.body.appendChild(attrEl); }
-  attrEl.style.display = show ? '' : 'none'; if (!show) { if (vrAttr) vrAttr.visible = false; return; }
-  const a = RE.tiles ? RE.tiles.getAttributions([]).filter(x => x.type === 'string').map(x => x.value).join('; ') : '';
+  attrEl.style.display = vis ? '' : 'none'; if (!vis) { if (vrAttr) vrAttr.visible = false; return; }
+  const a = RE.tiles.getAttributions([]).filter(x => x.type === 'string').map(x => x.value).join('; ');
   const txt = 'Google' + (a ? ' \u00b7 ' + a : ''); if (attrEl.textContent !== txt) attrEl.textContent = txt;
   const sc = document.querySelector('a-scene'), xr = sc && sc.is('vr-mode');
   if (xr) { if (!vrAttr) { const c = document.createElement('canvas'); c.width = 1024; c.height = 64; const t = new THREE.CanvasTexture(c);
-      vrAttr = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.031), new THREE.MeshBasicMaterial({map: t, transparent: true, depthTest: false}));
-      vrAttr.renderOrder = 3000; vrAttr.position.set(0, -0.3, -0.8); vrAttr.userData.c = c; sc.camera.el.object3D.add(vrAttr); }
-    if (vrAttr.userData.txt !== txt) { const c = vrAttr.userData.c, g = c.getContext('2d'); g.clearRect(0, 0, 1024, 64); g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, 0, 1024, 64);
-      g.fillStyle = '#fff'; g.font = '30px sans-serif'; g.fillText(txt.slice(0, 80), 12, 42); vrAttr.material.map.needsUpdate = true; vrAttr.userData.txt = txt; }
+      vrAttr = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.031), new THREE.MeshBasicMaterial({map: t, transparent: true, opacity: .55, depthTest: false}));
+      vrAttr.renderOrder = 3000; vrAttr.position.set(0, -1.1, -0.35); vrAttr.rotation.x = -1.0; vrAttr.userData.c = c; sc.camera.el.object3D.add(vrAttr); }   // low, by the feet, off the sight line
+    if (vrAttr.userData.txt !== txt) { const c = vrAttr.userData.c, g = c.getContext('2d'); g.clearRect(0, 0, 1024, 64);
+      g.font = '30px sans-serif'; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText(txt.slice(0, 80), 12, 42);
+      g.fillStyle = '#fff'; g.fillText(txt.slice(0, 80), 12, 42); vrAttr.material.map.needsUpdate = true; vrAttr.userData.txt = txt; }
     vrAttr.visible = true; } else if (vrAttr) vrAttr.visible = false;
 }
 function toast(s) { console.log(s); if (W3D.toast) W3D.toast(s); }
