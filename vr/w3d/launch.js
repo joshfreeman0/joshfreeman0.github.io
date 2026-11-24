@@ -17,7 +17,7 @@
 const W3D = window.W3D = window.W3D || {};
 const LITE = !!window.JFVR_LITE;
 const BASE = '/vr/w3d/bw/';
-const MARS_URL = 'https://redplanetlounge.pages.dev/?spot=pad&from=joshfreeman-vr';
+const MARS_URL = '/vr/mars/?spot=pad&from=joshfreeman-vr';   // same-origin arrival page (Quest keeps VR only on same-origin navigation); it runs RPL's live code
 const PATCH = {cx: 9400, cz: -2350, S: 2400, n: 241};
 const PAD = {x: 9617.0, z: -2976.9, g: 11.4, R: 18, top: 12.2};
 PATCH.x0 = PATCH.cx - PATCH.S / 2; PATCH.z0 = PATCH.cz - PATCH.S / 2; PATCH.x1 = PATCH.x0 + PATCH.S; PATCH.z1 = PATCH.z0 + PATCH.S;

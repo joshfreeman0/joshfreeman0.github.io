@@ -12,7 +12,7 @@
 'use strict';
 const W3D = window.W3D = window.W3D || {};
 const LITE = !!window.JFVR_LITE;
-const MARS_URL = 'https://redplanetlounge.pages.dev/?spot=pad&from=joshfreeman-vr';
+const MARS_URL = '/vr/mars/?spot=pad&from=joshfreeman-vr';   // same-origin arrival page (Quest keeps VR only on same-origin navigation); it runs RPL's live code
 const HOME = {x: 1000, z: -447, yaw: 0};      // bank lawn north of the exhibit rooms (x 924-967, z -401..-428); flat terrain at y 34
 const RAD = 9, FLOOR = 2.02, NSEAT = 6, SEAT_R = 3.4, COUNT = 3000;
 // seats stand on a 0.35 m riser (cushion top FLOOR + 0.86); a seated rider's eyes go SEAT_EYE above the cabin floor, i.e. ~1.1 m above

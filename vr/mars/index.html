@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<script>
+/* Fowling Pond -> Mars, same-origin arrival (joshfreeman.org/vr/mars/).
+   Quest Browser keeps an immersive session across a navigation only when it is SAME-ORIGIN (default since Browser 24.4;
+   cross-origin needs chrome://flags/#webxr-navigation-permission = Allowed). joshfreeman.org -> redplanetlounge.pages.dev
+   is cross-origin, so Quest dropped to 2D there. This page is on joshfreeman.org, so the session carries over; it then runs
+   Red Planet Lounge's own live code from redplanetlounge.pages.dev unchanged (nothing of RPL is copied or edited here).
+   1) 'sessiongranted' is caught first thing and the session is requested at once, with exactly the features RPL's VRButton
+      asks for. A black keep-alive frame loop holds it while RPL downloads and builds its world.
+   2) RPL's own requestSession('immersive-vr') (its VRButton click on sessiongranted) is handed that same live session.
+   3) RPL registers its sessiongranted listener only after its world is built, by then the real event may be gone, so it is
+      re-sent once RPL's ENTER VR button exists.
+   Any failure: fall back to the plain RPL address. */
+(function () {
+  var RPL = 'https://redplanetlounge.pages.dev/';
+  var FEATS = { optionalFeatures: ['local-floor', 'bounded-floor', 'layers', 'local-floor', 'bounded-floor'] };
+  var X = navigator.xr, H = window.JFMARS = { granted: false, session: null, pending: null, handed: false, log: [] };
+  function log(m) { H.log.push(Math.round(performance.now()) + ' ' + m); try { console.log('mars: ' + m); } catch (e) {} }
+  H.fallback = function () { location.replace(RPL + location.search + location.hash); };
+  if (!X || !X.requestSession) return;
+  var origReq = X.requestSession.bind(X), raf = 0;
+  function keepAlive(s) {   // clear to black every frame so the compositor keeps the session while RPL loads
+    try {
+      var c = document.createElement('canvas'), gl = c.getContext('webgl2', { xrCompatible: true, alpha: false }) || c.getContext('webgl', { xrCompatible: true });
+      var bind = null, proj = null, fb = gl.createFramebuffer();
+      if (s.renderState.layers !== undefined && window.XRWebGLBinding) { bind = new XRWebGLBinding(s, gl); proj = bind.createProjectionLayer({}); s.updateRenderState({ layers: [proj] }); }
+      else s.updateRenderState({ baseLayer: new XRWebGLLayer(s, gl) });
+      var ref = null; s.requestReferenceSpace('local').then(function (r) { ref = r; });
+      var tick = function (t, f) {
+        if (H.handed) return; raf = s.requestAnimationFrame(tick);
+        var pose = ref && f.getViewerPose(ref);
+        gl.clearColor(0, 0, 0, 1);
+        if (proj) { if (!pose) return; gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+          for (var i = 0; i < pose.views.length; i++) { var sub = bind.getViewSubImage(proj, pose.views[i]);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, sub.colorTexture, 0);
+            var v = sub.viewport; gl.viewport(v.x, v.y, v.width, v.height); gl.clear(gl.COLOR_BUFFER_BIT); } }
+        else { gl.bindFramebuffer(gl.FRAMEBUFFER, s.renderState.baseLayer.framebuffer); gl.clear(gl.COLOR_BUFFER_BIT); }
+      };
+      raf = s.requestAnimationFrame(tick); log('keep-alive on (' + (proj ? 'projection layer' : 'baseLayer') + ')');
+    } catch (e) { log('keep-alive failed: ' + e); }
+  }
+  function onGrant(ev) {
+    if (ev && ev.jfMars) return;                     // our own re-sent event for RPL
+    if (H.granted) return; H.granted = true; log('sessiongranted');
+    H.pending = origReq('immersive-vr', FEATS).then(function (s) {
+      H.session = s; log('session live');
+      s.addEventListener('end', function () { log('session ended'); if (H.session === s) { H.session = null; H.pending = null; } });
+      if (!H.handed) keepAlive(s); return s;
+    }, function (e) { log('requestSession failed: ' + e); H.pending = null; throw e; });
+  }
+  X.addEventListener('sessiongranted', onGrant);
+  X.requestSession = function (mode, init) {
+    if (mode === 'immersive-vr' && H.pending && !H.handed) {
+      H.handed = true; log('handing session to RPL');
+      return H.pending.then(function (s) { if (raf) try { s.cancelAnimationFrame(raf); } catch (e) {} return s; });
+    }
+    return origReq(mode, init);
+  };
+})();
+</script>
+<base href="https://redplanetlounge.pages.dev/">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Red Planet Lounge - a nightclub in a Mars colony</title>
+<meta name="theme-color" content="#b5532d">
+<link rel="icon" href="data:,">
+</head><body style="background:#000">
+<script>
+/* Pull RPL's live page (so it always matches Me's latest deploy), take its import map, styles and body, then run its main.js. */
+(function () {
+  var RPL = 'https://redplanetlounge.pages.dev/', H = window.JFMARS || { log: [] };
+  function abs(u) { return new URL(u, RPL).href; }
+  fetch(RPL + location.search, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }).then(function (html) {
+    var d = new DOMParser().parseFromString(html, 'text/html'), mods = [];
+    d.querySelectorAll('script[type="importmap"]').forEach(function (s) {
+      var m = JSON.parse(s.textContent); Object.keys(m.imports || {}).forEach(function (k) { m.imports[k] = abs(m.imports[k]); });
+      var n = document.createElement('script'); n.type = 'importmap'; n.textContent = JSON.stringify(m); document.head.appendChild(n);
+    });
+    d.querySelectorAll('link[rel="stylesheet"], style').forEach(function (l) {
+      var n = l.cloneNode(true); if (n.href) n.href = abs(l.getAttribute('href')); document.head.appendChild(n);
+    });
+    var meta = d.querySelector('meta[name="description"]'); if (meta) document.head.appendChild(meta.cloneNode(true));
+    Array.prototype.slice.call(d.body.childNodes).forEach(function (c) {
+      if (c.nodeName === 'SCRIPT') { if (c.type === 'module' && c.getAttribute('src')) mods.push(abs(c.getAttribute('src'))); return; }
+      document.body.appendChild(document.importNode(c, true));
+    });
+    document.body.style.background = '';
+    if (!mods.length) throw new Error('no RPL module');
+    return mods.reduce(function (p, u) { return p.then(function () { return import(u); }); }, Promise.resolve());
+  }).then(function () {
+    H.log.push('RPL loaded');
+    // RPL listens for sessiongranted only once its world is built; if Quest fired it earlier, send it again for RPL.
+    var t0 = performance.now(), sent = false;
+    (function poll() {
+      if (!H.granted || sent || H.handed) return;
+      var b = document.getElementById('VRButton');
+      if (b && /ENTER VR/i.test(b.textContent)) { sent = true; var e = new Event('sessiongranted'); e.jfMars = true; navigator.xr.dispatchEvent(e); H.log.push('re-sent sessiongranted'); return; }
+      if (performance.now() - t0 < 20000) setTimeout(poll, 100);
+    })();
+  }).catch(function (e) { console.warn('mars wrapper:', e); if (H.fallback) H.fallback(); else location.replace(RPL + location.search); });
+})();
+</script>
+</body></html>
