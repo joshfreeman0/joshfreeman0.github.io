@@ -71,6 +71,7 @@ window.JFVR_LITE = (function () {
 <script src="w3d/zoo.js?v=2"></script>
 <script src="w3d/transit.js?v=1"></script>
 <script src="w3d/launch.js?v=6"></script>
+<script src="w3d/prison.js?v=1"></script>
 <script src="w3d/invite.js?v=2"></script>
 <script src="w3d/clickfix.js?v=1"></script>
 <script src="w3d/softgpu.js?v=1"></script>
@@ -160,6 +161,9 @@ body{margin:0;font-family:system-ui,sans-serif}
     <a-plane class="btn" data-w="saucer" position="1.7 -0.8 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Flying saucer" align="center" color="#111" width="1.9"></a-text></a-plane>
     <a-plane class="btn" data-w="walker" position="1.9 -1.2 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Walker Memorial (Boston)" align="center" color="#111" width="2.4"></a-text></a-plane>
     <a-plane class="btn" data-w="houseboat" position="0 -1.6 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Houseboat (sleep aboard)" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="bridgewater" position="-1.9 -2.0 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Corporate Base (Bridgewater)" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="aldensquare" position="0 -2.0 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Alden Square viewpoint" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="rockets" position="1.9 -2.0 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Rocket yard (18)" align="center" color="#111" width="2.4"></a-text></a-plane>
     <a-plane class="btn" data-w="home" position="0 -1.2 0" width="1.6" height="0.26" material="shader:flat;color:#9ffcff"><a-text value="Home: Fowling Pond" align="center" color="#111" width="2.4"></a-text></a-plane>
     <a-plane class="btn" data-invite="world" position="-1.7 -1.2 0" width="0.8" height="0.26" material="shader:flat;color:#9ffcff"><a-text value="Invite" align="center" color="#111" width="1.9"></a-text></a-plane>
     <a-plane class="btn" fly-toggle position="2.1 -0.4 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text id="flylabel" value="Fly: OFF" align="center" color="#111" width="1.9"></a-text></a-plane>
@@ -182,6 +186,9 @@ body{margin:0;font-family:system-ui,sans-serif}
   <button data-w="pyramid">Pyramid park (24/495)</button>
   <button data-w="launchpad">Launch pad (Bridgewater)</button>
   <button data-w="saucer">Flying saucer</button>
+  <button data-w="bridgewater">Corporate Base (Bridgewater)</button>
+  <button data-w="aldensquare">Alden Square viewpoint</button>
+  <button data-w="rockets">Rocket yard (18)</button>
   <button data-w="walker">Walker Memorial (Boston)</button>
   <button data-w="houseboat">Houseboat (sleep aboard)</button>
   <button data-w="residence">Josh's residence (bank tower L6)</button>
@@ -251,7 +258,7 @@ setTimeout(() => { if (!window.W3D_READY) window.JFVR_fail('The 3D world is taki
    and, with no spot, lands at the Bridgewater launch pad beside the rocket */
 const QS = new URLSearchParams(location.search), FROM_MARS = /^redplanet/i.test(QS.get('from') || '');
 const SPOT_ALIAS = {pond: 'marker', temple: 'temple', bank: 'hall', vesta: 'vesta', saucer: 'saucer', launchpad: 'launchpad', 'launch-pad': 'launchpad', pad: 'launchpad',
-  terrace: 'terrace', hall: 'hall', vault: 'vault', office: 'office', conservatory: 'conservatory', propulsion: 'propulsion', ufo: 'ufo', showcase: 'showcase', pyramid: 'pyramid', marker: 'marker', home: 'home', walker: 'walker', 'walker-memorial': 'walker', pharos: 'pharos', lighthouse: 'pharos', houseboat: 'houseboat', 'house-boat': 'houseboat', residence: 'residence', guest: 'guest', tower: 'tower'};
+  terrace: 'terrace', hall: 'hall', vault: 'vault', office: 'office', conservatory: 'conservatory', propulsion: 'propulsion', ufo: 'ufo', showcase: 'showcase', pyramid: 'pyramid', marker: 'marker', home: 'home', walker: 'walker', 'walker-memorial': 'walker', pharos: 'pharos', lighthouse: 'pharos', houseboat: 'houseboat', 'house-boat': 'houseboat', residence: 'residence', guest: 'guest', tower: 'tower', bridgewater: 'bridgewater', base: 'bridgewater', aldensquare: 'aldensquare', alden: 'aldensquare', 'alden-square': 'aldensquare', rockets: 'rockets'};
 function arrivalSpot(){ const sp = (QS.get('spot') || '').toLowerCase(), k = SPOT_ALIAS[sp];
   if (!W3D.spots.temple) W3D.spots.temple = () => W3D.teleportTo(866, undefined, -380, -90);   // between the sphinxes, facing the gate
   if (FROM_MARS && (!k || k === 'launchpad') && W3D.spots.padland) return 'padland';   // back from Mars: on the pad deck beside the rocket
