@@ -164,7 +164,7 @@ function attribution(show) {
     document.body.appendChild(attrEl); }
   attrEl.style.display = vis ? '' : 'none'; if (!vis) { if (vrAttr) vrAttr.visible = false; return; }
   const a = RE.tiles.getAttributions([]).filter(x => x.type === 'string').map(x => x.value).join('; ');
-  const txt = 'Google' + (a ? ' \u00b7 ' + a : ''); if (attrEl.textContent !== txt) attrEl.textContent = txt;
+  const txt = !a ? 'Google' : /^google/i.test(a) ? a.replace(/;\s*/g, ' \u00b7 ') : 'Google \u00b7 ' + a; if (attrEl.textContent !== txt) attrEl.textContent = txt;
   const sc = document.querySelector('a-scene'), xr = sc && sc.is('vr-mode');
   if (xr) { if (!vrAttr) { const c = document.createElement('canvas'); c.width = 1024; c.height = 64; const t = new THREE.CanvasTexture(c);
       vrAttr = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.031), new THREE.MeshBasicMaterial({map: t, transparent: true, opacity: .55, depthTest: false}));
