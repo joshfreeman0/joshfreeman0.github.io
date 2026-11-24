@@ -30,7 +30,7 @@
       let P = b.p; { let a0 = 0; for (let i = 0; i < P.length; i++) { const a = P[i], c2 = P[(i + 1) % P.length]; a0 += a[0] * c2[1] - c2[0] * a[1]; } if (a0 < 0) P = b.r ? [P[1], P[0], P[3], P[2]] : P.slice().reverse(); }   // one winding: walls face out
       let cx = 0, cz = 0, lo = 1e9, wet = false; for (const [x, z] of P) { cx += x; cz += z; const y = tH(x, z); lo = Math.min(lo, y); if (y < WATER + 0.15 && x > -1812 && x < 574 && z > -794 && z < 768) wet = true; } cx /= P.length; cz /= P.length;
       const tc = tH(cx, cz);
-      if (wet || !isFinite(lo) || Math.hypot(cx - HQ.x, cz - HQ.z) < 190 || (GA && GA(cx, cz, tc + 60) > tc + 1.0) || inPark(cx, cz) || onRiver(cx, cz)) { H.skipped++; return; }
+      if (wet || !isFinite(lo) || (W3D.keepOut || []).some(k => Math.hypot(cx - k.x, cz - k.z) < k.r) || Math.hypot(cx - HQ.x, cz - HQ.z) < 190 || (GA && GA(cx, cz, tc + 60) > tc + 1.0) || inPark(cx, cz) || onRiver(cx, cz)) { H.skipped++; return; }
       const key = Math.floor(cx / TS) + ',' + Math.floor(cz / TS); let T = tiles.get(key); if (!T) { T = {p: [], n: [], uv: [], c: [], cx: (Math.floor(cx / TS) + 0.5) * TS, cz: (Math.floor(cz / TS) + 0.5) * TS}; tiles.set(key, T); }
       const y0 = lo - 0.4, y1 = lo + b.h, wc = col.setHex(WALL[Math.floor(hash(bi) * (b.r ? WALL.length : 4))]).clone(), rc = new THREE.Color(b.r ? ROOF[Math.floor(hash(bi * 7) * ROOF.length)] : 0x8b8a86);
       const push = (x, y, z, nx, ny, nz, u, v, c) => { T.p.push(x, y, z); T.n.push(nx, ny, nz); T.uv.push(u, v); T.c.push(c.r, c.g, c.b); };

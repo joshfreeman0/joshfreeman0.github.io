@@ -56,7 +56,7 @@
     const tH = W3D.terrainH, GA = W3D.groundAt, WATER = 16.5, riv = [];
     for (const R of (W3D.water && W3D.water.rivers) || []) for (const [x, z] of R.pts) riv.push(x, z, (R.hw || 7) + 3);
     const occ = (W3D.home3d && W3D.home3d.occ) || new Set();
-    const free = (x, z, clear) => { const y = tH(x, z); if (!(y > WATER + clear)) return null; if (occ.has(Math.floor(x / 4) + ',' + Math.floor(z / 4))) return null; if (GA && GA(x, z, y + 40) > y + 0.6) return null; if (roadsOk(x, z)) return null;
+    const free = (x, z, clear) => { if ((W3D.keepOut || []).some(k => Math.hypot(x - k.x, z - k.z) < k.r)) return null; const y = tH(x, z); if (!(y > WATER + clear)) return null; if (occ.has(Math.floor(x / 4) + ',' + Math.floor(z / 4))) return null; if (GA && GA(x, z, y + 40) > y + 0.6) return null; if (roadsOk(x, z)) return null;
       for (let k = 0; k < riv.length; k += 3) { const dx = riv[k] - x, dz = riv[k + 1] - z; if (dx * dx + dz * dz < riv[k + 2] * riv[k + 2]) return null; } return y; };
     const pines = [], oaks = [], blue = [], rush = [], stones = [];
     const scat = (step, f) => { for (let x = BX[0]; x < BX[2]; x += step) for (let z = BX[1]; z < BX[3]; z += step) { const px = x + r() * step, pz = z + r() * step, k = zoneAt(px, pz); if (k) f(px, pz, k); } };

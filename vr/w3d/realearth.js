@@ -49,7 +49,7 @@ function buildMask() {
   if (wj.footbridge) line([wj.footbridge.a, wj.footbridge.b], 40);
   rect(820, -440, 1010, -280, 15);                                                                 // temple / bank / Vesta court / office
   // every named hand-built site group in the world root (its bounding box + margin)
-  const SITE = /bank|temple|vesta|sphinx|pyramid|office|showcase|zoo|lift|footbridge|weir|bridge-|kings|beach|shore|saucer|bridgewater|launch|campus|pad/i, bx = new THREE.Box3();
+  const SITE = /pharos|bank|temple|vesta|sphinx|pyramid|office|showcase|zoo|lift|footbridge|weir|bridge-|kings|beach|shore|saucer|bridgewater|launch|campus|pad/i, bx = new THREE.Box3();
   (W3D.root ? W3D.root.children : []).forEach(o => { if (!SITE.test(o.name || '') || /patch/.test(o.name)) return; bx.setFromObject(o); if (bx.isEmpty()) return;
     const sx = bx.max.x - bx.min.x, sz = bx.max.z - bx.min.z; if (sx > 3000 || sz > 3000) return; rect(bx.min.x, bx.min.z, bx.max.x, bx.max.z, 25); });
   { const a = P(9617, -2976.9); g.beginPath(); g.arc(a[0], a[1], 260 * s, 0, 7); g.fill(); }        // launch pad + tower

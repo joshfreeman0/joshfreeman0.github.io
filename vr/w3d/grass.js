@@ -35,7 +35,7 @@
     const st = RAD * 2 / Math.sqrt(COUNT * 1.6); let n = 0;
     for (let gx = Math.floor((px - RAD) / st); gx <= Math.ceil((px + RAD) / st) && n < COUNT; gx++) for (let gz = Math.floor((pz - RAD) / st); gz <= Math.ceil((pz + RAD) / st) && n < COUNT; gz++) {
       const x = (gx + hash(gx, gz)) * st, z = (gz + hash(gz + 7, gx - 3)) * st, dx = x - px, dz = z - pz; if (dx * dx + dz * dz > RAD * RAD) continue;
-      const c = veg(x, z); if (!c) continue; const y = W3D.terrainH(x, z); if (!(y > WATER + 0.35)) continue;
+      const c = veg(x, z); if (!c || (W3D.keepOut || []).some(k => Math.hypot(x - k.x, z - k.z) < k.r)) continue; const y = W3D.terrainH(x, z); if (!(y > WATER + 0.35)) continue;
       const gy = W3D.groundAt ? W3D.groundAt(x, z, y + 4) : y; if (gy > y + 0.25) continue;   // something built here
       const e = Math.sqrt(dx * dx + dz * dz) / RAD, s = (0.7 + hash(gx * 3, gz * 5) * 0.75) * (e < 0.7 ? 1 : Math.max(0.05, (1 - e) / 0.3));   // shrink toward the edge: no visible rim
       q.setFromAxisAngle(up, hash(gx, gz * 11) * 6.283); sv.set(s, s * (0.8 + hash(gz, gx * 13) * 0.6), s); pv.set(x, y - 0.04, z);

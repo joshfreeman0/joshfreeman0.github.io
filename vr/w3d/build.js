@@ -18,6 +18,7 @@
     const k = wd.kings; if (k && x > k.x0 && x < k.x1 && z > k.z0 && z < k.z1 && y < (k.level || 12.2) + 0.5) return "King's Pond";
     for (const R of wd.rivers || []) { const hw = (R.hw || 7) + 2; for (const [px, pz] of R.pts) if ((px - x) * (px - x) + (pz - z) * (pz - z) < hw * hw) return 'a river'; }
     if (x > 800 && x < 1060 && z > -720 && z < -260) return 'the bank and temple';
+    for (const k of W3D.keepOut || []) if (Math.hypot(x - k.x, z - k.z) < k.r) return k.name || 'a protected site';
     const P = wd.park; if (P && Math.pow((x - P.cx) / (P.ax + 60), 2) + Math.pow((z - P.cz) / (P.az + 60), 2) < 1) return 'the pyramid park';
     if (Math.hypot(x - 9617, z + 2976.9) < 120) return 'the launch pad';
     return null;
