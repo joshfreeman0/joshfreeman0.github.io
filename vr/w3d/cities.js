@@ -12,7 +12,7 @@ const DEFS = {   // origin = landing pad centre (local 0,0,0); yaw = direction t
   boston:    {name: 'Boston',        x: 100000, z: 60000, yaw: 0, v: 1},
   bangkok:   {name: 'Bangkok',       x: 120000, z: 60000, yaw: 0, v: 1},
   hongkong:  {name: 'Hong Kong',     x: 140000, z: 60000, yaw: 0, v: 1},
-  dubai:     {name: 'Dubai',         x: 160000, z: 60000, yaw: 0, v: 4}
+  dubai:     {name: 'Dubai',         x: 160000, z: 60000, yaw: 0, v: 5}
 };
 W3D.cityModules = W3D.cityModules || {};
 let cur = null;          // {id, grp, mod, ready, entered}
@@ -68,7 +68,7 @@ AFRAME.registerSystem('w3d-cities', { tick: function (t, dt) { if (cur && cur.en
     const gy = cur.mod.ground ? (cur.mod.ground(p.x - d.x, p.z - d.z) || 0) : 0, alt = Math.max(0, p.y - gy - 25);
     cur.fog.near = cur.fog0[0] + alt * 1.2; cur.fog.far = cur.fog0[1] + alt * 3.2; } } if (!cur || !cur.entered || t - (this.lt || 0) < 1000) return; this.lt = t;
   const c = document.querySelector('[camera]'); if (!c) return; const p = c.object3D.getWorldPosition(new THREE.Vector3()), d = DEFS[cur.id];
-  const dd = Math.hypot(p.x - d.x, p.z - d.z); if (dd < 2500) cur.near = true; else if (cur.near && dd > 3000 && !(W3D.saucer && W3D.saucer.seat() >= 0 && W3D.saucer.S.mode === 'fly')) unload(); } });
+  const dd = Math.hypot(p.x - d.x, p.z - d.z); if (dd < 2500) cur.near = true; else if (cur.near && dd > 3000 && !(W3D.saucer && W3D.saucer.seat() >= 0 && W3D.saucer.S.mode === 'fly') && !(W3D.realEarth && W3D.realEarth.on && W3D.realEarth.tiles)) unload(); } });   // with Real Earth on the city stays (you're flying over its real surroundings; Home / H still goes home)
 
 /* ---------- shared procedural kit ---------- */
 const TS = LITE ? 256 : 512;

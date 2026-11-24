@@ -15,8 +15,13 @@ const LITE = !!window.JFVR_LITE, QUEST = /OculusBrowser|Quest/i.test(navigator.u
 const LON0 = -71.06797286566898, LAT0 = 41.928658149882345, KX = 82938.7775, KY = 111071.9356, D2R = Math.PI / 180;
 const ANCH = {
   home:   {lat: LAT0, lon: LON0, x: 0, z: 0, yOff: 28.8, kx: KX, ky: KY},                       // geoid ~ -28.8 m at Raynham
-  london: {lat: 51.575359, lon: 0.111801, x: 60000, z: 60000, yOff: -(45.4 + 20.75)},
-  dubai: {lat: 25.19515, lon: 55.27315, x: 160000, z: 60000, yOff: -(-33.5 + 6)}                // geoid ~ -33.5 m, pad ~6 m             // geoid ~ +45.4 m, pad at 20.75 m
+  london: {lat: 51.575359, lon: 0.111801, x: 60000, z: 60000, yOff: -(45.4 + 20.75)},           // geoid ~ +45.4 m, pad at 20.75 m
+  dubai: {lat: 25.19515, lon: 55.27315, x: 160000, z: 60000, yOff: -(-33.5 + 6)},               // geoid ~ -33.5 m, pad ~6 m
+  // the stylised saucer cities sit on their real places too (pad = a real open waterfront spot); calibration levels the ground to the pad
+  boston: {lat: 42.36055, lon: -71.05035, x: 100000, z: 60000, yOff: -(-28.4 + 3), flat: 1},     // Christopher Columbus Park, harbour
+  saintjohn: {lat: 45.27255, lon: -66.06395, x: 80000, z: 60000, yOff: -(-21 + 4), flat: 1},     // Market Slip, uptown waterfront
+  bangkok: {lat: 13.74420, lon: 100.49260, x: 120000, z: 60000, yOff: -(-31 + 2), flat: 1},     // east bank opposite Wat Arun
+  hongkong: {lat: 22.29350, lon: 114.17190, x: 140000, z: 60000, yOff: -(-2 + 4), flat: 1}       // Tsim Sha Tsui promenade
 };
 const CAP = 32, LS = 'jfvr.gtiles', LSR = 'jfvr.gtiles.root', PREF = 'jfvr.realEarth';
 const q = location.search, forced = /[?&]realearth=1/.test(q) ? true : /[?&]realearth=0/.test(q) ? false : null;
@@ -117,7 +122,7 @@ function start() {
   const draco = new THREE.DRACOLoader(); draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
   T.registerPlugin(new K.GLTFExtensionsPlugin({dracoLoader: draco}));
   T.registerPlugin(new K.TileCompressionPlugin());
-  T.errorTarget = LITE ? 80 : QUEST ? 48 : 32;
+  T.errorTarget = LITE ? 72 : QUEST ? 40 : 24;   // sharper than v1 (80/48/32 looked blurry from flying height); the LRU caps below are unchanged
   const C = T.lruCache, MB = 1048576; if (C) { C.maxBytesSize = (LITE ? 120 : QUEST ? 300 : 500) * MB; C.minBytesSize = C.maxBytesSize * 0.7; C.maxSize = LITE ? 1500 : 4000; C.minSize = C.maxSize * 0.75; }
   T.addEventListener('load-model', ({scene}) => { scene.traverse(o => { if (o.isMesh) { [].concat(o.material).forEach(m => { m.fog = true; clipMat(m, 1); }); o.receiveShadow = o.castShadow = false; } }); });
   T.addEventListener('load-tile-set', () => { RE.ready = true; });
@@ -127,15 +132,25 @@ function start() {
 /* ECEF -> our local frame for anchor A: local = T(A.x, yOff, A.z) * P * ENU(lat, lon)^-1 */
 const _m = new THREE.Matrix4(), _p = new THREE.Matrix4().set(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
 function kxy(lat) { const p = lat * D2R; return {kx: 111412.84 * Math.cos(p) - 93.5 * Math.cos(3 * p), ky: 111132.954 - 559.822 * Math.cos(2 * p) + 1.175 * Math.cos(4 * p)}; }
-const REAL_CITY = {london: 480, dubai: 1650};   // hand-built square half-size kept over the Google tiles
+// half-size of the hand-built square kept over the Google tiles in each saucer city (London = the Goodmayes area labelled "London";
+// Dubai and the stylised cities keep only the landing lawn / pad plaza - Google's real city is the main look there)
+const REAL_CITY = {london: 480, dubai: 45, boston: 45, saintjohn: 45, bangkok: 45, hongkong: 45};
+// extra cutouts (slots 1-2) for hand-built buildings at real places: RE.addCut({lat, lon, half, need: /name/})
+const CUTS = [];   // (walker.js keeps its own cutout in slot 3, placed from RE.anchors.boston)
+RE.addCut = c => { CUTS.push(c); };
+// Google's Photorealistic 3D Tiles have no 3D surface data in the UAE (flat imagery + terrain only, Google Maps Platform coverage: Maps 3D
+// unavailable in AE), so in Dubai our Overture buildings, Burj spire, palms and fountain stay standing on Google's ground and imagery.
+const KEEP3D = {dubai: 1};
+RE.anchors = ANCH;   // the real place under each saucer city (walker.js places Walker Memorial from RE.anchors.boston)
+RE.geoToLocal = (lat, lon) => { const A = RE.A; return A ? {x: A.x + (lon - A.lon) * A.kx, z: A.z - (lat - A.lat) * A.ky} : null; };
 function setAnchor(name, A) {
   A = A || ANCH[name]; if (!A.kx) Object.assign(A, kxy(A.lat)); RE.anchor = name; RE.A = A; const T = RE.tiles; if (!T) return;
   const cal = +localStorage.getItem('jfvr.gtiles.cal.' + name) || 0; A.cal = A.cal != null ? A.cal : cal;
   window.JF3DTiles.WGS84_ELLIPSOID.getEastNorthUpFrame(A.lat * D2R, A.lon * D2R, _m); _m.invert();
   const M = new THREE.Matrix4().makeTranslation(A.x, A.yOff + (A.cal || 0), A.z).multiply(_p).multiply(_m);
   T.group.matrix.copy(M); T.group.matrixWorldNeedsUpdate = true; T.group.updateMatrixWorld(true);
-  const RC = REAL_CITY[name]; clipU.jfRect.value[0].set(A.x, A.z, RC ? RC : -1, 40);
 }
+
 function geoOf(x, z) { const A = RE.A; return {lat: A.lat - (z - A.z) / A.ky, lon: A.lon + (x - A.x) / A.kx}; }
 RE.geoOf = geoOf;
 RE.goGeo = (lat, lon, alt) => { // test / future menu hook: jump to any place on Earth (free anchor at a spot 200 km out so home stays clean)
@@ -144,8 +159,8 @@ RE.goGeo = (lat, lon, alt) => { // test / future menu hook: jump to any place on
 /* ---------- calibration: match the Google ground to ours near the anchor (25th percentile of tile - ours, outside cutouts) ---------- */
 function calibrate() {
   const T = RE.tiles; if (!T || RE.anchor === 'free') return false; const A = RE.A, rc = new THREE.Raycaster(), d = [];
-  const hf = RE.anchor === 'home' ? (x, z) => W3D.terrainH(x, z) : (x, z) => W3D.groundAt(x, z, 999);
-  const pts = RE.anchor === 'home' ? [[1500, 0], [-1500, 1300], [0, 1700], [-600, -1500], [1600, 1400], [2600, -900], [-2600, 1800], [3000, 2600], [-3200, -2400], [200, -3000], [-1800, 2600], [2200, 2900]]
+  const hf = RE.anchor === 'home' ? (x, z) => W3D.terrainH(x, z) : A.flat ? () => 0 : (x, z) => W3D.groundAt(x, z, 999);
+  const pts = A.flat ? [[A.x + 60, A.z], [A.x - 60, A.z], [A.x, A.z + 60], [A.x, A.z - 60], [A.x + 45, A.z + 45], [A.x - 45, A.z - 45]] : RE.anchor === 'home' ? [[1500, 0], [-1500, 1300], [0, 1700], [-600, -1500], [1600, 1400], [2600, -900], [-2600, 1800], [3000, 2600], [-3200, -2400], [200, -3000], [-1800, 2600], [2200, 2900]]
     : [[A.x + 700, A.z], [A.x - 700, A.z + 300], [A.x, A.z + 800], [A.x + 500, A.z - 700], [A.x - 600, A.z - 600], [A.x + 900, A.z + 800]];
   for (const [x, z] of pts) { rc.set(new THREE.Vector3(x, 3000, z), new THREE.Vector3(0, -1, 0)); rc.far = 6000;
     const h = rc.intersectObject(T.group, true)[0]; const o = hf(x, z); if (h && isFinite(o)) d.push(h.point.y - o); }
@@ -190,6 +205,48 @@ function addButtons() {
   label();
 }
 
+/* ---------- places: jump to a real landmark near where you are (menu "Places" / VR "Next place") ---------- */
+const HOME_P = [['Bridgewater', 41.9904, -70.9751], ['Brockton', 42.0834, -71.0184], ['Randolph', 42.1626, -71.0412], ['Blue Hills, Milton', 42.2120, -71.0730],
+  ['Quincy', 42.2529, -71.0023], ['Boston Common', 42.3550, -71.0656], ['MIT / Walker Memorial', 42.3594, -71.0883], ['Harvard Square', 42.3736, -71.1190], ['Fenway Park', 42.3467, -71.0972]];
+const PLACES = {
+  home: HOME_P, boston: HOME_P.slice(5).concat([['Boston Harbor', 42.3601, -71.0420]]),
+  london: [['London (landing)', 51.575359, 0.111801], ['Thames at Dagenham', 51.5130, 0.1390], ['Tower of London', 51.5081, -0.0759], ['London Eye', 51.5033, -0.1196],
+    ['Buckingham Palace', 51.5014, -0.1419], ['British Museum', 51.5194, -0.1270], ["Regent's Park", 51.5313, -0.1570], ['Wembley Stadium', 51.5560, -0.2795],
+    ['Emirates Stadium', 51.5549, -0.1084], ['Tottenham Hotspur Stadium', 51.6043, -0.0664], ['Stamford Bridge', 51.4817, -0.1910], ['London Stadium', 51.5386, -0.0166],
+    ['Twickenham', 51.4560, -0.3415], ["Lord's", 51.5294, -0.1727], ['The Oval', 51.4837, -0.1150]],
+  dubai: [['Burj Khalifa', 25.19515, 55.27315], ['The World islands', 25.2230, 55.1700], ['Burj Al Arab', 25.1412, 55.1853], ['Palm Jumeirah', 25.1124, 55.1390],
+    ['Dubai Marina', 25.0805, 55.1403], ['Palm Jebel Ali', 25.0030, 54.9890], ['Abu Dhabi: Sheikh Zayed Mosque', 24.4128, 54.4750]],
+  saintjohn: [['Saint John harbour', 45.27255, -66.06395], ['Reversing Falls', 45.2626, -66.0896]],
+  bangkok: [['Wat Arun', 13.7437, 100.4889], ['Grand Palace', 13.7500, 100.4913]],
+  hongkong: [['Victoria Harbour', 22.2935, 114.1719], ['Central', 22.2820, 114.1588], ['Victoria Peak', 22.2759, 114.1455]]
+};
+function placesHere() { const c = W3D.cities && W3D.cities.current && W3D.cities.current(); return PLACES[c] || PLACES.home; }
+RE.places = () => placesHere().map(p => p[0]);
+RE.goPlace = i => { const L = placesHere(), p = L[i]; if (!p || !RE.A) return false; if (!RE.on) setOn(true);
+  const c = W3D.cities && W3D.cities.current && W3D.cities.current(); if (c && ANCH[c] && RE.anchor !== c && RE.anchor !== 'free' && RE.tiles) { setAnchor(c); calTries = 0; RE.calDone = null; }
+  if (c && ANCH[c] && !ANCH[c].kx) Object.assign(ANCH[c], kxy(ANCH[c].lat));
+  const A = c && ANCH[c] && RE.anchor !== 'free' ? ANCH[c] : RE.A, q2 = {x: A.x + (p[2] - A.lon) * A.kx, z: A.z - (p[1] - A.lat) * A.ky}, sc = document.querySelector('a-scene'); sc.camera.getWorldPosition(_c);
+  const zz = q2.z + 900, dc = Math.hypot(_c.x - A.x, _c.z - A.z), dt = Math.hypot(q2.x - A.x, zz - A.z);
+  const y = (RE.gY != null ? RE.gY : 0) + (dc * dc - dt * dt) / 12742000 + (/Abu Dhabi|Palm|World|Marina/.test(p[0]) ? 700 : 320);
+  if (window.JFVR) JFVR.fly = true; W3D.teleportTo(q2.x, y, zz, 0); if (window.JFVR) JFVR.fly = true;
+  const lc = document.querySelector('[camera]') && document.querySelector('[camera]').components['look-controls']; if (lc && !sc.is('vr-mode')) { lc.pitchObject.rotation.x = -0.3; lc.yawObject.rotation.y = 0; }
+  RE.placeI = i; toast(p[0]); return true; };
+function placesUI() {
+  const tools = document.querySelector('#ui .tools') || document.querySelector('#ui .grp') || document.getElementById('ui');
+  if (tools && !document.getElementById('placesbtn')) { const b = document.createElement('button'); b.id = 'placesbtn'; b.textContent = 'Places';
+    const box = document.createElement('div'); box.id = 'placesbox'; box.style.cssText = 'display:none;position:fixed;right:12px;bottom:70px;z-index:20;max-height:60vh;overflow:auto;background:rgba(20,24,30,.92);border-radius:10px;padding:6px;font:14px system-ui,sans-serif';
+    document.body.appendChild(box);
+    b.onclick = () => { if (box.style.display !== 'none') { box.style.display = 'none'; return; } box.innerHTML = '';
+      RE.places().forEach((n, i) => { const e = document.createElement('div'); e.textContent = n; e.style.cssText = 'color:#fff;padding:7px 12px;cursor:pointer;border-radius:6px';
+        e.onmouseenter = () => { e.style.background = '#2d6a8a'; }; e.onmouseleave = () => { e.style.background = ''; }; e.onclick = () => { box.style.display = 'none'; RE.goPlace(i); }; box.appendChild(e); });
+      box.style.display = ''; };
+    tools.appendChild(b); }
+  const fly = document.querySelector('[fly-toggle]'); if (fly && !document.getElementById('placesvr')) {
+    const p = document.createElement('a-plane'); p.id = 'placesvr'; p.className = 'btn'; p.setAttribute('position', '1.7 -1.5 0'); p.setAttribute('width', '0.8'); p.setAttribute('height', '0.26'); p.setAttribute('material', 'shader:flat;color:#ffe08a');
+    const tx = document.createElement('a-text'); tx.setAttribute('align', 'center'); tx.setAttribute('color', '#111'); tx.setAttribute('width', '1.9'); tx.setAttribute('value', 'Next place'); p.appendChild(tx);
+    p.addEventListener('click', () => { const n = placesHere().length; RE.goPlace(((RE.placeI == null ? -1 : RE.placeI) + 1) % n); }); fly.parentNode.appendChild(p); }
+}
+
 
 /* ---------- simple collision with Google buildings (outside the cutouts): low-frequency raycasts against the loaded tile meshes ----------
    ~8 Hz, below 400 m: a downward ray under you and 2 m ahead fills a 2 m height cache; walking treats a tile surface > 2.5 m above our
@@ -198,7 +255,7 @@ function addButtons() {
 const HC = new Map(), _rc = new THREE.Raycaster(), _o = new THREE.Vector3(), _d = new THREE.Vector3(), _pr = new THREE.Vector3(); let colT = 0, havePrev = false, maskPx = null;
 function maskAt(x, z) { const c = RE.maskCanvas; if (!c) return 0; if (!maskPx) maskPx = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
   const u = (x + MR) / (2 * MR), v = (z + MR) / (2 * MR); let m = 0; if (u > 0 && u < 1 && v > 0 && v < 1) m = maskPx[(Math.floor(v * c.height) * c.width + Math.floor(u * c.width)) * 4] / 255;
-  for (const R of clipU.jfRect.value) if (R.z > 0 && Math.abs(x - R.x) < R.z && Math.abs(z - R.y) < R.z) m = 1; return m; }   // every cutout rect (slot 3 = Walker Memorial)
+  for (const R of clipU.jfRect.value) if (R.z > 0 && Math.abs(x - R.x) < R.z && Math.abs(z - R.y) < R.z) m = 1; return m; }
 const key = (x, z) => Math.round(x / 2) + ',' + Math.round(z / 2);
 function topAt(x, z, now) { const T = RE.tiles; _rc.set(_o.set(x, 3000, z), _d.set(0, -1, 0)); _rc.far = 6000; const h = _rc.intersectObject(T.group, true)[0]; const y = h ? h.point.y : null;
   HC.set(key(x, z), {y, t: now}); if (HC.size > 4000) { const it = HC.keys(); for (let i = 0; i < 1000; i++) HC.delete(it.next().value); } return y; }
@@ -206,7 +263,7 @@ function tileBlocked(x, z, y) {
   if (!oursOn || !RE.tiles) return false; const c = HC.get(key(x, z)); if (!c || c.y === null) return false;
   const g = W3D.terrainH ? W3D.terrainH(x, z) : 0; return c.y > y + 0.6 && c.y - g > 2.5 && maskAt(x, z) < 0.5; }
 RE.tileBlocked = tileBlocked; RE.setNight = n => { clipU.jfNi.value = n; };
-(function hookCity() { let cb = W3D.cityBlocked || null; const comb = (x, z, y) => (cb ? cb(x, z, y) : false) || tileBlocked(x, z, y);
+(function hookCity() { let cb = W3D.cityBlocked || null; const comb = (x, z, y) => (cb && (!oursOn || KEEP3D[W3D.cities && W3D.cities.current && W3D.cities.current()] || maskAt(x, z) >= 0.5) ? cb(x, z, y) : false) || tileBlocked(x, z, y);   // hidden city blocks outside the kept square don't block
   try { Object.defineProperty(W3D, 'cityBlocked', {configurable: true, get: () => comb, set: v => { cb = v; }}); } catch (e) {} })();
 function collide(t, sc) {
   if (t - colT < 120) return; colT = t; const T = RE.tiles; if (!T || !oursOn) return;
@@ -223,31 +280,90 @@ function collide(t, sc) {
   } else havePrev = false;
 }
 
+/* ---------- fallback ground: never empty space under you ----------
+   A plain earth-coloured disc (radius ~ the view distance) that follows the camera a little below the lowest Google ground sampled
+   around you, bent down with the Earth's curvature so it stays under far tiles. Wherever tiles haven't loaded yet (fast flight, high up,
+   slow network) you see this ground fading into the haze instead of sky; where tiles are loaded they cover it. */
+let FB = null, fbT = 0, fbI = 0, rootHid = false; const fbS = [];
+function fallback(t, sc, show) {
+  if (!FB) { const g = new THREE.CircleGeometry(1, 96, 0, Math.PI * 2), P = g.attributes.position;   // unit disc, rings added below
+    const rings = [], N = 48; for (let i = 0; i <= N; i++) rings.push(Math.pow(i / N, 2.2));
+    const pos = [], idx = []; const S = 48;
+    for (let i = 0; i <= N; i++) for (let j = 0; j < S; j++) { const r = rings[i], a = j / S * Math.PI * 2; pos.push(Math.cos(a) * r, 0, Math.sin(a) * r); }
+    for (let i = 0; i < N; i++) for (let j = 0; j < S; j++) { const a = i * S + j, b = i * S + (j + 1) % S, c = a + S, d = b + S; idx.push(a, c, b, b, c, d); }
+    g.dispose(); const G = new THREE.BufferGeometry(); G.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); G.setIndex(idx);
+    FB = new THREE.Mesh(G, new THREE.MeshBasicMaterial({color: 0x66705a, fog: true})); FB.name = 'realearth-fallback'; FB.frustumCulled = false; FB.renderOrder = -5;
+    FB.userData.R = 0; sc.object3D.add(FB); RE.fallback = FB; }
+  // one downward ray per ~110 ms around you (centre, 1.5 km, 4 km rings); keep the lowest of the last 9
+  if (t - fbT > 110) { fbT = t; const k = fbI++ % 9, r = k === 0 ? 0 : k < 5 ? 1500 : 4000, a = k * 1.7;
+    const T = RE.tiles; _rc.set(_o.set(_c.x + Math.cos(a) * r, _c.y + 3000, _c.z + Math.sin(a) * r), _d.set(0, -1, 0)); _rc.far = 20000;
+    const h = _rc.intersectObject(T.group, true)[0]; fbS[k] = h ? h.point.y : null; if (k === 0 && h && (RE.gY == null || Math.abs(h.point.y - RE.gY) < 400 || fbS.filter(x => x != null && Math.abs(x - h.point.y) < 250).length > 2)) RE.gY = h.point.y; }
+  const v = fbS.filter(x => x != null); if (!v.length) { const g0 = W3D.groundAt ? W3D.groundAt(_c.x, _c.z, -1e4) : 0; v.push(isFinite(g0) ? g0 : 0); }
+  const sv = v.slice().sort((a, b) => a - b), med = sv[sv.length >> 1], lo = Math.min.apply(null, v.filter(x => Math.abs(x - med) < 250)), R = Math.max(30000, sc.camera.far * 0.95);
+  if (Math.abs(FB.userData.R - R) > 1000) { FB.userData.R = R; const P = FB.geometry.attributes.position, n = P.count;   // curvature drop + a slope margin
+    for (let i = 0; i < n; i++) { const x = P.getX(i), z = P.getZ(i), rr = Math.hypot(x, z) || 0, d = rr * R; P.setY(i, -(d * d / 12742000 + d * 0.012) / R); } P.needsUpdate = true; }
+  FB.scale.set(R, R, R); FB.position.set(_c.x, lo - 12, _c.z); FB.visible = show;
+  const city = W3D.cities && W3D.cities.current && W3D.cities.current(); FB.material.color.setHex(city === 'dubai' ? 0xb5a686 : city === 'bangkok' || city === 'hongkong' ? 0x5f6a55 : 0x66705a);
+  if (clipU.jfNi.value > 0) FB.material.color.multiplyScalar(1 - 0.85 * clipU.jfNi.value);
+}
+// stylised cities have a themed (sunset / dusk) fog colour; over the real city use a neutral daylight haze while tiles show
+let tinted = null;
+function skyTint(sc, on) { const s3 = sc.object3D, f = s3.fog;
+  if (on && f && !tinted) { tinted = {f, c: f.color.getHex(), b: s3.background && s3.background.isColor ? s3.background.getHex() : null}; f.color.setHex(0xc9d6e2); if (tinted.b != null) s3.background.setHex(0xc9d6e2); }
+  else if (!on && tinted) { if (tinted.f === f) { f.color.setHex(tinted.c); if (tinted.b != null && s3.background && s3.background.isColor) s3.background.setHex(tinted.b); } tinted = null; } }
+
 /* ---------- per frame ---------- */
-const _c = new THREE.Vector3(); let calT = 0, calTries = 0;
+const _c = new THREE.Vector3(); let calT = 0, calTries = 0, cutT = -1e9, cutsLive = [];
+function hasNamed(sc, re) { let f = false; sc.object3D.traverse(o => { if (!f && o.name && re.test(o.name) && o.visible !== false) f = true; }); return f; }
 AFRAME.registerSystem('w3d-realearth', {
-  init: function () { const go = () => { addButtons(); if (RE.on) { start(); } };
+  init: function () { const go = () => { addButtons(); placesUI(); if (RE.on) { start(); } };
     if (window.W3D_READY) go(); else window.addEventListener('w3d-ready', go), (function w() { if (window.W3D_READY) { if (!RE._go) { RE._go = 1; go(); } } else setTimeout(w, 500); })(); },
   tick: function (t, dt) {
     const T = RE.tiles, sc = this.el; if (!T || !sc.camera) return;
     const city = W3D.cities && W3D.cities.current && W3D.cities.current(), D = W3D.cities && W3D.cities.DEFS;
     if ((!clipU.jfMask.value || !RE.mask2 && t > 20000) && W3D.water) { if (clipU.jfMask.value) RE.mask2 = true; buildMask(); }
-    if (REAL_CITY[city] && show0()) { const cg = sc.object3D.getObjectByName('city-' + city); if (cg && !cg.userData.jfClip) { cg.userData.jfClip = 1; cg.traverse(o => { if (o.isMesh && !/saucer/i.test(o.name || '')) [].concat(o.material).forEach(m => clipMat(m, 2)); }); } }
+    if (REAL_CITY[city] && show0() && RE.everReady) { const cg = sc.object3D.getObjectByName('city-' + city); if (cg && !cg.userData.jfClip) { cg.userData.jfClip = 1; const off = [], bb = new THREE.Box3(), h = REAL_CITY[city] + 60, P = cg.position;
+        cg.updateMatrixWorld(true); cg.traverse(o => { if (!o.isMesh || /saucer|fountain|beacon/i.test(o.name || '')) return;
+          if (!o.geometry) return; if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+          if (KEEP3D[city] && o.geometry.boundingBox.max.y - o.geometry.boundingBox.min.y > 3) return;   // Google has no 3D there: keep our buildings / trees, swap only the flat ground
+          [].concat(o.material).forEach(m => clipMat(m, 2)); if (o.isInstancedMesh) return;
+          if (bb.max.x < P.x - h || bb.min.x > P.x + h || bb.max.z < P.z - h || bb.min.z > P.z + h) off.push(o); });   // wholly outside the kept square: don't draw at all
+        cg.userData.jfOff = off; }
+      const cg2 = sc.object3D.getObjectByName('city-' + city);
+      if (cg2 && D && D[city]) { const far = Math.hypot(_c.x - D[city].x, _c.z - D[city].z) > (KEEP3D[city] ? 60000 : 4500); if (far && cg2.visible) { cg2.visible = false; cg2.userData.jfFarHid = true; } else if (!far && cg2.userData.jfFarHid) { cg2.visible = true; cg2.userData.jfFarHid = false; } } if (cg2 && cg2.userData.jfOff && cg2.userData.jfOffOn !== true) { cg2.userData.jfOffOn = true; cg2.userData.jfOff.forEach(o => { o.userData.jfVis = o.visible; o.visible = false; }); } }
+    else if (city) { const cg = sc.object3D.getObjectByName('city-' + city); if (cg && cg.userData.jfFarHid) { cg.visible = true; cg.userData.jfFarHid = false; } if (cg && cg.userData.jfOffOn) { cg.userData.jfOffOn = false; cg.userData.jfOff.forEach(o => { o.visible = o.userData.jfVis !== false; }); } }
     const xr = sc.renderer.xr && sc.renderer.xr.isPresenting, cam = xr ? sc.renderer.xr.getCamera() : sc.camera;
     sc.camera.getWorldPosition(_c);
     let want = 'home', show = RE.on && !!W3D.active && !W3D.spaceView && !(W3D.arrival && W3D.arrival.active) && !W3D.launchFlight;
     const nearCity = D && Object.keys(D).find(k => Math.hypot(_c.x - D[k].x, _c.z - D[k].z) < 3500);
-    if (REAL_CITY[city] || REAL_CITY[nearCity]) want = REAL_CITY[city] ? city : nearCity;
-    else if (nearCity || city) show = false;                                      // stylised cities have no real place under them
+    const cityA = city && ANCH[city] ? city : nearCity && ANCH[nearCity] ? nearCity : null;
+    if (cityA) {   // every saucer city sits on its real place: fly anywhere from it (anchor = the city within ~12 km, then a floating origin)
+      const dc = Math.hypot(_c.x - D[cityA].x, _c.z - D[cityA].z); want = dc < (RE.anchor === cityA ? 13000 : 11000) ? cityA : 'free'; }
     else if (Math.hypot(_c.x, _c.z) > 30000 || RE.anchor === 'free' && RE.pin) want = 'free';
-    if (RE.pin && Math.hypot(_c.x, _c.z) < 30000) RE.pin = false;
+    if (RE.pin && !cityA && Math.hypot(_c.x, _c.z) < 30000) RE.pin = false;
     if (want !== 'free' && RE.anchor !== want) { setAnchor(want); calTries = 0; RE.calDone = null; }
-    else if (want === 'free') { const A = RE.A; if (RE.anchor !== 'free') { const g = geoOf(_c.x, _c.z); setAnchor('free', {lat: g.lat, lon: g.lon, x: _c.x, z: _c.z, yOff: A.yOff}); }
-      else if (Math.hypot(_c.x - A.x, _c.z - A.z) > 15000) { const g = geoOf(_c.x, _c.z); setAnchor('free', {lat: g.lat, lon: g.lon, x: _c.x, z: _c.z, yOff: A.yOff}); } }
-    T.group.visible = show; applyOursState(show);
+    else if (want === 'free') { const A = RE.A, dA = Math.hypot(_c.x - A.x, _c.z - A.z);
+      // re-base under the camera; the new tangent frame is lowered by the Earth's curvature drop at that distance so the ground doesn't jump
+      if (RE.anchor !== 'free' || dA > 15000) { const g = geoOf(_c.x, _c.z); setAnchor('free', {lat: g.lat, lon: g.lon, x: _c.x, z: _c.z, yOff: A.yOff + (A.cal || 0) - dA * dA / 12742000, cal: 0}); } }
+    // cutouts that follow the loaded city (slot 0) and hand-built places at real coordinates (slots 1-3)
+    { const R = clipU.jfRect.value, rc = city && REAL_CITY[city] && D[city]; if (rc) R[0].set(D[city].x, D[city].z, REAL_CITY[city], 40); else R[0].set(0, 0, -1, 0);
+      if (t - cutT > 3000) { cutT = t; cutsLive = CUTS.filter(c => !c.need || hasNamed(sc, c.need)); }
+      let k = 1; for (const c of cutsLive) { if (k > 2) break; const q2 = RE.geoToLocal(c.lat, c.lon); if (q2 && Math.hypot(q2.x - _c.x, q2.z - _c.z) < 40000) R[k++].set(q2.x, q2.z, c.half, 30); }
+      for (; k < 3; k++) R[k].set(0, 0, -1, 0); }   // slot 3 belongs to walker.js
+    if (!RE.on && city && LITE && !RE._liteTip) { RE._liteTip = 1; toast('Real Earth is off on this phone to save memory - turn it on in the menu to see the whole city around you'); }
+    // our classic ground stays until Google's first tiles around you have arrived (no pale empty world while the first load runs)
+    if (!RE.everReady && T.visibleTiles && (T.visibleTiles.size > 25 && !T.stats.downloading && !T.stats.parsing || T.visibleTiles.size > 12 && t - (RE.t0 || (RE.t0 = t)) > 20000)) RE.everReady = true;
+    if (!RE.t0) RE.t0 = t;
+    const vis = show && !!RE.everReady;
+    T.group.visible = vis; applyOursState(vis); if (!vis && FB) FB.visible = false;
+    // far from home (past the cutout mask) the home world is entirely clipped away anyway: stop drawing it
+    { const far = vis && !city && Math.hypot(_c.x, _c.z) > (rootHid ? 13000 : 14000), R0 = W3D.root;
+      if (R0 && far !== rootHid) { if (far && R0.visible) { R0.visible = false; rootHid = true; } else if (!far) { if (rootHid && !city) R0.visible = true; rootHid = false; } } }
+    skyTint(sc, show && cityA && ANCH[cityA].flat);
     if (show) {
       T.setCamera(cam); T.setResolutionFromRenderer(cam, sc.renderer); cam.updateMatrixWorld(); T.update();
-      const gnd = W3D.groundAt ? W3D.groundAt(_c.x, _c.z, -1e4) : 0, alt = Math.max(0, _c.y - (isFinite(gnd) ? gnd : 0));
+      fallback(t, sc, show);
+      const gnd0 = W3D.groundAt ? W3D.groundAt(_c.x, _c.z, -1e4) : 0, gnd = RE.gY != null && (RE.anchor !== 'home' || !isFinite(gnd0)) ? RE.gY : gnd0, alt = Math.max(0, _c.y - (isFinite(gnd) ? gnd : 0));
       const f = sc.object3D.fog; if (f && f.far !== undefined) { f.near = Math.max(f.near, (LITE ? 6000 : 14000) + alt * 4); f.far = Math.max(f.far, (LITE ? 20000 : 45000) + alt * 16); }
       const cf = Math.min(4e6, Math.max(60000, 60000 + alt * 40)); if (Math.abs(sc.camera.far - cf) > 2000) { sc.camera.far = cf; sc.camera.updateProjectionMatrix(); }
       const gg = sc.object3D.getObjectByName('globalGround'); if (gg) gg.visible = false;

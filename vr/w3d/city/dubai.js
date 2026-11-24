@@ -44,7 +44,7 @@ function build(grp, K, D) {
   const coll = K.blocks(grp, list, mats);
   // Burj Khalifa spire (760 -> 828 m) and its crown
   { const sp = new THREE.Mesh(K.merge([K.xform(new THREE.CylinderGeometry(0.6, 3.2, 68, 10), 100, 760 + 34, -229), K.xform(new THREE.CylinderGeometry(3.4, 4.2, 6, 12), 100, 757, -229)]), mats.burj); sp.name = 'dubai-spire'; grp.add(sp);
-    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 6), new THREE.MeshBasicMaterial({color: 0xff4030})); beacon.position.set(100, 828.5, -229); grp.add(beacon); out.beacon = beacon; }
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 6), new THREE.MeshBasicMaterial({color: 0xff4030})); beacon.position.set(100, 828.5, -229); beacon.name = 'dubai-beacon'; grp.add(beacon); out.beacon = beacon; }
   // fountain: rows of jets in the lake that pulse in sequence
   const jets = []; const lake = D.lake; if (lake) { let cx = 0, cz = 0; lake.forEach(p => { cx += p[0]; cz += p[1]; }); cx /= lake.length; cz /= lake.length;
     for (let i = 0; i < (L ? 24 : 60); i++) { const a = i / (L ? 24 : 60), x = cx - 120 + a * 240, z = cz + Math.sin(a * Math.PI * 3) * 22; if (!K.inPoly(x, z, lake)) continue; jets.push([x, z, a]); } }
