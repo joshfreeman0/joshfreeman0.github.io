@@ -11,6 +11,8 @@
   const MOLE = [[-971, 618], [-971, 566], [-970, 546], [-964, 537], [-943, 533], [-935, 526], [-924, 525], [-916, 533], [-903, 535], [-896, 545], [-895, 600], [-891, 606], [-884, 609], [-870, 612], [-862, 618]];
   W3D.keepOut = (W3D.keepOut || []).concat([{x: -931, z: 570, r: 62, name: 'the Pharos'}]);   // no houses / grass / plants / builds on it
   const P = W3D.pharos = {height: 0, tris: 0};
+  // ?spot=pharos is resolved before the tower is built (it builds on W3D_READY): wait for it, then go to the gallery
+  if (W3D.spots) W3D.spots.pharos = () => { const iv = setInterval(() => { if (P.ready && P.go) { clearInterval(iv); P.go(); } }, 150); setTimeout(() => clearInterval(iv), 60000); };
   const parts = [];   // [geometry, colour]
   const col = (g, c, x, y, z, ry) => { if (ry) g.rotateY(ry); g.translate(x || 0, y || 0, z || 0); parts.push([g, c]); return g; };
   const STONE = 0xe6dcc6, STONE2 = 0xd8ccb2, DARK = 0x3a3630;
@@ -76,7 +78,7 @@
     // ---- walkable: deck, court, terrace, gallery; viewpoint
     const F = W3D.floors; F.push({x0: -966, x1: -900, z0: 538, z1: 612, y: DECK + 0.25}, {x0: C.x - 18 * K, x1: C.x + 18 * K, z0: C.z - 18 * K, z1: C.z + 18 * K, y: DECK + 3},
       {x0: C.x - b1 - 1.2, x1: C.x + b1 + 1.2, z0: C.z - b1 - 1.2, z1: C.z + b1 + 1.2, y: P.terrace}, {x0: C.x - o1 - 1.4, x1: C.x + o1 + 1.4, z0: C.z - o1 - 1.4, z1: C.z + o1 + 1.4, y: P.gallery});
-    W3D.spots = W3D.spots || {}; W3D.spots.pharos = () => { W3D.teleportTo(C.x, P.gallery + 0.05, C.z - o1 - 0.6, -62); if (window.JFVR && JFVR.hud) JFVR.hud('Pharos lantern gallery - ' + Math.round(P.gallery - 16.5) + ' m above the pond'); };
+    W3D.spots = W3D.spots || {}; W3D.spots.pharos = P.go = () => { W3D.teleportTo(C.x, P.gallery + 0.05, C.z - o1 - 0.6, -62); if (window.JFVR && JFVR.hud) JFVR.hud('Pharos lantern gallery - ' + Math.round(P.gallery - 16.5) + ' m above the pond'); };
     clearTrees(); P.ready = true; menu();
   }
   function triton(x, y, z, a) {   // merman blowing a conch: fish tail coiled on the cornice, torso, head, raised conch

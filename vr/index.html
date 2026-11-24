@@ -80,7 +80,7 @@ window.JFVR_LITE = (function () {
 <script src="w3d/walker.js?v=1"></script>
 <script src="w3d/daynight.js?v=1"></script>
 <script src="w3d/realism.js?v=1"></script>
-<script src="w3d/pharos.js?v=1"></script>
+<script src="w3d/pharos.js?v=2"></script>
 <script src="w3d/grass.js?v=2"></script>
 <script src="w3d/home3d.js?v=3"></script>
 <script src="w3d/coverup.js?v=2"></script>
@@ -243,7 +243,7 @@ setTimeout(() => { if (!window.W3D_READY) window.JFVR_fail('The 3D world is taki
    and, with no spot, lands at the Bridgewater launch pad beside the rocket */
 const QS = new URLSearchParams(location.search), FROM_MARS = /^redplanet/i.test(QS.get('from') || '');
 const SPOT_ALIAS = {pond: 'marker', temple: 'temple', bank: 'hall', vesta: 'vesta', saucer: 'saucer', launchpad: 'launchpad', 'launch-pad': 'launchpad', pad: 'launchpad',
-  terrace: 'terrace', hall: 'hall', vault: 'vault', office: 'office', conservatory: 'conservatory', propulsion: 'propulsion', ufo: 'ufo', showcase: 'showcase', pyramid: 'pyramid', marker: 'marker', home: 'home', walker: 'walker', 'walker-memorial': 'walker'};
+  terrace: 'terrace', hall: 'hall', vault: 'vault', office: 'office', conservatory: 'conservatory', propulsion: 'propulsion', ufo: 'ufo', showcase: 'showcase', pyramid: 'pyramid', marker: 'marker', home: 'home', walker: 'walker', 'walker-memorial': 'walker', pharos: 'pharos', lighthouse: 'pharos'};
 function arrivalSpot(){ const sp = (QS.get('spot') || '').toLowerCase(), k = SPOT_ALIAS[sp];
   if (!W3D.spots.temple) W3D.spots.temple = () => W3D.teleportTo(866, undefined, -380, -90);   // between the sphinxes, facing the gate
   if (FROM_MARS && (!k || k === 'launchpad') && W3D.spots.padland) return 'padland';   // back from Mars: on the pad deck beside the rocket
