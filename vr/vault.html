@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script>
+      // Specie ledger: gold reserves vs. banknotes in circulation.
+      AFRAME.registerComponent('specie-ledger', {
+        schema: {
+          reserves: {type: 'number', default: 100000},
+          circulation: {type: 'number', default: 250000},
+          minRatio: {type: 'number', default: 0.2}
+        },
+        init: function () {
+          this.reserves = this.data.reserves;
+          this.circulation = this.data.circulation;
+          this.display = document.getElementById('ledger-text');
+          this.render();
+        },
+        deposit: function (amt) {            // specie comes in, notes issued against it
+          this.reserves += amt; this.circulation += amt; this.render();
+        },
+        redeem: function (amt) {             // notes presented, gold paid out
+          if (this.ratio() <= this.data.minRatio || this.reserves < amt) {
+            this.render('SPECIE PAYMENTS SUSPENDED'); return;
+          }
+          this.reserves -= amt; this.circulation = Math.max(0, this.circulation - amt); this.render();
+        },
+        lend: function (amt) {               // new notes, no new gold
+          this.circulation += amt; this.render();
+        },
+        ratio: function () { return this.circulation ? this.reserves / this.circulation : 1; },
+        render: function (alert) {
+          const r = this.ratio();
+          const ok = r > this.data.minRatio;
+          const fmt = n => '$' + Math.round(n).toLocaleString();
+          this.display.setAttribute('value',
+            'STATE BANK LEDGER\n\nSpecie reserves: ' + fmt(this.reserves) +
+            '\nNotes in circulation: ' + fmt(this.circulation) +
+            '\nReserve ratio: ' + (r * 100).toFixed(1) + '%' +
+            (alert ? '\n\n' + alert : (ok ? '' : '\n\nRESERVES BELOW MINIMUM')));
+          this.display.setAttribute('color', ok && !alert ? '#00ffd5' : '#ff4040');
+        }
+      });
+
+      // Vault door: click toggles open and closed.
+      AFRAME.registerComponent('vault-interaction', {
+        init: function () {
+          this.open = false;
+          this.el.addEventListener('click', () => {
+            this.open = !this.open;
+            this.el.setAttribute('animation__door', {
+              property: 'position', dur: 3000, easing: 'easeInOutQuad',
+              to: this.open ? '8.2 0 0.2' : '0 0 0.2'
+            });
+          });
+        }
+      });
+
+      // Ledger buttons: action = deposit | redeem | lend
+      AFRAME.registerComponent('ledger-button', {
+        schema: {action: {type: 'string'}, amount: {type: 'number', default: 1000}},
+        init: function () {
+          this.el.addEventListener('click', () => {
+            const ledger = document.getElementById('economic-engine').components['specie-ledger'];
+            ledger[this.data.action](this.data.amount);
+          });
+          this.el.addEventListener('mouseenter', () => this.el.setAttribute('scale', '1.08 1.08 1.08'));
+          this.el.addEventListener('mouseleave', () => this.el.setAttribute('scale', '1 1 1'));
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <a-scene background="color: #0b0b1a">
+      <a-sky color="#0f0c1b"></a-sky>
+      <a-entity light="type: ambient; intensity: 0.5"></a-entity>
+      <a-entity light="type: point; intensity: 1.2; distance: 60" position="0 15 -30"></a-entity>
+      <a-plane rotation="-90 0 0" width="200" height="200" color="#1a1528" roughness="0.9"></a-plane>
+
+      <a-entity id="temple-hall" position="0 0 -10">
+        <a-box position="-6 7 -5" width="4" height="14" depth="6" color="#3d2c54"></a-box>
+        <a-box position="6 7 -5" width="4" height="14" depth="6" color="#3d2c54"></a-box>
+        <a-box position="0 13 -5" width="16" height="3" depth="6" color="#2c1f3d"></a-box>
+        <a-cylinder class="column" radius="1.5" height="18" color="#d4af37" position="-5 9 -15"></a-cylinder>
+        <a-cylinder class="column" radius="1.5" height="18" color="#d4af37" position="-5 9 -25"></a-cylinder>
+        <a-cylinder class="column" radius="1.5" height="18" color="#d4af37" position="-5 9 -35"></a-cylinder>
+        <a-cylinder class="column" radius="1.5" height="18" color="#d4af37" position="5 9 -15"></a-cylinder>
+        <a-cylinder class="column" radius="1.5" height="18" color="#d4af37" position="5 9 -25"></a-cylinder>
+        <a-cylinder class="column" radius="1.5" height="18" color="#d4af37" position="5 9 -35"></a-cylinder>
+      </a-entity>
+
+      <a-entity position="0 0 -45">
+        <a-box position="0 10 -0.6" width="24" height="20" depth="0.8" color="#231930"></a-box>
+        <a-entity id="vault-structure" position="0 5 0">
+          <a-box position="0 0 -0.4" width="8.5" height="10.5" depth="0.4" color="#110d17"></a-box>
+          <!-- gold stacks behind the door -->
+          <a-box position="-1.5 -4.2 -0.1" width="2" height="1.2" depth="0.3" color="#ffd700" metalness="0.8" roughness="0.3"></a-box>
+          <a-box position="1.5 -4.2 -0.1" width="2" height="1.2" depth="0.3" color="#ffd700" metalness="0.8" roughness="0.3"></a-box>
+          <a-box id="vault-door" class="clickable" position="0 0 0.2" width="8" height="10" depth="1" color="#8a6f27" vault-interaction>
+            <a-plane position="0 0 0.51" width="3" height="3" color="#000" emissive="#00ffd5" emissive-intensity="0.2"></a-plane>
+            <a-text value="VAULT" align="center" position="0 0 0.53" width="8" color="#00ffd5"></a-text>
+          </a-box>
+        </a-entity>
+
+        <!-- ledger board left of the vault -->
+        <a-plane position="-8 6 0.05" width="6.5" height="5" color="#05040a"></a-plane>
+        <a-text id="ledger-text" value="" align="center" position="-8 6 0.1" width="6" color="#00ffd5"></a-text>
+
+        <!-- teller buttons right of the vault -->
+        <a-box class="clickable" ledger-button="action: deposit; amount: 5000" position="8 8 0.3" width="5" height="1.2" depth="0.3" color="#2e7d32">
+          <a-text value="DEPOSIT $5,000 SPECIE" align="center" position="0 0 0.16" width="5"></a-text>
+        </a-box>
+        <a-box class="clickable" ledger-button="action: redeem; amount: 5000" position="8 6 0.3" width="5" height="1.2" depth="0.3" color="#b8860b">
+          <a-text value="REDEEM $5,000 IN NOTES" align="center" position="0 0 0.16" width="5"></a-text>
+        </a-box>
+        <a-box class="clickable" ledger-button="action: lend; amount: 25000" position="8 4 0.3" width="5" height="1.2" depth="0.3" color="#8b1a1a">
+          <a-text value="ISSUE $25,000 LOAN" align="center" position="0 0 0.16" width="5"></a-text>
+        </a-box>
+      </a-entity>
+
+      <a-entity id="economic-engine" specie-ledger="reserves: 100000; circulation: 250000; minRatio: 0.2"></a-entity>
+
+      <a-entity id="player" position="0 0 5">
+        <a-camera position="0 1.6 0" look-controls wasd-controls="acceleration: 40">
+          <a-cursor raycaster="objects: .clickable" color="#00ffd5"></a-cursor>
+        </a-camera>
+        <a-entity laser-controls="hand: left" raycaster="objects: .clickable"></a-entity>
+        <a-entity laser-controls="hand: right" raycaster="objects: .clickable"></a-entity>
+      </a-entity>
+    </a-scene>
+  </body>
+</html>
