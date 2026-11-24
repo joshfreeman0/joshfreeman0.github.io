@@ -3,7 +3,7 @@
      sunset + 20 min and day fades back in from sunrise - 20 min to sunrise. Rechecked every minute against the viewer's own clock.
    - Overrides: ?night=1 / ?day=1 (testing, this visit only) and a menu choice Sky: Auto / Day / Night saved in this browser
      (localStorage 'jfvr_sky'); never sent to the room.
-   - Night: dark sky dome with stars, green / violet aurora curtains, a moon, cool moonlight, darker fog and ambient light, existing lamps
+   - Night: dark sky dome with stars, green / violet aurora curtains, a moon with its real phase and position (SunCalc ephemeris, ?moondate=YYYY-MM-DD&moonhour=H to preview; moonlight and ambient scale with illumination), cool moonlight, darker fog and ambient light, existing lamps
      brighter with soft glows (bank, pavilion, temple lamps, Vesta fire, shore lanterns).
    - Night sounds (WebAudio, synthesised, no files): crickets, frogs near the ponds, an occasional owl or loon. Start on the first tap /
      click / key / controller press; menu "Night sounds: On/Off" (localStorage 'jfvr_nsnd').
@@ -39,9 +39,44 @@
   function target() { return mode === 'night' ? 1 : mode === 'day' ? 0 : autoNight(Date.now()); }
   const today = () => { const n = Date.now(), ev = events(n).filter(e => new Date(e[0]).toDateString() === new Date(n).toDateString()); return ev.map(e => (e[1] ? 'sunrise ' : 'sunset ') + new Date(e[0]).toLocaleTimeString()); };
 
+
+  // ---------- moon ephemeris: SunCalc (c) 2011-2015 Vladimir Agafonkin, BSD-2-Clause, https://github.com/mourner/suncalc (Meeus-style low-precision sun and moon) ----------
+  const RD = Math.PI / 180, EPS = RD * 23.4397, J1970 = 2440588, J2000 = 2451545;
+  const toDays = ms => ms / 864e5 - 0.5 + J1970 - J2000;
+  const ra_ = (l, b) => Math.atan2(Math.sin(l) * Math.cos(EPS) - Math.tan(b) * Math.sin(EPS), Math.cos(l)), dec_ = (l, b) => Math.asin(Math.sin(b) * Math.cos(EPS) + Math.cos(b) * Math.sin(EPS) * Math.sin(l));
+  function sunCoords(d) { const M = RD * (357.5291 + 0.98560028 * d), C = RD * (1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M)), L = M + C + RD * 102.9372 + Math.PI; return {dec: dec_(L, 0), ra: ra_(L, 0)}; }
+  function moonCoords(d) { const L = RD * (218.316 + 13.176396 * d), M = RD * (134.963 + 13.064993 * d), F = RD * (93.272 + 13.229350 * d), l = L + RD * 6.289 * Math.sin(M), b = RD * 5.128 * Math.sin(F);
+    return {ra: ra_(l, b), dec: dec_(l, b), dist: 385001 - 20905 * Math.cos(M)}; }
+  function moonIllum(ms) { const d = toDays(ms), s = sunCoords(d), m = moonCoords(d), sd = 149598000;
+    const phi = Math.acos(Math.sin(s.dec) * Math.sin(m.dec) + Math.cos(s.dec) * Math.cos(m.dec) * Math.cos(s.ra - m.ra)), inc = Math.atan2(sd * Math.sin(phi), m.dist - sd * Math.cos(phi));
+    const ang = Math.atan2(Math.cos(s.dec) * Math.sin(s.ra - m.ra), Math.sin(s.dec) * Math.cos(m.dec) - Math.cos(s.dec) * Math.sin(m.dec) * Math.cos(s.ra - m.ra));
+    return {fraction: (1 + Math.cos(inc)) / 2, phase: 0.5 + 0.5 * inc * (ang < 0 ? -1 : 1) / Math.PI, inc}; }   // phase 0 new, .25 first quarter, .5 full, .75 last quarter
+  // sky direction in the scene frame (x east, y up, -z north) of body c at time d (days since J2000)
+  function skyDir(c, d, out) { const H = RD * (280.16 + 360.9856235 * d) + LON * RD - c.ra, ph = LAT * RD, alt = Math.asin(Math.sin(ph) * Math.sin(c.dec) + Math.cos(ph) * Math.cos(c.dec) * Math.cos(H)),
+      az = Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(ph) - Math.tan(c.dec) * Math.cos(ph)), ca = Math.cos(alt);
+    out.set(-Math.sin(az) * ca, Math.sin(alt), Math.cos(az) * ca); return alt; }
+  // ?moondate=YYYY-MM-DD[&moonhour=H] previews any date (hour = Raynham local time, default 22); the clock then runs on from there
+  function easternOffsetH(y, mo, dd) { const nth = (n) => { const f = new Date(Date.UTC(y, mo, 1)).getUTCDay(); return 1 + (7 - f) % 7 + 7 * (n - 1); };
+    const dstS = Date.UTC(y, 2, nth(2), 7), dstE = Date.UTC(y, 10, nth(1), 6), t = Date.UTC(y, mo, dd, 12); return t >= dstS && t < dstE ? -4 : -5; }
+  const MD = QS.get('moondate'); let moonBase = null;
+  if (MD && /^\d{4}-\d{2}-\d{2}$/.test(MD)) { const [y, mo, dd] = MD.split('-').map(Number), hr = parseFloat(QS.get('moonhour') || '22');
+    moonBase = Date.UTC(y, mo - 1, dd, 0) + (hr - easternOffsetH(y, mo - 1, dd)) * 3600e3; }
+  const t0 = Date.now(), moonNow = () => moonBase === null ? Date.now() : moonBase + (Date.now() - t0);
+  const MS = {fraction: 1, phase: 0.5, alt: 0, time: 0}, _s = new THREE.Vector3(), _m = new THREE.Vector3(), _r = new THREE.Vector3(), _u = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+  function moonUpdate() {
+    const ms = moonNow(), d = toDays(ms), il = moonIllum(ms); MS.fraction = il.fraction; MS.phase = il.phase; MS.time = ms;
+    MS.alt = skyDir(moonCoords(d), d, _m) / RD; skyDir(sunCoords(d), d, _s); U.moon.value.copy(_m);
+    _r.crossVectors(_m, UP); if (_r.lengthSq() < 1e-6) _r.set(1, 0, 0); _r.normalize(); _u.crossVectors(_r, _m).normalize(); U.mR.value.copy(_r); U.mU.value.copy(_u);
+    const sx = _s.dot(_r), sy = _s.dot(_u), l = Math.hypot(sx, sy) || 1, sinI = Math.sin(il.inc), cosI = Math.cos(il.inc);   // inc = phase angle: 0 full, PI new
+    U.mS.value.set(sinI * sx / l, sinI * sy / l, cosI);
+    const k = il.fraction; U.mK.value = 0.06 + 0.94 * k; U.mE.value = 0.05 + 0.1 * (1 - k);
+    MS.sunLvl = 0.07 + 0.13 * k; MS.hemiLvl = 0.17 + 0.13 * k;   // night light multipliers: full = the old 0.2 / 0.3, new moon keeps a playable minimum
+  }
+  MS.sunLvl = 0.2; MS.hemiLvl = 0.3;
+
   // ---------- night sky ----------
   const skyFS = `
-    uniform float uN, uT; uniform vec3 moon; varying vec3 vd;
+    uniform float uN, uT, mK, mE; uniform vec3 moon, mR, mU, mS; varying vec3 vd;
     float h21(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
     float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
       return mix(mix(h21(i), h21(i+vec2(1,0)), f.x), mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), f.x), f.y); }
@@ -61,13 +96,19 @@
           float streak = 0.55 + 0.45 * vn(vec2(p.x*7.0 + uT*0.2, fi));
           vec3 col = mix(vec3(0.15,1.0,0.45), vec3(0.62,0.25,0.95), fi / float(ALAYERS)); a += col * k * streak * (1.0 - fi/float(ALAYERS+1)); }
         c += a * north * smoothstep(0.02, 0.25, d.y) * (1.0 - smoothstep(0.75, 1.0, d.y)) * AGAIN; }
-      // moon
-      float m = dot(d, moon); c = mix(c, vec3(0.93,0.93,0.86), smoothstep(0.99955, 0.99968, m)); c += vec3(0.55,0.6,0.75) * pow(max(m, 0.0), 300.0) * 0.35 + vec3(0.2,0.24,0.35) * pow(max(m,0.0), 12.0) * 0.08;
+      // moon: real phase. Disc coords q in the moon's own right/up frame; mS = sun direction in that frame (z toward viewer), so the lit side faces the real sun
+      float mm = dot(d, moon); float hz = smoothstep(-0.04, 0.0, d.y);
+      if (mm > 0.9) { vec2 q = vec2(dot(d, mR), dot(d, mU)) / 0.028; float rr = length(q);
+        if (rr < 1.05) { vec3 nn = vec3(q, sqrt(max(0.0, 1.0 - rr*rr))); float lit = smoothstep(-0.05, 0.07, dot(nn, mS));
+          float mar = vn(q*2.6 + 11.0)*0.55 + vn(q*7.0 + 3.0)*0.3; vec3 sf = vec3(0.93,0.93,0.86) * (0.62 + 0.38*(1.0 - mar)) * (0.78 + 0.22*nn.z);
+          vec3 mc = sf * lit * (0.35 + 0.65*mK) + vec3(0.55,0.66,0.9) * sf * (1.0 - lit) * mE;
+          c = mix(c, mc, (1.0 - smoothstep(0.93, 1.0, rr)) * hz); } }
+      c += (vec3(0.55,0.6,0.75) * pow(max(mm, 0.0), 300.0) * 0.35 + vec3(0.2,0.24,0.35) * pow(max(mm,0.0), 12.0) * 0.08) * mK * hz;
       gl_FragColor = vec4(c, uN);
     }`;
-  const MOON = new THREE.Vector3(0.32, 0.5, -0.8).normalize();     // moon to the north-east-ish, mid sky (fixed, keeps the aurora side lit)
-  let built = false, dome, glow, hemi, sun, D = {}, pls = [], envMats = null, cur = -1, want = 0, lastCalc = -1e9, lastEnv = 0;
-  const U = {uN: {value: 0}, uT: {value: 0}, moon: {value: MOON}};
+  const MOON = new THREE.Vector3(0.32, 0.5, -0.8).normalize();     // start value only; moonUpdate() puts it at the real position
+  let built = false, dome, glow, hemi, sun, D = {}, pls = [], envMats = null, cur = -1, want = 0, lastCalc = -1e9, lastMoon = -1e9, lastEnv = 0;
+  const U = {uN: {value: 0}, uT: {value: 0}, mK: {value: 1}, mE: {value: 0.08}, moon: {value: MOON}, mR: {value: new THREE.Vector3(1, 0, 0)}, mU: {value: new THREE.Vector3(0, 1, 0)}, mS: {value: new THREE.Vector3(0, 0, 1)}};
   function glowTex() { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
     gr.addColorStop(0, 'rgba(255,220,160,1)'); gr.addColorStop(0.25, 'rgba(255,200,130,0.45)'); gr.addColorStop(1, 'rgba(255,180,100,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
@@ -103,8 +144,8 @@
   function apply(n, sceneEl) {
     const day = n <= 0.0005; dome.visible = !day; U.uN.value = n;
     if (W3D.sky) W3D.sky.visible = n < 0.999;
-    if (hemi) { own(hemi, 'intensity', 0, 1 - 0.7 * n); lerpC(hemi.color, D.hemi.c, NC.hemiS, n); lerpC(hemi.groundColor, D.hemi.g, NC.hemiG, n); }
-    if (sun) { own(sun, 'intensity', 0, 1 - 0.8 * n); lerpC(sun.color, D.sun.c, NC.sun, n); }
+    if (hemi) { own(hemi, 'intensity', 0, 1 - (1 - MS.hemiLvl) * n); lerpC(hemi.color, D.hemi.c, NC.hemiS, n); lerpC(hemi.groundColor, D.hemi.g, NC.hemiG, n); }
+    if (sun) { own(sun, 'intensity', 0, 1 - (1 - MS.sunLvl) * n); lerpC(sun.color, D.sun.c, NC.sun, n); }
     if (D.fog && W3D.fog) lerpC(W3D.fog.color, D.fog, NC.fog, n);
     if (D.bg && W3D.bg) lerpC(W3D.bg, D.bg, NC.fog, n);
     const r = sceneEl.renderer; if (r && !(W3D.cities && W3D.cities.current && W3D.cities.current())) r.setClearColor(new THREE.Color().copy(D.clear).lerp(NC.fog, n), D.clearA);
@@ -177,13 +218,15 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addMenu); else addMenu();
 
   const api = {get mode() { return mode; }, set: setMode, get n() { return cur; }, target, today, sound: () => ({on: soundOn, ctx: ac && ac.state})};
-  window.JFVR_NIGHT = api;
+  api.moon = () => ({dir: U.moon.value.toArray(), fraction: MS.fraction, phase: MS.phase, altDeg: MS.alt, time: new Date(MS.time).toISOString(), sunLvl: MS.sunLvl, hemiLvl: MS.hemiLvl});
+  api.moonIllum = moonIllum; window.JFVR_NIGHT = api;
 
   // ---------- tick (A-Frame tick = XR frame loop, so it runs on Quest in immersive mode) ----------
   const cp = new THREE.Vector3();
   AFRAME.registerSystem('w3d-daynight', { tick: function (t, dt) {
     if (!window.W3D_READY || !W3D.root) return; if (!built) build(this.el);
-    const now = performance.now(); if (now - lastCalc > 60000) { want = target(); lastCalc = now; }
+    const now = performance.now(); if (now - lastMoon > 5000) { moonUpdate(); lastMoon = now; if (cur > 0) lastEnv = 0; }
+    if (now - lastCalc > 60000) { want = target(); lastCalc = now; }
     const step = Math.min(1, (dt || 16) / 2500);   // ease to the target over ~2.5 s (manual switch) - the auto blend itself is 20 min
     const nn = Math.abs(want - cur) < 0.002 || cur < 0 ? want : cur + (want - cur) * Math.max(step * 3, 0.01);
     if (nn !== cur || (cur > 0 && now - lastEnv > 1500)) { cur = nn; apply(cur, this.el); lastEnv = now; }
