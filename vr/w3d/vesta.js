@@ -4,13 +4,13 @@
    aspergillum, urceus, dolabra, urna, laurel, bucranium with fillets), a cella (inner diameter 8.6 m, wall 0.6 m) with one door facing
    east and engaged columns inside, a conical bronze-tile roof with an opening at the apex under a flower-like bronze chimney, the round
    hearth with an ever-burning fire (animated flame, one warm light, smoke rising out of the roof opening) and the penus, a small recess
-   screened off with mats. Beside it, a low garden court after the House of the Vestals: three water pools, hedged beds,
-   14 generic robed statues (procedural, no names), ruined colonnades and warm weathered paving.
+   screened off with mats. Beside it, the garden of the House of the Vestals: three water pools, hedged beds,
+   14 generic robed statues (procedural, no names) and warm weathered paving; the intact house around it is vestahouse.js.
    Everything is built once; the fire animates only when you are within ~150 m. */
 (function () {
 const W3D = window.W3D = window.W3D || {};
 const C = {x: 985, z: -318};                 // centre of the temple (south lawn, east of the conservatory)
-const COURT = {x0: 903, x1: 949, z0: -321, z1: -303};
+const COURT = {x0: 903, x1: 949, z0: -306.3, z1: -288.3};   // the garden inside the House of the Vestals (vestahouse.js builds the house around it)
 const PR = 7.5, PH = 3.0, NCOL = 20, CR = 5.9, CD = 0.56, CH = 5.9, WR_IN = 4.3, WR_OUT = 4.9;
 let fire = null;
 function cnv(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
@@ -137,9 +137,9 @@ function build() {
     const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.9, 1.6), new THREE.MeshLambertMaterial({color: 0x6e5638})); shelf.position.set(C.x - WR_IN + 0.5, yb + 0.45, C.z); root.add(shelf);
     const jar = new THREE.Mesh(lathe([[0, 0], [0.14, 0.02], [0.2, 0.18], [0.12, 0.36], [0.08, 0.42], [0, 0.42]], 12), new THREE.MeshLambertMaterial({color: 0x9a5a36})); jar.position.set(C.x - WR_IN + 0.5, yb + 0.9, C.z + 0.3); root.add(jar);
     for (let i = 0; i < 6; i++) { const a = a0 + (a1 - a0) * (i + 0.5) / 6, x = C.x + Math.cos(a) * rs, z = C.z + Math.sin(a) * rs; L.walls.push({x0: x - 0.3, x1: x + 0.3, z0: z - 0.3, z1: z + 0.3, y0: yb, y1: yb + 2.1}); } }
-  // ---- House of the Vestals: garden court with three water pools, hedged beds, 14 generic robed statues (procedural, no names) on plinths,
-  //      ruined colonnades along both long sides and warm weathered paving. Merged into a handful of meshes (one per material). ----
-  { const cy = W3D.groundAt((COURT.x0 + COURT.x1) / 2, (COURT.z0 + COURT.z1) / 2, -1e4), cx = (COURT.x0 + COURT.x1) / 2, cz = (COURT.z0 + COURT.z1) / 2, w = COURT.x1 - COURT.x0, d = COURT.z1 - COURT.z0, fy = cy + 0.14;
+  // ---- House of the Vestals: garden court with three water pools, hedged beds, 14 generic robed statues (procedural, no names) on plinths
+  //      and warm weathered paving, raised to the house's court level (its colonnades are in vestahouse.js). Merged into a handful of meshes (one per material). ----
+  { const cy = W3D.groundAt((COURT.x0 + COURT.x1) / 2, (COURT.z0 + COURT.z1) / 2, -1e4), cx = (COURT.x0 + COURT.x1) / 2, cz = (COURT.z0 + COURT.z1) / 2, w = COURT.x1 - COURT.x0, d = COURT.z1 - COURT.z0, fy = cy + 0.30;
     let sd = 7; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
     const bins = {};   // material key -> list of non-indexed geometries already in world space
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
@@ -156,9 +156,9 @@ function build() {
         for (let i = 0; i < 26; i++) { pg.fillStyle = 'rgba(' + (rnd() < 0.5 ? '120,100,70' : '250,240,220') + ',' + rnd() * 0.16 + ')'; pg.fillRect(x + rnd() * ww, y + rnd() * hh, 2 + rnd() * 8, 1 + rnd() * 3); }
         if (rnd() < 0.25) { const gr = pg.createRadialGradient(x + ww / 2, y + hh / 2, 2, x + ww / 2, y + hh / 2, ww / 2); gr.addColorStop(0, 'rgba(110,95,60,0.22)'); gr.addColorStop(1, 'rgba(110,95,60,0)'); pg.fillStyle = gr; pg.fillRect(x, y, ww, hh); }
         x += ww; } y += hh; }
-    const pave = new THREE.Mesh(new THREE.BoxGeometry(w, 0.16, d), new THREE.MeshStandardMaterial({map: tex(pc, [w / 7, d / 7]), color: 0xd9bf98, roughness: 0.85}));
-    pave.position.set(cx, cy + 0.06, cz); pave.receiveShadow = true; root.add(pave); L.floors.push({x0: COURT.x0, x1: COURT.x1, z0: COURT.z0, z1: COURT.z1, y: fy});
-    for (const [kw, kd, kx, kz] of [[w, 0.4, cx, COURT.z0], [w, 0.4, cx, COURT.z1], [0.4, d, COURT.x0, cz], [0.4, d, COURT.x1, cz]]) put('stone', new THREE.BoxGeometry(kw, 0.5, kd), kx, cy + 0.25, kz);
+    const pave = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), new THREE.MeshStandardMaterial({map: tex(pc, [w / 7, d / 7]), color: 0xd9bf98, roughness: 0.85}));
+    pave.position.set(cx, cy + 0.15, cz); pave.receiveShadow = true; root.add(pave); L.floors.push({x0: COURT.x0, x1: COURT.x1, z0: COURT.z0, z1: COURT.z1, y: fy});
+    for (const [kw, kd, kx, kz] of [[w, 0.4, cx, COURT.z0], [w, 0.4, cx, COURT.z1], [0.4, d, COURT.x0, cz], [0.4, d, COURT.x1, cz]]) put('stone', new THREE.BoxGeometry(kw, 0.22, kd), kx, fy + 0.11, kz);
     // three pools: low rims around sunken water
     const pools = [[cx - 15, 8], [cx, 13], [cx + 15, 8]], PD = 5;
     for (const [px, pw] of pools) { for (const [bw, bd, bx, bz] of [[pw + 0.6, 0.3, px, cz - PD / 2 - 0.15], [pw + 0.6, 0.3, px, cz + PD / 2 + 0.15], [0.3, PD, px - pw / 2 - 0.15, cz], [0.3, PD, px + pw / 2 + 0.15, cz]]) put('stone', new THREE.BoxGeometry(bw, 0.34, bd), bx, fy + 0.17, bz);
@@ -172,7 +172,7 @@ function build() {
     for (const s of [-1, 1]) for (const [px, pw] of pools) { const bz = cz + s * 4.6, bw = pw - 0.4;
       put('soil', new THREE.BoxGeometry(bw, 0.18, 2.0), px, fy + 0.09, bz);
       for (const [hw, hd, hx, hz] of [[bw + 0.5, 0.5, px, bz - 1.25], [bw + 0.5, 0.5, px, bz + 1.25], [0.5, 2.0, px - bw / 2 - 0.0, bz], [0.5, 2.0, px + bw / 2, bz]]) put('hedge', new THREE.BoxGeometry(hw, 0.62, hd), hx, fy + 0.31, hz);
-      const n = Math.round(bw * 2.2); for (let i = 0; i < n; i++) put(rnd() < 0.5 ? 'flowerA' : 'flowerB', new THREE.IcosahedronGeometry(0.11 + rnd() * 0.07, lite ? 0 : 1), px - bw / 2 + 0.3 + rnd() * (bw - 0.6), fy + 0.3, bz - 0.7 + rnd() * 1.4, rnd() * 3);
+      const n = Math.round(bw * (lite ? 1.1 : 2.2)); for (let i = 0; i < n; i++) put(rnd() < 0.5 ? 'flowerA' : 'flowerB', new THREE.IcosahedronGeometry(0.11 + rnd() * 0.07, lite ? 0 : 1), px - bw / 2 + 0.3 + rnd() * (bw - 0.6), fy + 0.3, bz - 0.7 + rnd() * 1.4, rnd() * 3);
       L.walls.push({x0: px - bw / 2 - 0.3, x1: px + bw / 2 + 0.3, z0: bz - 1.5, z1: bz + 1.5, y0: cy, y1: cy + 0.7}); }
     // 14 plinths with generic robed (veiled) figures: a lathe body with drapery folds, folded arms, a head; slight variety, a few weathered/damaged
     const plist = []; for (let i = 0; i < 7; i++) for (const s of [-1, 1]) plist.push([COURT.x0 + 3 + i * (w - 6) / 6, cz + s * (d / 2 - 1.6), s]);
@@ -189,17 +189,6 @@ function build() {
       if (!dmg) { put('statue', head.clone(), x, y0 + 1.6 * sc2, z, ry, 0, 0, sc2); put('statue', veil.clone(), x, y0 + 1.6 * sc2, z - 0.0, ry, 0, 0, sc2); }
       const fx = Math.sin(ry) * 0.2 * sc2, fz = Math.cos(ry) * 0.2 * sc2; put('statue', arms.clone(), x + fx, y0 + 1.05 * sc2, z + fz, ry, 0, Math.PI / 2, sc2);
       L.walls.push({x0: x - 0.5, x1: x + 0.5, z0: z - 0.5, z1: z + 0.5, y0: cy, y1: cy + 3.2}); });
-    // ruined colonnades along both long sides: column bases, broken shafts of varied height, two surviving runs carrying architrave, fallen drums
-    const shaft = new THREE.CylinderGeometry(0.27, 0.31, 1, lite ? 10 : 14), cbase = new THREE.CylinderGeometry(0.42, 0.45, 0.28, lite ? 10 : 14), ccap = new THREE.BoxGeometry(0.78, 0.26, 0.78), FULL = 4.4;
-    for (const s of [-1, 1]) { const zc = cz + s * (d / 2 - 0.62), N = 14, step = (w - 2.4) / (N - 1), run = s < 0 ? [3, 5] : [8, 10];
-      for (let i = 0; i < N; i++) { const x = COURT.x0 + 1.2 + i * step, inRun = i >= run[0] && i <= run[1], r1 = rnd();
-        put('stone', cbase.clone(), x, fy + 0.14, zc); if (!inRun && r1 < 0.18) continue;   // only the base survives
-        const h = inRun ? FULL : 0.6 + rnd() * 3.2; const sh = shaft.clone(); sh.scale(1, h, 1); put('stone', sh, x, fy + 0.28 + h / 2, zc, 0, (rnd() - 0.5) * (inRun ? 0 : 0.05), (rnd() - 0.5) * (inRun ? 0 : 0.05));
-        if (inRun) put('stone', ccap.clone(), x, fy + 0.28 + FULL + 0.13, zc);
-        L.walls.push({x0: x - 0.45, x1: x + 0.45, z0: zc - 0.45, z1: zc + 0.45, y0: cy, y1: fy + 0.28 + h}); }
-      const xa = COURT.x0 + 1.2 + run[0] * step, xb = COURT.x0 + 1.2 + run[1] * step; put('stone', new THREE.BoxGeometry(xb - xa + 0.9, 0.62, 0.7), (xa + xb) / 2, fy + 0.28 + FULL + 0.26 + 0.31, zc);
-      put('stone', new THREE.BoxGeometry(xb - xa + 1.1, 0.16, 0.86), (xa + xb) / 2, fy + 0.28 + FULL + 0.26 + 0.7, zc);
-      for (let k = 0; k < 3; k++) { const dh = 0.7 + rnd() * 0.6, dr = shaft.clone(); dr.scale(1, dh, 1); put('stone', dr, COURT.x0 + 4 + rnd() * (w - 8), fy + 0.29, zc + s * (1.3 + rnd() * 0.4), rnd() * 3, 0, Math.PI / 2); } }
     const tone = c => new THREE.MeshStandardMaterial({color: c, roughness: 0.78, metalness: 0, envMap: W3D.env || null, envMapIntensity: 0.35});
     flush('stone', tone(0xc4ae8a), true); flush('plinth', tone(0xcdbb9c), true); flush('statue', tone(0xd6cab4), true); flush('basin', tone(0x2b3f3d));
     flush('soil', new THREE.MeshLambertMaterial({color: 0x5a4430})); flush('hedge', new THREE.MeshLambertMaterial({color: 0x3f5a2c}), true);
