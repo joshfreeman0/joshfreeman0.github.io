@@ -188,7 +188,8 @@ function waterMat(alphaMap, river) {
   // clip 21: the pond read as a flat opaque dark-green plane. Now natural blue-green water: two drifting normal-mapped ripple layers
   // (one on phones), a sky reflection from the scene env map plus an analytic sky gradient weighted by a Schlick fresnel term, so the
   // water is darker looking straight down and reflects the sky toward the horizon. Pond, King's Pond and the rivers share it.
-  const mat = new THREE.MeshStandardMaterial({color: 0x24474a, roughness: 0.1, metalness: 0.0, alphaMap: alphaMap || null, alphaTest: alphaMap ? 0.5 : 0,
+  const CLEAR = !CLASSIC && !!alphaMap && !river;   // Fowling Pond only: clear shallows -> turquoise -> deep blue (pondmask_w1.png R = metres from shore / 80)
+  const mat = new THREE.MeshStandardMaterial({color: CLEAR ? 0x000000 : 0x24474a, roughness: CLEAR ? 0.05 : 0.1, metalness: 0.0, alphaMap: alphaMap || null, alphaTest: alphaMap ? 0.5 : 0,
     transparent: !!river, opacity: river ? 0.84 : 1, depthWrite: !river});
   if (W3D.env) { mat.envMap = W3D.env; mat.envMapIntensity = 0.75; }
   mat.name = 'water';
@@ -196,10 +197,12 @@ function waterMat(alphaMap, river) {
   mat.onBeforeCompile = sh => {
     sh.uniforms.wN = W3D.waterU.wN; sh.uniforms.wT = W3D.waterU.wT; sh.uniforms.wNi = W3D.waterU.wNi;
     sh.vertexShader = 'varying vec3 vWw;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvWw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'uniform sampler2D wN; uniform float wT; uniform float wNi; varying vec3 vWw;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', [
+    sh.fragmentShader = 'uniform sampler2D wN; uniform float wT; uniform float wNi; varying vec3 vWw; float wDepth = 0.5;\n' + sh.fragmentShader
+      .replace('#include <alphamap_fragment>', CLEAR ? 'vec4 wMk = texture2D(alphaMap, vAlphaMapUv); diffuseColor.a *= wMk.g; wDepth = wMk.r;' : '#include <alphamap_fragment>')  // same single mask fetch, R now carries shore distance
+      .replace('#include <normal_fragment_maps>', [
       'vec2 wp = vWw.xz;',
       'vec3 n1 = texture2D(wN, wp / 30.0 + vec2(0.011, 0.007) * wT).xyz * 2.0 - 1.0;',
-      CLASSIC ? '' : 'vec3 n0 = texture2D(wN, mat2(0.6, 0.8, -0.8, 0.6) * wp / 140.0 + vec2(0.004, -0.003) * wT).xyz * 2.0 - 1.0; n1.xy += n0.xy * 0.7;',   // quality: slow broad swells
+      CLASSIC ? '' : 'vec3 n0 = texture2D(wN, mat2(0.6, 0.8, -0.8, 0.6) * wp / 140.0 + vec2(0.004, -0.003) * wT).xyz * 2.0 - 1.0; n1.xy += n0.xy * ' + (CLEAR ? '0.4' : '0.7') + ';',   // quality: slow broad swells
       'float wd = length(vWw - cameraPosition);',
       LITE ? 'vec2 sl = n1.xy * 0.26 * mix(1.0, 0.1, smoothstep(60.0, 450.0, wd));'
         : 'vec3 n2 = texture2D(wN, mat2(0.8, -0.6, 0.6, 0.8) * wp / 7.5 + vec2(-0.017, 0.012) * wT).xyz * 2.0 - 1.0;\n' +
@@ -210,10 +213,16 @@ function waterMat(alphaMap, river) {
       '  float fr = 0.02 + 0.98 * pow(1.0 - cth, 5.0);',
       '  vec3 rw = inverseTransformDirection(reflect(-vd, normal), viewMatrix);',
       '  vec3 sky = mix(vec3(0.62, 0.72, 0.80), vec3(0.27, 0.45, 0.70), clamp(rw.y * 1.6, 0.0, 1.0)) * mix(1.0, 0.07, wNi);',  // night layer (daynight.js); 1.0 by day
-      CLASSIC ? '  outgoingLight = mix(outgoingLight, sky, clamp(fr, 0.0, 0.55)); }' : '  outgoingLight = mix(outgoingLight * mix(1.0, 0.8, fr), sky, clamp(fr * 1.15, 0.0, 0.7)); }',
+      CLASSIC ? '  outgoingLight = mix(outgoingLight, sky, clamp(fr, 0.0, 0.55)); }' : CLEAR ? [
+      '  float dm = wDepth * 80.0;',   // metres from the waterline: sandy shallows (clear) -> turquoise -> deep blue
+      '  vec3 cS = vec3(0.70, 0.80, 0.66), cT = vec3(0.04, 0.42, 0.46), cD = vec3(0.008, 0.13, 0.27);',
+      '  vec3 body = mix(cS, cT, smoothstep(0.5, 14.0, dm)); body = mix(body, cD, smoothstep(14.0, 70.0, dm));',
+      '  float shal = 1.0 - smoothstep(0.0, 12.0, dm); body *= 1.0 + shal * (n1.x + n1.y) * 0.35;',   // caustic shimmer on the sandy bottom
+      '  body *= (1.0 - wNi * 0.9) * (1.0 - 0.35 * fr);',
+      '  outgoingLight = mix(outgoingLight + body, sky * vec3(0.78, 0.90, 1.0), clamp(fr * 1.1, 0.0, 0.5)); }'].join('\n') : '  outgoingLight = mix(outgoingLight * mix(1.0, 0.8, fr), sky, clamp(fr * 1.15, 0.0, 0.7)); }',
       '#include <opaque_fragment>'].join('\n'));
   };
-  mat.customProgramCacheKey = () => 'jfwater2' + (CLASSIC ? 'c' : 'q') + (alphaMap ? 'a' : '') + (river ? 'r' : '') + (LITE ? 'l' : '');
+  mat.customProgramCacheKey = () => 'jfwater2' + (CLASSIC ? 'c' : 'q') + (alphaMap ? 'a' : '') + (river ? 'r' : '') + (CLEAR ? 'w' : '') + (LITE ? 'l' : '');
   return mat;
 }
 
@@ -477,7 +486,7 @@ function buildRings() {
 }
 function buildWater(J) { // Fowling Pond (restored) inside the real pond bed (OSM Pine Swamp); the soft mask gives a smooth natural shoreline
   const P = J.pond, x0 = P.x0, x1 = P.x1, z0 = P.z0, z1 = P.z1, w = x1 - x0, d = z1 - z0;
-  const am = new THREE.TextureLoader().load(BASE + 'pondmask_t4.png?v=3'); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
+  const am = new THREE.TextureLoader().load(BASE + (CLASSIC ? 'pondmask_t4.png?v=3' : 'pondmask_w1.png?v=1')); am.repeat.set(w / SIZE, d / SIZE); am.offset.set((x0 + HALF) / SIZE, 1 - (z1 + HALF) / SIZE);
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d, 8, 4), waterMat(am)); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, WATER, (z0 + z1) / 2); m.receiveShadow = true; root.add(m);
 }
 /* Smooth river banks: the 10.7 m terrain grid makes the waterline stair-step, so each side gets a thin ground-textured strip that
