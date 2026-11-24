@@ -77,10 +77,12 @@
     const oakG = merge([0, 1, 2, 3].map(i => { const g = new THREE.IcosahedronGeometry(i === 3 ? 0.9 : 1.0, 0); g.scale(1.15, 0.75, 1.15); g.translate(i === 3 ? 0 : Math.cos(i * 2.1) * 0.75, i === 3 ? 1.6 : 0.85 + i * 0.12, i === 3 ? 0 : Math.sin(i * 2.1) * 0.75); return g; }));   // ground-hugging thicket
     const bl = merge([0, 1, 2].map(i => { const g = new THREE.PlaneGeometry(0.35, 0.75, 1, 1); g.translate(0, 0.37, 0); g.rotateY(i * 1.047); return g; }));
     const bark = new THREE.MeshLambertMaterial({color: 0x4d3f33}), ndl = new THREE.MeshLambertMaterial({color: 0x3f5a2a, flatShading: true}), leaf = new THREE.MeshLambertMaterial({color: 0xffffff, flatShading: true});
+    const SK = W3D.seasonKit; if (SK) { SK.snowTop(ndl, {up0: 0.12, up1: 0.4, k: 0.8, dark: 0.18}); SK.decid(leaf, {pivot: 0.9, keep: true}); SK.snowTop(bark, {up0: 0.4, up1: 0.8, k: 0.7}); }   // seasons.js
     const bt = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); for (let i = 0; i < 16; i++) { const x = 6 + Math.random() * 52, h = 34 + Math.random() * 30, l = (Math.random() - 0.5) * 14; g.strokeStyle = 'rgba(' + (200 + Math.random() * 40 | 0) + ',' + (190 + Math.random() * 40 | 0) + ',' + (170 + Math.random() * 30 | 0) + ',1)'; g.lineWidth = 1.6 + Math.random(); g.beginPath(); g.moveTo(x, 64); g.quadraticCurveTo(x + l * 0.3, 64 - h * 0.6, x + l, 64 - h); g.stroke(); }
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();   // thin wiry stems
     const grassM = new THREE.MeshLambertMaterial({color: 0xffffff, side: THREE.DoubleSide, map: bt, alphaTest: 0.4});
     grassM.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize( vNormal );'); };   // both faces lit like the ground
+    if (SK) SK.grass(grassM, {blue: true});
     bl.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(bl.attributes.position.count).fill(0).flatMap(() => [0, 1, 0]), 3));
     const stoneG = new THREE.DodecahedronGeometry(0.6, 0), stoneM = new THREE.MeshLambertMaterial({color: 0xffffff, flatShading: true});
     inst(pineTrunk, bark, pines, 'trees-pitchpine-trunk', true); inst(pineCrown, ndl, pines, 'trees-pitchpine', true); inst(oakG, leaf, oaks, 'trees-scruboak', true);

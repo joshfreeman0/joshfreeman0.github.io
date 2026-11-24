@@ -3,7 +3,7 @@
    Fowling Pond Restoration Plan v6 features drawn approximately from the plan's concept maps.
    Buildings, plants and animals are procedural concept models. Not a survey or engineering design. */
 (function () {
-const W3D = window.W3D = {};
+const W3D = window.W3D = window.W3D || {};   // seasons.js loads first
 const BASE = '/vr/w3d/';
 /* Lite tier (phones/tablets, <=4 GB devices; never the Quest): see JFVR_LITE in index.html. Smaller photos, no 0.5 m tile,
    40% of the trees, 1024 px cap on every texture, smaller shadow map - keeps iPhone Safari under its WebGL memory limit. */
@@ -443,6 +443,7 @@ function buildTerrain() {
       'vec3 gg = gt * tint; gg = mix(vec3(dot(gg, vec3(0.3, 0.59, 0.11))), gg, 0.72) * vec3(0.97, 0.9, 0.8);',   // real lawn in sun: yellower, less saturated than the photo tile
       'texelColor.rgb = mix(texelColor.rgb, gg, gn * mix(0.35, 0.8, veg)); gNear = gn * veg;',
       'diffuseColor *= texelColor;'].join('\n'));
+    if (W3D.seasonKit) W3D.seasonKit.terrain(sh);   // seasons.js: dormant / mud / snow ground blend
     if (!CLASSIC && !LITE && !QUEST) sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' +   // quality: fine ground relief within ~90 m
       '{ float bn = (1.0 - smoothstep(6.0, 90.0, dd)) * (1.0 - 0.6 * gNear); vec2 bq = vWp.xz / 1.7; float h0 = texture2D(detMap, bq).r, h1 = texture2D(detMap, bq + vec2(0.004, 0.0)).r, h2 = texture2D(detMap, bq + vec2(0.0, 0.004)).r;\n' +
       '  normal = normalize(normal + (viewMatrix * vec4((h0 - h1) * 7.0, 0.0, (h0 - h2) * 7.0, 0.0)).xyz * bn); }');
@@ -624,11 +625,12 @@ function buildTrees(a) {
     im.frustumCulled = false; im.name = 'trees'; root.add(im); return im;   // named so shore.js can clear trees off its path
   };
   const trunkG = new THREE.CylinderGeometry(0.25, 0.35, 4, 5, 1, true); trunkG.translate(0, 2, 0);   // lean geometry: Quest 3S triangle budget
-  mk(trunkG, M.trunk, con, 0, 1); mk(trunkG, M.trunk, dec, 0, 1);
+  const SK = W3D.seasonKit, QST = /OculusBrowser|Quest/i.test(navigator.userAgent) || /[?&]quest=1/.test(location.search);
+  mk(trunkG, M.trunk, con, 0, 1); mk(SK ? SK.treeGeo(trunkG, LITE ? 0 : QST ? 1 : 2) : trunkG, SK ? SK.bark() : M.trunk, dec, 0, 1);   // seasons: trunk + bare limbs in one mesh
   const coneG = new THREE.ConeGeometry(2.6, 9, 7, 1, true); coneG.translate(0, 7.5, 0);
-  mk(coneG, new THREE.MeshLambertMaterial({color: 0xffffff, side: THREE.DoubleSide}), con, 0, 1, ['#26402a', '#2c472d', '#22392a', '#2f4a2f']);
+  mk(coneG, SK ? SK.snowTop(new THREE.MeshLambertMaterial({color: 0xffffff, side: THREE.DoubleSide}), {up0: 0.12, up1: 0.4, k: 0.8, dark: 0.18}) : new THREE.MeshLambertMaterial({color: 0xffffff, side: THREE.DoubleSide}), con, 0, 1, ['#26402a', '#2c472d', '#22392a', '#2f4a2f']);
   const crownG = new THREE.IcosahedronGeometry(3.8, 0); crownG.scale(1, 0.85, 1); crownG.translate(0, 6.5, 0);
-  mk(crownG, new THREE.MeshLambertMaterial({color: 0xffffff, flatShading: true}), dec, 0, 1, ['#3d5a2a', '#46632e', '#3a5530', '#52683a', '#4a5e34']);
+  mk(crownG, SK ? SK.decid(new THREE.MeshLambertMaterial({color: 0xffffff, flatShading: true}), {pivot: 6.5}) : new THREE.MeshLambertMaterial({color: 0xffffff, flatShading: true}), dec, 0, 1, ['#3d5a2a', '#46632e', '#3a5530', '#52683a', '#4a5e34']);
 }
 /* The real line passes under King Philip St (north) and E Britannia St (south) about 300 m back from the pond; it runs in a cutting
    down to a tunnel portal just short of each road, then in tunnel under the road and the restored pond. Carves the core height grid. */
@@ -747,7 +749,7 @@ function buildPark(P) {
     if (Math.max(Math.abs(x - px), Math.abs(z - pz)) < B + 25) continue; if (Math.abs(f - 0.42) < 0.02 || Math.abs(f - 0.8) < 0.02) continue; pts.push([x, K.deckY(x, z), z, 0.9 + rnd() * 0.5]); }
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3();
   const tg = new THREE.CylinderGeometry(0.25, 0.35, 4, 5, 1, true); tg.translate(0, 2, 0); const crg = new THREE.IcosahedronGeometry(3.8, 0); crg.scale(1, 0.85, 1); crg.translate(0, 6.5, 0);
-  for (const [geo, mat] of [[tg, M.trunk], [crg, new THREE.MeshLambertMaterial({color: 0x4a6534, flatShading: true})]]) { const im = new THREE.InstancedMesh(geo, mat, pts.length);
+  const SK2 = W3D.seasonKit; for (const [geo, mat] of [[SK2 ? SK2.treeGeo(tg, LITE ? 0 : 1) : tg, SK2 ? SK2.bark() : M.trunk], [crg, SK2 ? SK2.decid(new THREE.MeshLambertMaterial({color: 0x4a6534, flatShading: true}), {pivot: 6.5}) : new THREE.MeshLambertMaterial({color: 0x4a6534, flatShading: true})]]) { const im = new THREE.InstancedMesh(geo, mat, pts.length);
     pts.forEach((t, i) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * 2.4); sv.set(t[3], t[3], t[3]); pv.set(t[0], t[1] - 0.3, t[2]); m4.compose(pv, q, sv); im.setMatrixAt(i, m4); }); root.add(im); }
   W3D.parkInfo = {x: px, z: pz, y: y0, trees: pts.length, cut: K.cut, plane: K.plane.map(v => +v.toFixed(4))};
 }

@@ -5,7 +5,7 @@
   if (window.JFVR_LITE || /[?&]classic=1/.test(location.search)) return;
   const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent) || /[?&]quest=1/.test(location.search);
   const COUNT = QUEST ? 3200 : 9000, RAD = QUEST ? 30 : 46, HALF = 2048, SIZE = 4096, WATER = 16.5;
-  let mesh = null, mask = null, MW = 0, MH = 0, cx = 1e9, cz = 1e9, last = 0, U = {wT: {value: 0}};
+  let mesh = null, mask = null, MW = 0, MH = 0, cx = 1e9, cz = 1e9, last = 0, lastF = -1, U = {wT: {value: 0}};
   function bladeTex() {
     const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
     for (let i = 0; i < 22; i++) { const x = 8 + Math.random() * 112, h = 70 + Math.random() * 56, lean = (Math.random() - 0.5) * 30, w = 3 + Math.random() * 3;
@@ -48,7 +48,8 @@
     mat.onBeforeCompile = sh => { sh.uniforms.wT = U.wT; sh.vertexShader = 'uniform float wT;\n' + sh.vertexShader.replace('#include <begin_vertex>',
       '#include <begin_vertex>\nvec3 ip = instanceMatrix[3].xyz; float sw = sin(wT * 1.6 + ip.x * 0.35 + ip.z * 0.22) + 0.5 * sin(wT * 2.7 + ip.z * 0.9); transformed.x += sw * 0.05 * uv.y; transformed.z += sw * 0.03 * uv.y;'); };
     mat.onBeforeCompile = ((ob) => sh => { ob(sh); sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize( vNormal );'); })(mat.onBeforeCompile);   // both faces lit like the ground (no dark backs)
-    mat.customProgramCacheKey = () => 'jfgrass2';
+    if (W3D.seasonKit) W3D.seasonKit.grass(mat, {});   // seasons.js: dormant tan, whitened + shrunk under snow
+    mat.customProgramCacheKey = () => 'jfgrass3';
     mesh = new THREE.InstancedMesh(tuftGeo(), mat, COUNT); mesh.count = 0; mesh.frustumCulled = false; mesh.receiveShadow = !QUEST; mesh.name = 'grass-tufts';
     mesh.setColorAt(0, base); W3D.root.add(mesh);
   }
@@ -59,6 +60,7 @@
     if (!mask && !buildMask()) return; if (!mesh) make();
     const cam = this.el.camera; if (!cam) return; cam.getWorldPosition(v);
     const h = v.y - W3D.terrainH(v.x, v.z), show = W3D.root.visible && h < 60 && Math.abs(v.x) < HALF && Math.abs(v.z) < HALF; mesh.visible = show && !W3D.grassOff; if (!mesh.visible) return;
+    const nf = W3D.floors ? W3D.floors.length : 0; if (nf !== lastF) { lastF = nf; cx = 1e9; }   // a floor was added (build mode): re-scatter so no blades poke through it
     if (Math.hypot(v.x - cx, v.z - cz) > RAD * 0.3) { cx = v.x; cz = v.z; scatter(cx, cz); }
   } });
   const attach = () => { const sc = document.querySelector('a-scene'); if (sc) sc.setAttribute('w3d-grass', ''); };

@@ -60,6 +60,7 @@
       H.n++;
     });
     const mat = new THREE.MeshLambertMaterial({map: wallTex(), vertexColors: true}); mat.name = 'houses';
+    if (W3D.seasonKit) W3D.seasonKit.snowTop(mat, {up0: 0.25, up1: 0.5, k: 0.95});   // snow on roofs
     for (const [k, T] of tiles) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(T.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(T.n, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(T.uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(T.c, 3)); g.computeBoundingSphere();
       const m = new THREE.Mesh(g, mat); m.name = 'houses-' + k; m.castShadow = !LITE && !QUEST; m.receiveShadow = !LITE; m.userData.c = [T.cx, T.cz]; m.visible = false; W3D.root.add(m); H.tiles.push(m); H.tris += T.p.length / 9; }
     if (W3D.realEarth && W3D.realEarth.clipOurs) W3D.realEarth.clipOurs(mat);
