@@ -91,6 +91,15 @@
     g.fillStyle = '#fff'; g.font = 'bold 36px Arial, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(txt, 78, 42);
     vTex.needsUpdate = true; }
   function toggleVoice() { const MP = window.JFMP; if (MP && MP.toggleVoice) MP.toggleVoice(); else hud('Voice chat is not available here'); }
+  /* wrist button label drawn on a canvas (a-text labels drew under the panel backing in the headset's sort order) */
+  function lbl(el, w, h, bg) { const c = document.createElement('canvas'); c.width = 256; c.height = Math.round(256 * h / w); const g = c.getContext('2d');
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({map: tex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false}));
+    m.position.z = 0.001; m.renderOrder = 3004; el.object3D.add(m);
+    return {set: txt => { g.clearRect(0, 0, c.width, c.height); g.fillStyle = bg; if (g.roundRect) { g.beginPath(); g.roundRect(0, 0, c.width, c.height, 14); g.fill(); } else g.fillRect(0, 0, c.width, c.height);
+      g.fillStyle = '#111'; g.textAlign = 'center'; g.textBaseline = 'middle'; let fs = Math.round(c.height * 0.5); g.font = 'bold ' + fs + 'px Arial, sans-serif';
+      while (g.measureText(txt).width > c.width * 0.9 && fs > 10) { fs -= 2; g.font = 'bold ' + fs + 'px Arial, sans-serif'; }
+      g.fillText(txt, c.width / 2, c.height / 2 + 2); tex.needsUpdate = true; }}; }
   function buildWrist() { const L = document.querySelector('[laser-controls*="left"]'), sc = document.querySelector('a-scene'); if (!L || !sc || wrist) return wrist;
     wrist = document.createElement('a-entity'); wrist.id = 'wristpanel'; sc.appendChild(wrist); wrist.object3D.visible = false;   // not the visible attribute: it applies late and would hide a panel just shown
     const c = document.createElement('canvas'); c.width = 512; c.height = 64 * ROWS + 48; pCtx = c.getContext('2d'); pTex = new THREE.CanvasTexture(c); pTex.colorSpace = THREE.SRGBColorSpace;
@@ -102,8 +111,8 @@
     // invisible backing over the whole panel: stops the laser (line ends on the panel, dot shows), clicks on it do nothing
     const blk = plane(wrist, PW, TOT + 0.008, 0, -FH / 2, 0.0005, 'shader:flat;transparent:true;opacity:0;depthTest:false;depthWrite:false', 'btn'); blk.dataset.blocker = '1';
     goBtns = [];
-    for (let i = 0; i < ROWS; i++) { const b = plane(wrist, 0.045, 0.028, 0.07, H / 2 - 0.026 - 0.035 * i - 0.0175, 0.002, 'shader:flat;color:#ffd700;depthTest:false;depthWrite:false', 'btn');
-      const t = document.createElement('a-text'); t.setAttribute('value', 'Go'); t.setAttribute('align', 'center'); t.setAttribute('color', '#111'); t.setAttribute('width', 0.4); t.setAttribute('position', '0 0 0.001'); b.appendChild(t);
+    for (let i = 0; i < ROWS; i++) { const b = plane(wrist, 0.045, 0.028, 0.07, H / 2 - 0.026 - 0.035 * i - 0.0175, 0.002, 'shader:flat;transparent:true;opacity:0;depthTest:false;depthWrite:false', 'btn');
+      lbl(b, 0.045, 0.028, '#ffd700').set('Go');
       b.addEventListener('click', ev => { if (fromLeft(ev)) return; const r = rows[i]; if (r) FR.go(r.id); }); b.object3D.renderOrder = 3001; goBtns.push(b); }
     // Voice ON / OFF (big, left) and voice range (right) along the bottom
     const vy = -H / 2 - FH / 2;
@@ -112,8 +121,8 @@
     const vm = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.0375), new THREE.MeshBasicMaterial({map: vTex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false}));
     vm.position.z = 0.001; vm.renderOrder = 3002; vb.object3D.add(vm); vb.object3D.renderOrder = 3001;
     vb.addEventListener('click', ev => { if (fromLeft(ev)) return; toggleVoice(); vSig = ''; setTimeout(drawVoice, 50); });
-    const vt = plane(wrist, 0.08, 0.04, 0.058, vy, 0.002, 'shader:flat;color:#9ffcff;depthTest:false;depthWrite:false', 'btn'); vt.object3D.renderOrder = 3001;
-    const vtt = document.createElement('a-text'); vtt.setAttribute('align', 'center'); vtt.setAttribute('color', '#111'); vtt.setAttribute('width', 0.36); vtt.setAttribute('position', '0 0 0.001'); vt.appendChild(vtt);
+    const vt = plane(wrist, 0.08, 0.04, 0.058, vy, 0.002, 'shader:flat;transparent:true;opacity:0;depthTest:false;depthWrite:false', 'btn'); vt.object3D.renderOrder = 3001;
+    const vtt = lbl(vt, 0.08, 0.0375, '#9ffcff');
     vt.addEventListener('click', ev => { if (fromLeft(ev)) return; FR.setRange(FR.range === 'auto' ? 'near' : 'auto'); }); wrist.userData.vt = vtt; renderBtns(); vSig = ''; drawVoice();
     window.addEventListener('jfmp-voice', () => { vSig = ''; drawVoice(); });
     setTimeout(() => document.querySelectorAll('[raycaster]').forEach(r => r.components.raycaster && r.components.raycaster.refreshObjects()), 300);
@@ -135,12 +144,12 @@
     pTex.needsUpdate = true;
     goBtns.forEach((b, i) => { if (b.object3D) b.object3D.visible = i < rows.length; }); drawVoice(); }
   /* the buttons and their labels are a-frame meshes created late with renderOrder 0, so they drew under the 92%-opaque backing and looked
-     dim; lift every such mesh into the transparent pass above the backing (labels sit 1 mm nearer, so they still sort over their buttons) */
-  function fixOrder() { if (!wrist) return; wrist.object3D.traverse(o => { if (!o.isMesh || o.renderOrder >= 2999) return; o.renderOrder = 3003;
+     dim; lift every such mesh into the transparent pass above the backing (labels get a higher order than their buttons so they draw on top) */
+  function fixOrder() { if (!wrist) return; wrist.object3D.traverse(o => { if (!o.isMesh || o.renderOrder >= 2999) return; const isTxt = !!(o.parent && o.parent.el && o.parent.el.tagName === 'A-TEXT'); o.renderOrder = isTxt ? 3004 : 3003;
     const m = o.material; if (m && !m.transparent) { m.transparent = true; m.needsUpdate = true; } }); }
   function showPanel(on) { if (!wrist) return; if (on) fixOrder(); if (wrist.object3D.visible === on) return; wrist.object3D.visible = on; FR.open = on;
     document.querySelectorAll('[raycaster]').forEach(r => r.components.raycaster && r.components.raycaster.refreshObjects()); }
-  function renderBtns() { const t = 'Voice: ' + (FR.range === 'auto' ? 'Auto' : 'Near only'); if (wrist && wrist.userData.vt) wrist.userData.vt.setAttribute('value', FR.range === 'auto' ? 'Range: Auto' : 'Range: Near');
+  function renderBtns() { const t = 'Voice: ' + (FR.range === 'auto' ? 'Auto' : 'Near only'); if (wrist && wrist.userData.vt) wrist.userData.vt.set(FR.range === 'auto' ? 'Range: Auto' : 'Range: Near');
     const hb = document.getElementById('voicerange'); if (hb) hb.textContent = t; }
   FR.wrist = () => wrist;
   /* test hook (headless checks, no headset): FR.debugWrist(true) builds the panel and parks it 0.5 m in front of the camera */
