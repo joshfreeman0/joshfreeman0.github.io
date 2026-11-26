@@ -124,7 +124,7 @@ function start() {
   const draco = new THREE.DRACOLoader(); draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
   T.registerPlugin(new K.GLTFExtensionsPlugin({dracoLoader: draco}));
   T.registerPlugin(new K.TileCompressionPlugin());
-  T.errorTarget = LITE ? 72 : QUEST ? 32 : 24;   // sharper than v1 (80/48/32 looked blurry from flying height); Nov 26: Quest 40 -> 32 (distant scenery east of the pond looked blurry in the headset)
+  T.errorTarget = LITE ? 72 : QUEST ? 40 : 24;   /* Nov 26 pm: Quest back to 40 - 32 cost frame rate (dropped frames = reprojection wobble) */   // sharper than v1 (80/48/32 looked blurry from flying height); Nov 26: Quest 40 -> 32 (distant scenery east of the pond looked blurry in the headset)
   const C = T.lruCache, MB = 1048576; if (C) { C.maxBytesSize = (LITE ? 120 : QUEST ? 400 : 500) * MB;   /* Quest 300 -> 400 MB with the sharper target, so tiles aren't evicted and re-fetched as you turn (popping) */ C.minBytesSize = C.maxBytesSize * 0.7; C.maxSize = LITE ? 1500 : 4000; C.minSize = C.maxSize * 0.75; }
   T.addEventListener('load-model', ({scene}) => { scene.traverse(o => { if (o.isMesh) { [].concat(o.material).forEach(m => { m.fog = true; clipMat(m, 1); }); o.receiveShadow = o.castShadow = false; } }); });
   T.addEventListener('load-tile-set', () => { RE.ready = true; });

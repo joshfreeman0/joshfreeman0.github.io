@@ -141,6 +141,7 @@
   const own = (o, key, val, k) => { // multiply a value someone else may also set (realism.js sets hemi intensity per area): re-base when it changed under us
     if (o['_dn' + key] === undefined || o[key] !== o['_dnSet' + key]) o['_dn' + key] = o[key];
     o[key] = o['_dnSet' + key] = o['_dn' + key] * k; };
+  let shN = -9;
   function apply(n, sceneEl) {
     const day = n <= 0.0005; dome.visible = !day; U.uN.value = n;
     if (W3D.sky) W3D.sky.visible = n < 0.999;
@@ -158,7 +159,8 @@
     if (day) { // exact day values back (no float drift)
       if (hemi) { hemi.color.copy(D.hemi.c); hemi.groundColor.copy(D.hemi.g); } if (sun) sun.color.copy(D.sun.c);
       if (D.fog && W3D.fog) W3D.fog.color.copy(D.fog); if (D.bg && W3D.bg) W3D.bg.copy(D.bg); }
-    if (sceneEl.renderer && sceneEl.renderer.shadowMap) sceneEl.renderer.shadowMap.needsUpdate = true;
+    // Nov 26: only re-draw shadows when the light really changed; this runs every 1.5 s at night and forced a full shadow pass each time (Quest wobble)
+    if (sceneEl.renderer && sceneEl.renderer.shadowMap && !(Math.abs(n - shN) < 0.02)) { shN = n; sceneEl.renderer.shadowMap.needsUpdate = true; }
   }
 
   // ---------- sounds ----------

@@ -1088,7 +1088,7 @@ AFRAME.registerComponent('w3d-keys', { tick: function (t, dt) { if (!W3D.active 
 const _cp = new THREE.Vector3(); let _sf = 0;
 AFRAME.registerComponent('w3d-anim', { tick: function (t, dt) { if (W3D.waterU) W3D.waterU.wT.value = t / 1000; if (LITE && this.el.sceneEl.renderer) freeSources(this.el.sceneEl.renderer, this.el.sceneEl.object3D, t); if (!W3D.active) return; if (W3D.tickWildlife) W3D.tickWildlife(t, dt); if (W3D.tickRooms) W3D.tickRooms(t, dt);
   if (!CLASSIC && W3D.sunRig && _sf % 30 === 0) followSun(this.el.sceneEl);
-  const r = this.el.renderer, N = r && r.xr && r.xr.isPresenting ? (W3D.xrSlow ? 0 : 90) : 12; if (r && N && ++_sf % N === 0) r.shadowMap.needsUpdate = true; /* headset: rare shadow refreshes, none while frames run late */
+  const r = this.el.renderer, N = r && r.xr && r.xr.isPresenting ? (W3D.xrSlow ? 0 : 1800) : 12; ++_sf; if (r && N && _sf % N === 0) r.shadowMap.needsUpdate = true; /* headset: shadows re-render only every ~25 s (the sun moves slowly; followSun still refreshes after you move 20 m) - Nov 26: the old 90-frame refresh re-drew 600 shadow casters every 1.25 s, a dropped frame the Quest reprojects as a wobble. _sf now counts every frame (it stalled while frames ran late, running followSun each frame) */
   if (W3D.sky && this.el.camera) { this.el.camera.getWorldPosition(_cp); W3D.sky.position.copy(_cp); } } });
 // lifts between hall and office
 AFRAME.registerComponent('w3d-lift', { schema: {to: {type: 'string'}}, init: function () { this.el.addEventListener('click', () => { if (this.data.to === 'office') W3D.spots.office(); else W3D.teleportTo(958, HQ.y + 0.3, HQ.z, -90); JFVR.hud && JFVR.hud(this.data.to === 'office' ? "Josh's office - top floor" : 'Banking hall'); }); } });
