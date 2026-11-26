@@ -136,11 +136,11 @@ body{margin:0;font-family:system-ui,sans-serif}
 #ui a.lnk{display:inline-block;font-size:15px;margin:3px;padding:8px 12px;border-radius:8px;color:#111;text-decoration:none}
 @media (max-width:600px){#ui #tabbar button.tab{font-size:15px;padding:9px 10px}#ui button{font-size:14px;padding:8px 10px}}
 </style></head><body>
-<a-scene vr-mode-ui="enabled: true" light="defaultLightsEnabled: false" renderer="antialias: true; colorManagement: true; toneMapping: ACESFilmic; exposure: 1.0; highRefreshRate: false; foveationLevel: 1; logarithmicDepthBuffer: true; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160; precision: high" hd-renderer="scale: 1.0" w3d-anim>
+<a-scene device-orientation-permission-ui="enabled: false" vr-mode-ui="enabled: true" light="defaultLightsEnabled: false" renderer="antialias: true; colorManagement: true; toneMapping: ACESFilmic; exposure: 1.0; highRefreshRate: false; foveationLevel: 1; logarithmicDepthBuffer: true; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160; precision: high" hd-renderer="scale: 1.0" w3d-anim>
   <a-entity id="sky" visible="false"></a-entity>
   <a-entity id="rig" wasd-controls="acceleration: 25" w3d-physics w3d-keys>
     <!-- the winged-sun fly disk that hovered overhead is gone; Fly is a button on the menu (A/X still toggles it) -->
-    <a-entity camera="near: 0.1; far: 30000" look-controls touch-pitch wasd-controls="enabled:false" position="0 1.6 0">
+    <a-entity camera="near: 0.1; far: 30000" look-controls="magicWindowTrackingEnabled: false" touch-pitch wasd-controls="enabled:false" position="0 1.6 0">
     <a-entity cursor="fuse:false; rayOrigin:mouse" raycaster="objects:.btn; far: 60"></a-entity>
   </a-entity>
   <a-entity laser-controls="hand:right" snap-turn w3d-teleport jf-pointer raycaster="objects:.btn; far: 60"></a-entity>
@@ -332,6 +332,6 @@ document.getElementById('helpbtn').onclick=()=>ui.classList.toggle('help');})();
 </script>
 <script src="w3d/tesseractreader.js?v=1"></script>
 <script src="w3d/tesseractlink.js?v=3"></script>
-<script src="w3d/menutabs.js?v=1"></script>
+<script src="w3d/menutabs.js?v=2"></script>
 <script>/* ?nomp=1 (automated tests) skips joining the public voice room */ if (!/[?&]nomp=1/.test(location.search)) { const s = document.createElement('script'); s.src = 'mp.js?v=7'; document.body.appendChild(s); }</script>
 </body></html>

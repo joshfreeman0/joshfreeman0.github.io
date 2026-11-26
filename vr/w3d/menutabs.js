@@ -107,6 +107,28 @@
   window.JFVR_menuInventory = () => ({ vr: Object.fromEntries(TABS.map(([k]) => [k, []])), ...(() => { const out = {}; const bar = document.getElementById('vrbar');
     [...bar.children].forEach(e => { if (/^jfv-(tab-|title|hint|bg)/.test(e.id || '')) return; const k = keyOf(e); const r = Object.keys(ORDER).find(t => ORDER[t].includes(k)) || 'set';
       (out[r] = out[r] || []).push(k + ' = ' + (((e.querySelector && e.querySelector('a-text')) || e).getAttribute('value') || '')); }); return {vrTabs: out}; })() });
-  function boot() { init2D(); const sc = document.querySelector('a-scene'); if (!sc) return; if (sc.hasLoaded) initVR(); else sc.addEventListener('loaded', initVR); }
+  /* Nov 26: A-Frame's load-time "requires access to your device motion sensors" Deny/Allow prompt is off (a-scene
+     device-orientation-permission-ui). Drag-look + joystick need no permission. Tilt-to-look is opt-in here, default OFF; permission
+     is only ever requested from this tap (iOS needs a user gesture), the saved choice alone never triggers a prompt. */
+  function initTilt() {
+    const host = document.getElementById('set-look'); if (!host || document.getElementById('tiltbtn') || typeof window.DeviceOrientationEvent === 'undefined') return;
+    const b = document.createElement('button'); b.id = 'tiltbtn'; host.appendChild(b);
+    const lc = () => { const c = document.querySelector('[camera]'); return c && c.components['look-controls']; };
+    let on = false;
+    const apply = v => { on = v; const l = lc(); if (l) l.data.magicWindowTrackingEnabled = v; const c = document.querySelector('[camera]'); if (c) c.setAttribute('look-controls', 'magicWindowTrackingEnabled', v);
+      if (!v && l && l.magicWindowDeltaEuler) l.magicWindowDeltaEuler.set(0, 0, 0); b.textContent = 'Tilt phone to look: ' + (v ? 'On' : 'Off'); };
+    const save = v => { try { localStorage.setItem('jfvr_tilt', v ? '1' : '0'); } catch (e) {} };
+    b.addEventListener('click', () => {
+      if (on) { apply(false); save(false); return; }
+      const D = window.DeviceOrientationEvent;
+      if (D && typeof D.requestPermission === 'function') D.requestPermission().then(r => { const ok = r === 'granted'; apply(ok); save(ok); if (!ok) b.textContent = 'Tilt phone to look: blocked (Settings > Safari/Brave > Motion)'; }).catch(() => { apply(false); b.textContent = 'Tilt phone to look: not allowed'; });
+      else { apply(true); save(true); } });
+    // remembered ON: re-enable without asking where no permission is needed (Android); on iOS it stays off until tapped
+    let saved = false; try { saved = localStorage.getItem('jfvr_tilt') === '1'; } catch (e) {}
+    apply(saved && !(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function'));
+    if (saved && !on) b.textContent = 'Tilt phone to look: Off (tap to turn on)';
+    const sc = document.querySelector('a-scene'); if (sc) { sc.addEventListener('enter-vr', () => { if (sc.is('vr-mode')) b.style.display = 'none'; }); sc.addEventListener('exit-vr', () => { b.style.display = ''; }); }
+  }
+  function boot() { initTilt(); init2D(); const sc = document.querySelector('a-scene'); if (!sc) return; if (sc.hasLoaded) initVR(); else sc.addEventListener('loaded', initVR); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
