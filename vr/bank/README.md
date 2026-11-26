@@ -28,6 +28,8 @@ A small public blockchain for the Fowling Pond VR bank:
 ## Ledger updates (git anchors)
 | Block(s) | What | Commit |
 |---|---|---|
-| 0 | Genesis - Third Edition - $150,000,000,000,000.00 minted to the Treasury - hash `a3eaaaf9036f2e66...` | pending |
-| 1 | Issue printed color run (serials 00000001-00000003, 12 denominations) - hash `b32a8a3a5e3f153b...` | pending |
-| 2 | Issue printed black-and-white run (serials 00000501-00000503, 12 denominations) - hash `2e5df3816460ea80...` | pending |
+| 0 | Genesis - Third Edition - $150,000,000,000,000.00 minted to the Treasury - hash `a3eaaaf9036f2e66...` | [a5775da](https://github.com/joshfreeman0/joshfreeman0.github.io/commit/a5775da) (2026-11-26) |
+| 1 | Issue printed color run (serials 00000001-00000003, 12 denominations) - hash `b32a8a3a5e3f153b...` | [a5775da](https://github.com/joshfreeman0/joshfreeman0.github.io/commit/a5775da) (2026-11-26) |
+| 2 | Issue printed black-and-white run (serials 00000501-00000503, 12 denominations) - hash `2e5df3816460ea80...` | [a5775da](https://github.com/joshfreeman0/joshfreeman0.github.io/commit/a5775da) (2026-11-26) |
+
+For each later ledger update, add a row with the block number(s) and the commit that published them.
