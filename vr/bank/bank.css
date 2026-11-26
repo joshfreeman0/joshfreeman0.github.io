@@ -45,3 +45,4 @@ details .in{padding:4px 12px 12px;overflow-x:auto}
 html,body{overflow-x:hidden}
 main,.panel,details,.in{min-width:0;max-width:100%}
 td,th{overflow-wrap:anywhere}table{table-layout:auto}@media (max-width:600px){.panel{padding:12px 10px}details .in{padding:4px 6px 10px}}
+.codebox{margin-top:10px;padding:10px 12px;border-radius:10px;border:1px dashed var(--gold);background:#1b2233}

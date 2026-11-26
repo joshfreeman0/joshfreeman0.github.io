@@ -66,7 +66,13 @@
           if (amt !== DENOMS[p.L][1]) throw new Error(where + ': amount does not match face value');
           if ((bal.get(TREASURY) || 0n) < amt) throw new Error(where + ': Treasury overspend');
           add(TREASURY, -amt); add(p.s, amt);
-          bills.set(p.s, { serial: p.s, denomination: DENOMS[p.L][2], face: amt, letter: p.L, edition: e.edition, run: e.print_run, status: 'in circulation', holder: e.holder });
+          if (e.code_hash !== undefined && (e.code_kdf !== 'pbkdf2-sha256' || !/^[0-9a-f]{64}$/.test(e.code_hash))) throw new Error(where + ': bad code hash fields');
+          bills.set(p.s, { serial: p.s, denomination: DENOMS[p.L][2], face: amt, letter: p.L, edition: e.edition, run: e.print_run, status: 'in circulation', holder: e.holder,
+            series: e.series || 'Run 1', code: e.code_hash ? { salt: e.code_salt, iter: e.code_iter, hash: e.code_hash } : null, claimedBy: null, claimedAt: null });
+        } else if (e.type === 'claim') {
+          const x = bills.get(e.serial); if (!x || x.status !== 'in circulation') throw new Error(where + ': not in circulation');
+          if (!x.code) throw new Error(where + ': bill has no secret code'); if (x.claimedBy !== null) throw new Error(where + ': already claimed');
+          if (e.holder_from !== x.holder) throw new Error(where + ': holder mismatch'); x.holder = x.claimedBy = e.holder_to; x.claimedAt = b.header.timestamp;
         } else if (e.type === 'transfer') {
           const x = bills.get(e.serial); if (!x || x.status !== 'in circulation') throw new Error(where + ': not in circulation');
           if (e.holder_from !== x.holder) throw new Error(where + ': holder mismatch'); x.holder = e.holder_to;
@@ -118,14 +124,33 @@
       const h = b.header;
       const ents = b.entries.map(e => '<tr><td>' + esc(e.type) + '</td><td class="mono">' + (e.serial ? '<a href="?serial=' + esc(e.serial) + '#lookup">' + esc(e.serial) + '</a>' : esc(e.to)) + '</td><td>' +
         (e.amount_cents ? money(e.amount_cents) : '') + '</td><td>' + esc(e.denomination || '') + (e.print_run ? ' · ' + esc(e.print_run === 'bw' ? 'B&W' : 'color') : '') +
-        (e.type === 'transfer' ? esc(e.holder_from) + ' &rarr; ' + esc(e.holder_to) : '') + '</td></tr>').join('');
+        (e.type === 'transfer' || e.type === 'claim' ? esc(e.holder_from) + ' &rarr; ' + esc(e.holder_to) : '') + (e.code_hash ? ' · secret code' : '') + '</td></tr>').join('');
       return '<details id="block-' + h.index + '"' + (h.index === 0 ? ' open' : '') + '><summary><b>Block ' + h.index + '</b> · ' + esc(h.timestamp.replace('T', ' ').replace('Z', ' UTC')) + ' · ' + esc(h.memo) + '</summary><div class="in">' +
         '<div class="kv small"><div>Hash</div><div class="mono brk">' + b.hash + '</div><div>Previous</div><div class="mono brk">' + h.prev_hash + '</div><div>Merkle root</div><div class="mono brk">' + h.merkle_root +
         '</div><div>Signature</div><div class="mono brk">' + esc(b.signature) + '</div><div>Entries</div><div>' + h.entry_count + '</div></div>' +
         '<table><thead><tr><th>Type</th><th>Serial / account</th><th>Amount</th><th>Details</th></tr></thead><tbody>' + ents + '</tbody></table></div></details>';
     }).join('');
   }
-  function lookup(raw) {
+  const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  async function codeHash(serial, code, salt, iter) {
+    const k = await crypto.subtle.importKey('raw', enc.encode(code), 'PBKDF2', false, ['deriveBits']);
+    return hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode('FPBANK3|' + serial + '|' + salt), iterations: iter }, k, 256));
+  }
+  const when = ts => esc(ts.replace('T', ' ').replace('Z', ' UTC'));
+  async function codeBlock(b, rawCode) {
+    if (!b.code) return '<div class="codebox">Run 1 bill: it has no secret code, so it is valid by serial number only.</div>';
+    const claimed = b.claimedBy ? 'Already claimed by <b>' + esc(b.claimedBy) + '</b> on ' + when(b.claimedAt) + ' - any other bill with this serial is a copy.' : '';
+    const code = String(rawCode || '').replace(/[\s\-]/g, '').toUpperCase();
+    if (!code) return '<div class="codebox">' + (claimed ? claimed + '<br>' : '') + 'This Run 2 bill has a secret code. Peel the sticky tab and type the code above to check it.</div>';
+    if (!new RegExp('^[' + CODE_ALPHABET + ']{8}$').test(code)) return '<div class="res bad"><h3>Wrong code - likely a copy</h3>Codes are 8 characters (like ABCD-EFGH) and never use 0, O, 1, I or L.' + (claimed ? '<br>' + claimed : '') + '</div>';
+    let ok = false; try { ok = (await codeHash(b.serial, code, b.code.salt, b.code.iter)) === b.code.hash; } catch (e) { return '<div class="res warnr">This browser could not check the code (' + esc(e.message) + ').</div>'; }
+    if (!ok) return '<div class="res bad"><h3>Wrong code - likely a copy</h3>The code does not match this serial.' + (claimed ? '<br>' + claimed : '') + '</div>';
+    if (claimed) return '<div class="res warnr"><h3>Code matches - already claimed</h3>' + claimed + ' If that is you, this is your bill.</div>';
+    return '<div class="res ok"><h3>Code matches - genuine bill</h3>Not claimed yet. The first person to claim it owns it: ask the bank to record your claim.</div>';
+  }
+  let lookSeq = 0;
+  async function lookup(raw, rawCode) {
+    const seq = ++lookSeq;
     const out = $('lres'), p = parseSerial(raw); $('serial').value = p.s || '';
     if (!p.s) { out.innerHTML = ''; return; }
     if (p.err) { out.innerHTML = '<div class="res bad"><h3>Not genuine: ' + esc(p.s) + '</h3>' + esc(p.err) + '</div>'; return; }
@@ -133,13 +158,15 @@
     const b = STATE.bills.get(p.s);
     if (!b) { out.innerHTML = '<div class="res warnr"><h3>' + esc(p.s) + ': not on the ledger</h3>The format and check letter are valid for a ' + DENOMS[p.L][2] + ' note, but this serial has never been issued by the bank, so the bill is not real money in Fowling Pond.</div>'; return; }
     const h = STATE.hist.get(p.s).map(x => '<li><a href="#block-' + x.block + '">Block ' + x.block + '</a> · ' + esc(x.ts.replace('T', ' ').replace('Z', ' UTC')) + ' · ' + esc(x.type) +
-      (x.type === 'transfer' ? ' to ' + esc(x.e.holder_to) : '') + '</li>').join('');
+      (x.type === 'transfer' || x.type === 'claim' ? ' to ' + esc(x.e.holder_to) : '') + '</li>').join('');
     out.innerHTML = '<div class="res ok"><h3>Genuine: ' + esc(p.s) + ' <span class="tag ' + (b.status === 'redeemed' ? 'r' : 'c') + '">' + esc(b.status) + '</span></h3><div class="kv">' +
       '<div>Denomination</div><div>' + esc(b.denomination) + ' (' + money(b.face) + ')</div><div>Bank</div><div>Bank of the United States</div><div>Edition</div><div>' + esc(b.edition) + '</div>' +
-      '<div>Print run</div><div>' + (b.run === 'bw' ? 'Black-and-white' : 'Color') + '</div><div>Current holder</div><div>' + esc(b.holder) + '</div></div><p class="small">History:</p><ul>' + h + '</ul>' +
+      '<div>Print run</div><div>' + esc(b.series) + ', ' + (b.run === 'bw' ? 'black-and-white' : 'color') + '</div><div>Current holder</div><div>' + esc(b.holder) + '</div></div>' +
+      '<div id="codeslot">' + (b.code ? '<div class="codebox">Checking code...</div>' : '') + '</div><p class="small">History:</p><ul>' + h + '</ul>' +
       '<p class="small">Play money - not legal tender - for Fowling Pond VR use only.</p></div>';
+    const cb = await codeBlock(b, rawCode); if (seq === lookSeq && $('codeslot')) $('codeslot').innerHTML = cb;
   }
-  $('lf').addEventListener('submit', e => { e.preventDefault(); const u = new URL(location.href); u.searchParams.set('serial', $('serial').value.replace(/\s/g, '').toUpperCase()); history.replaceState(null, '', u.pathname + u.search + '#lookup'); lookup($('serial').value); });
+  $('lf').addEventListener('submit', e => { e.preventDefault(); const u = new URL(location.href); u.searchParams.set('serial', $('serial').value.replace(/\s/g, '').toUpperCase()); history.replaceState(null, '', u.pathname + u.search + '#lookup'); lookup($('serial').value, $('code').value); });
   $('vbtn').addEventListener('click', async () => {
     const out = $('vres'); out.innerHTML = '<div class="res warnr">Checking...</div>'; const lines = [];
     try {

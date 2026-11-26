@@ -23,7 +23,14 @@ A small public blockchain for the Fowling Pond VR bank:
 - `bank-public-key.txt`: the bank's Ed25519 public key.
 
 ## Entry types
-`mint` (genesis only), `issue` (Treasury to serial), `transfer` (records a new holder; the value stays with the bill), `redeem` (serial back to Treasury; the bill is retired).
+`mint` (genesis only), `issue` (Treasury to serial), `transfer` (records a new holder; the value stays with the bill), `claim` (first claimer of a coded bill, after the bank checked the code), `redeem` (serial back to Treasury; the bill is retired).
+
+## Secret codes (Run 2)
+Run 2 bills (color 00000004-00000006, B&W 00000504-00000506, every denomination) carry a random 8-character code (alphabet `23456789ABCDEFGHJKMNPQRSTUVWXYZ`, shown as XXXX-XXXX) in a VERIFY CODE box sized for a removable sticky flag. The issue entry stores `code_kdf = pbkdf2-sha256`, `code_iter`, a random per-bill `code_salt` and `code_hash = PBKDF2-HMAC-SHA256(password = code without the dash, salt = "FPBANK3|" + serial + "|" + code_salt, code_iter, 32 bytes)`. Plaintext codes are never committed.
+
+- **Check (anyone, in the browser):** enter serial + code on the page. It recomputes the PBKDF2 hash locally and shows "Code matches - genuine bill" or "Wrong code - likely a copy".
+- **Claim (the bank, CLI):** `ledger.py claim SERIAL CODE --holder NAME` checks the code and appends a signed `claim` block. First claimer wins; a second claim is refused. After that the page shows "Already claimed by NAME on DATE - any other bill with this serial is a copy". A static page can't write to the ledger, so claims are recorded by the bank.
+- Run 1 bills (00000001-00000003, 00000501-00000503) have no code and stay valid by serial only.
 
 ## Ledger updates (git anchors)
 | Block(s) | What | Commit |
@@ -31,5 +38,6 @@ A small public blockchain for the Fowling Pond VR bank:
 | 0 | Genesis - Third Edition - $150,000,000,000,000.00 minted to the Treasury - hash `a3eaaaf9036f2e66...` | [a5775da](https://github.com/joshfreeman0/joshfreeman0.github.io/commit/a5775da) (2026-11-26) |
 | 1 | Issue printed color run (serials 00000001-00000003, 12 denominations) - hash `b32a8a3a5e3f153b...` | [a5775da](https://github.com/joshfreeman0/joshfreeman0.github.io/commit/a5775da) (2026-11-26) |
 | 2 | Issue printed black-and-white run (serials 00000501-00000503, 12 denominations) - hash `2e5df3816460ea80...` | [a5775da](https://github.com/joshfreeman0/joshfreeman0.github.io/commit/a5775da) (2026-11-26) |
+| 3 | Issue Run 2 (secret codes): color 4-6 and B&W 504-506, 12 denominations - hash `0dc18582bb678c0a...` | pending |
 
 For each later ledger update, add a row with the block number(s) and the commit that published them.

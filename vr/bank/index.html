@@ -5,7 +5,7 @@
 <title>Bank of the United States - Third Edition Ledger (Play Money) - Fowling Pond</title>
 <meta name="description" content="Public play-money ledger for the Fowling Pond VR Bank of the United States, Third Edition. Not legal tender.">
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="bank.css?v=1">
+<link rel="stylesheet" href="bank.css?v=2">
 </head><body>
 <div class="warn">PLAY MONEY - NOT LEGAL TENDER - FOR FOWLING POND VR USE ONLY</div>
 <header>
@@ -24,8 +24,8 @@
 
 <section class="panel" id="lookup">
   <h2>Serial number lookup</h2>
-  <p>Type the serial printed on a bill, for example <a href="?serial=FPA00000001C#lookup" class="mono">FPA 00000001 C</a>. Spaces don't matter.</p>
-  <form id="lf" autocomplete="off"><input id="serial" class="mono" maxlength="20" placeholder="FPA00000001C" aria-label="Serial number" autocapitalize="characters" spellcheck="false"><button type="submit">Look up</button></form>
+  <p>Type the serial printed on a bill, for example <a href="?serial=FPA00000001C#lookup" class="mono">FPA 00000001 C</a>. Spaces don't matter. Run 2 bills also have a secret <b>VERIFY CODE</b> under a sticky tab: peel it and type the code to prove the bill is not a copy.</p>
+  <form id="lf" autocomplete="off"><input id="serial" class="mono" maxlength="20" placeholder="FPA00000001C" aria-label="Serial number" autocapitalize="characters" spellcheck="false"><input id="code" class="mono" maxlength="12" placeholder="Code (Run 2): XXXX-XXXX" aria-label="Secret code (Run 2 bills)" autocapitalize="characters" spellcheck="false" autocomplete="off"><button type="submit">Look up</button></form>
   <div id="lres" aria-live="polite"></div>
 </section>
 
@@ -54,6 +54,7 @@
     <li><b>Each block is locked to the one before it.</b> A block carries a fingerprint of the previous block, so changing anything in an old block breaks every block after it.</li>
     <li><b>The bank signs every block.</b> Only the bank's private key can sign, and anyone can check the signature with the public key below. A forger can't make a valid block.</li>
     <li><b>The check letter catches fakes and typos.</b> The last letter of a serial is A plus (the sum of the 8 digits + the face value) counted around the alphabet. A wrong letter means the serial isn't genuine.</li>
+    <li><b>Secret codes stop photocopies (Run 2).</b> Each Run 2 bill has its own random code in a VERIFY CODE box, covered with a removable sticky tab. The ledger stores only a scrambled fingerprint of the code (salted PBKDF2-SHA256), never the code. A copier can copy the serial, but the first person to claim the bill with the right code owns it; the bank then records "claimed", and every other bill with that serial is a copy. Run 1 bills have no code and are valid by serial only.</li>
     <li><b>Git history is the clock.</b> Each ledger update is committed to the public GitHub repo, which timestamps it.</li>
   </ol>
   <p class="small">Bank public key (Ed25519): <span class="mono brk" id="pk"></span> · <a href="ledger.json">ledger.json</a> · <a href="bank-public-key.txt">bank-public-key.txt</a> · <a href="README.md">README</a></p>
@@ -63,5 +64,5 @@
 </main>
 <div class="warn">PLAY MONEY - NOT LEGAL TENDER - FOR FOWLING POND VR USE ONLY · No real value, no token, no wallet, nothing for sale.</div>
 <script src="nacl-fast.min.js?v=1"></script>
-<script src="bank.js?v=1"></script>
+<script src="bank.js?v=2"></script>
 </body></html>
