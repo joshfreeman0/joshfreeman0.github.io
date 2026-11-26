@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bank of the United States - Third Edition Ledger (Play Money) - Fowling Pond</title>
+<meta name="description" content="Public play-money ledger for the Fowling Pond VR Bank of the United States, Third Edition. Not legal tender.">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="bank.css?v=1">
+</head><body>
+<div class="warn">PLAY MONEY - NOT LEGAL TENDER - FOR FOWLING POND VR USE ONLY</div>
+<header>
+  <div class="kicker">Fowling Pond · Central Command Hall Vault</div>
+  <h1>Bank of the United States</h1>
+  <div class="ed">Third Edition · Public Ledger</div>
+  <div class="motto">PER AQUAS AD ASTRA</div>
+</header>
+<main>
+<section class="cards" id="cards">
+  <div class="card"><div class="lbl">Total supply</div><div class="val" id="c-supply">...</div></div>
+  <div class="card"><div class="lbl">Treasury (vault)</div><div class="val" id="c-treasury">...</div></div>
+  <div class="card"><div class="lbl">In circulation</div><div class="val" id="c-circ">...</div><div class="sub" id="c-bills"></div></div>
+  <div class="card"><div class="lbl">Blocks</div><div class="val" id="c-blocks">...</div><div class="sub mono" id="c-hash"></div></div>
+</section>
+
+<section class="panel" id="lookup">
+  <h2>Serial number lookup</h2>
+  <p>Type the serial printed on a bill, for example <a href="?serial=FPA00000001C#lookup" class="mono">FPA 00000001 C</a>. Spaces don't matter.</p>
+  <form id="lf" autocomplete="off"><input id="serial" class="mono" maxlength="20" placeholder="FPA00000001C" aria-label="Serial number" autocapitalize="characters" spellcheck="false"><button type="submit">Look up</button></form>
+  <div id="lres" aria-live="polite"></div>
+</section>
+
+<section class="panel">
+  <h2>Verify the whole chain</h2>
+  <p>Your browser re-checks every block by itself: the fingerprints (SHA-256 hashes), the Merkle roots, the bank's Ed25519 signatures, and that the books still add up to exactly $150 trillion.</p>
+  <button id="vbtn" type="button">Verify whole chain</button>
+  <div id="vres" aria-live="polite"></div>
+</section>
+
+<section class="panel">
+  <h2>Bills issued by denomination</h2>
+  <table id="dtab"><thead><tr><th>Note</th><th>Letter</th><th>Bills</th><th>Value</th></tr></thead><tbody></tbody></table>
+</section>
+
+<section class="panel">
+  <h2>Block explorer</h2>
+  <div id="blocks"></div>
+</section>
+
+<section class="panel how">
+  <h2>How it works, in plain words</h2>
+  <ol>
+    <li><b>The vault starts with $150 trillion of play money.</b> Block 0 (the "genesis" block) puts all of it in the Treasury in the Central Command Hall vault. No more can ever be added.</li>
+    <li><b>Every printed bill is recorded by its serial number.</b> When a bill is issued, its face value moves out of the Treasury and onto that serial. Treasury + all bills always equals $150 trillion.</li>
+    <li><b>Each block is locked to the one before it.</b> A block carries a fingerprint of the previous block, so changing anything in an old block breaks every block after it.</li>
+    <li><b>The bank signs every block.</b> Only the bank's private key can sign, and anyone can check the signature with the public key below. A forger can't make a valid block.</li>
+    <li><b>The check letter catches fakes and typos.</b> The last letter of a serial is A plus (the sum of the 8 digits + the face value) counted around the alphabet. A wrong letter means the serial isn't genuine.</li>
+    <li><b>Git history is the clock.</b> Each ledger update is committed to the public GitHub repo, which timestamps it.</li>
+  </ol>
+  <p class="small">Bank public key (Ed25519): <span class="mono brk" id="pk"></span> · <a href="ledger.json">ledger.json</a> · <a href="bank-public-key.txt">bank-public-key.txt</a> · <a href="README.md">README</a></p>
+  <div class="bills"><img src="bill-1-front.webp" alt="One dollar play-money note, serial FPA 00000001 C" loading="lazy"><img src="bill-100-front.webp" alt="One hundred dollar play-money note, serial FPF 00000001" loading="lazy"></div>
+</section>
+<p class="back"><a href="../">Back to Fowling Pond VR</a></p>
+</main>
+<div class="warn">PLAY MONEY - NOT LEGAL TENDER - FOR FOWLING POND VR USE ONLY · No real value, no token, no wallet, nothing for sale.</div>
+<script src="nacl-fast.min.js?v=1"></script>
+<script src="bank.js?v=1"></script>
+</body></html>
