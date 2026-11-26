@@ -10,7 +10,11 @@ const W3D = window.W3D = window.W3D || {};
 const C = {x: -520, z: 40}, FY = 16.9, PI = Math.PI;
 W3D.houseboat = {x: C.x, z: C.z, deckY: FY};
 const CREAM = 0xe8e2d2, WOOD = 0x8a6a45, DWOOD = 0x5e4126, ROOF = 0x4a5a66, HULL = 0x2f4a62, WHITE = 0xf2f0ea, DARK = 0x2a2d30, STEEL = 0xb9c0c4;
-let built = false, glassMat, lightMat, intMat, halos = [];
+let built = false, glassMat, lightMat, lampMat, intMat, halos = [];
+/* bedroom light switch (Josh, Nov 26): on the wall left of the bed. Off = cabin glow, bedside lamp, its halo and the warm windows go
+   dark (at night the cabin is genuinely dark: interior surfaces are dimmed too); the deck and roof lanterns outside stay as they are.
+   Laser + trigger in the headset, click / tap on desktop and phone. Remembered on this device. */
+let lightsOn = (function () { try { return localStorage.getItem('jfvr_hb_lights') !== 'off'; } catch (e) { return true; } })();
 function wallAdd(x0, x1, z0, z1, y0, y1) { W3D.walls.push({x0: C.x + x0, x1: C.x + x1, z0: C.z + z0, z1: C.z + z1, y0, y1}); }
 function floorAdd(x0, x1, z0, z1, y) { W3D.floors.push({x0: C.x + x0, x1: C.x + x1, z0: C.z + z0, z1: C.z + z1, y}); }
 function halo(x, y, z, size, rgb) { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -20,7 +24,7 @@ function halo(x, y, z, size, rgb) { const c = document.createElement('canvas'); 
 
 function build() {
   if (built || !W3D.root || !W3D.walls) return; built = true;
-  const ext = new W3D.MB(), inn = new W3D.MB(), glass = new W3D.MB(), glow = new W3D.MB();
+  const ext = new W3D.MB(), inn = new W3D.MB(), glass = new W3D.MB(), glow = new W3D.MB(), lamp = new W3D.MB();
   const hw = t => 4 * Math.min(1, 0.86 + t * 6, Math.pow(Math.max(0, (1 - t) / 0.2), 0.6) + 0.02);   // half beam: square stern, tapered bow (bow = +x)
   const fn = t => ({w: hw(t), ky: FY - 1.0 + 0.25 * (1 - t) * 0, gy: FY});
   ext.loft(16, fn, HULL, 12, null, 0x24384c); ext.lid(16, fn, WOOD, 12, 0.0, 1.0);                            // hull + plank deck
@@ -52,7 +56,7 @@ function build() {
   for (const sd of [-1, 1]) inn.box(0.5, 0.15, 0.7, -4.85, FY + 0.64, sd * 0.4, 0xfffaf0);                          // pillows
   inn.box(1.1, 0.08, 1.64, -3.7, FY + 0.61, 0, 0x2a5f7a); inn.box(1.05, 0.04, 0.5, -3.7, FY + 0.67, 0.5, 0xd8a62a); // blanket + throw stripe
   for (const sd of [-1, 1]) { inn.box(0.55, 0.5, 0.55, -4.95, FY + 0.25, sd * 1.4, WOOD); wallAdd(-5.25, -4.65, sd * 1.4 - 0.28, sd * 1.4 + 0.28, FY, FY + 0.5); }
-  inn.cyl(0.07, 0.07, 0.25, 8, -4.95, FY + 0.62, -1.4, DARK); glow.cyl(0.12, 0.2, 0.28, 10, -4.95, FY + 0.88, -1.4, 0xffffff);   // lamp base + glowing shade
+  inn.cyl(0.07, 0.07, 0.25, 8, -4.95, FY + 0.62, -1.4, DARK); lamp.cyl(0.12, 0.2, 0.28, 10, -4.95, FY + 0.88, -1.4, 0xffffff);   // lamp base + glowing shade (own material: the light switch turns it off)
   inn.box(3.6, 0.9, 0.7, 0.1, FY + 0.45, -2.45, 0xd9d3c0); inn.box(3.7, 0.04, 0.75, 0.1, FY + 0.92, -2.45, DARK); wallAdd(-1.7, 1.9, -2.8, -2.1, FY, FY + 0.92);
   inn.box(0.7, 0.04, 0.5, -0.7, FY + 0.95, -2.45, STEEL); inn.cyl(0.14, 0.14, 0.03, 10, 1.0, FY + 0.95, -2.45, DARK); inn.cyl(0.14, 0.14, 0.03, 10, 1.5, FY + 0.95, -2.45, DARK);   // sink + burners
   inn.box(3.2, 0.6, 0.35, 0.1, FY + 1.85, -2.62, WOOD); inn.box(0.8, 1.25, 0.7, 2.7, FY + 0.625, -2.45, WHITE); wallAdd(2.3, 3.1, -2.8, -2.1, FY, FY + 1.25);
@@ -84,23 +88,38 @@ function build() {
   const g = new THREE.Group(); g.name = 'houseboat';
   const lam = new THREE.MeshLambertMaterial({vertexColors: true, side: THREE.DoubleSide});
   intMat = new THREE.MeshLambertMaterial({vertexColors: true, side: THREE.DoubleSide, emissive: new THREE.Color(0x000000)});
-  glassMat = new THREE.MeshBasicMaterial({color: 0x9fbac4, side: THREE.DoubleSide, fog: true}); lightMat = new THREE.MeshBasicMaterial({color: 0xe8dcc0, fog: true});
+  glassMat = new THREE.MeshBasicMaterial({color: 0x9fbac4, side: THREE.DoubleSide, fog: true}); lightMat = new THREE.MeshBasicMaterial({color: 0xe8dcc0, fog: true}); lampMat = new THREE.MeshBasicMaterial({color: 0xe8dcc0, fog: true});
   const mk = (b, m, sh) => { const mesh = new THREE.Mesh(b.build(), m); mesh.castShadow = sh && !W3D.lite; mesh.receiveShadow = !W3D.lite; g.add(mesh); return mesh; };
-  mk(ext, lam, true); mk(inn, intMat, false); mk(glass, glassMat); mk(glow, lightMat);
+  mk(ext, lam, true); mk(inn, intMat, false); mk(glass, glassMat); mk(glow, lightMat); mk(lamp, lampMat);
   g.position.set(C.x, 0, C.z);
   // floors/walls were registered in world coords; geometry is local to C, so the group sits at C
   g.add(halo(7.4, FY + 2.0, 0, 5, '255,200,120')); g.add(halo(-4.9, RY + 1.4, -2.9, 4, '255,200,120')); g.add(halo(-4.95, FY + 0.95, -1.4, 3.2, '255,205,130')); g.add(halo(-1, FY + 1.5, 0, 6, '255,190,110'));
-  W3D.root.add(g); W3D.houseboat.group = g; W3D.houseboat.tris = ext.tris + inn.tris + glass.tris + glow.tris;
+  W3D.root.add(g); W3D.houseboat.group = g; W3D.houseboat.tris = ext.tris + inn.tris + glass.tris + glow.tris + lamp.tris;
+  buildSwitch();
 }
-const dayG = new THREE.Color(0x9fbac4), nightG = new THREE.Color(0xffc870), dayL = new THREE.Color(0xe8dcc0), nightL = new THREE.Color(0xffd890);
+function buildSwitch() { const sc = document.querySelector('a-scene'); if (!sc || document.getElementById('hb-switch')) return;
+  const e = document.createElement('a-entity'); e.id = 'hb-switch'; e.setAttribute('position', (C.x - 5.285) + ' ' + (FY + 1.3) + ' ' + (C.z - 2.2)); e.setAttribute('rotation', '0 90 0');
+  const plate = document.createElement('a-plane'); plate.className = 'btn'; plate.setAttribute('width', 0.2); plate.setAttribute('height', 0.3); plate.setAttribute('material', 'shader:flat;color:#f4f0e6'); e.appendChild(plate);
+  const rk = document.createElement('a-box'); rk.id = 'hb-rocker'; rk.setAttribute('width', 0.07); rk.setAttribute('height', 0.12); rk.setAttribute('depth', 0.03); rk.setAttribute('position', '0 0 0.015'); plate.appendChild(rk);
+  const lb = document.createElement('a-text'); lb.id = 'hb-label'; lb.setAttribute('align', 'center'); lb.setAttribute('width', 1.1); lb.setAttribute('position', '0 0.25 0.005'); e.appendChild(lb);
+  const hint = document.createElement('a-text'); hint.setAttribute('value', 'Bedroom lights - click'); hint.setAttribute('align', 'center'); hint.setAttribute('color', '#333'); hint.setAttribute('width', 0.7); hint.setAttribute('position', '0 -0.21 0.005'); e.appendChild(hint);
+  plate.addEventListener('click', () => setLights(!lightsOn)); sc.appendChild(e); paintSwitch(); }
+function paintSwitch() { const rk = document.getElementById('hb-rocker'), lb = document.getElementById('hb-label'); if (!rk || !lb) return;
+  rk.setAttribute('material', 'shader:flat;color:' + (lightsOn ? '#2ecc71' : '#c62828')); rk.setAttribute('rotation', (lightsOn ? -18 : 18) + ' 0 0');
+  lb.setAttribute('value', lightsOn ? 'LIGHTS ON' : 'LIGHTS OFF'); lb.setAttribute('color', lightsOn ? '#1e9e3e' : '#c62828'); }
+function setLights(on) { lightsOn = !!on; try { localStorage.setItem('jfvr_hb_lights', lightsOn ? 'on' : 'off'); } catch (e) {} lastN = -1; paintSwitch();
+  if (window.JFVR && JFVR.hud) JFVR.hud('Houseboat lights ' + (lightsOn ? 'on' : 'off')); }
+W3D.houseboat.setLights = setLights; W3D.houseboat.lights = () => lightsOn;
+const dayG = new THREE.Color(0x9fbac4), nightG = new THREE.Color(0xffc870), dayL = new THREE.Color(0xe8dcc0), nightL = new THREE.Color(0xffd890), darkG = new THREE.Color(0x1c2328), offL = new THREE.Color(0x4a4640);
 let lastN = -1;
 AFRAME.registerSystem('w3d-houseboat', { tick: function () {
   if (!built) { if (window.W3D_READY || (W3D.root && W3D.water)) build(); return; }
-  const g = W3D.houseboat.group; if (!g || !W3D.root.visible || !W3D.active) return;
+  const g = W3D.houseboat.group; if (!g || !W3D.root.visible || !W3D.active) return; if (!document.getElementById('hb-switch')) buildSwitch();
   const nt = window.JFVR_NIGHT, n = nt && nt.n > 0 ? nt.n : 0; if (Math.abs(n - lastN) < 0.004) return; lastN = n;
-  glassMat.color.copy(dayG).lerp(nightG, n); lightMat.color.copy(dayL).lerp(nightL, n);
-  intMat.emissive.setRGB(0.34 * n, 0.2 * n, 0.08 * n);
-  for (const h of halos) { h.material.opacity = n * 0.85; h.visible = n > 0.05; } } });
+  lightMat.color.copy(dayL).lerp(nightL, n);   // outside lanterns: unchanged by the switch
+  if (lightsOn) { glassMat.color.copy(dayG).lerp(nightG, n); lampMat.color.copy(dayL).lerp(nightL, n); intMat.emissive.setRGB(0.34 * n, 0.2 * n, 0.08 * n); intMat.color.setRGB(1, 1, 1); }
+  else { const k = 1 - 0.85 * n; glassMat.color.copy(dayG).lerp(darkG, n); lampMat.color.copy(offL); intMat.emissive.setRGB(0, 0, 0); intMat.color.setRGB(k, k, k); }
+  halos.forEach((h, i) => { const room = i >= 2, on = !room || lightsOn; h.material.opacity = on ? n * 0.85 : 0; h.visible = on && n > 0.05; }); } });
 (function addSpot() { if (!W3D.spots) return setTimeout(addSpot, 50);
   W3D.spots.houseboat = () => { build(); if (window.JFVR && JFVR.fly) { JFVR.fly = false; const l = document.querySelector('#flylabel'); if (l) l.setAttribute('value', 'Fly: OFF'); }
     W3D.teleportTo(C.x - 1.9, FY, C.z - 0.3, 90); JFVR.hud && JFVR.hud('Houseboat on Fowling Pond - the bed is ahead of you'); }; })();

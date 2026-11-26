@@ -198,6 +198,11 @@ function waterMat(alphaMap, river) {
     sh.uniforms.wN = W3D.waterU.wN; sh.uniforms.wT = W3D.waterU.wT; sh.uniforms.wNi = W3D.waterU.wNi;
     sh.vertexShader = 'varying vec3 vWw;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvWw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = 'uniform sampler2D wN; uniform float wT; uniform float wNi; varying vec3 vWw; float wDepth = 0.5;\n' + sh.fragmentShader
+      // Nov 26 pond z-fighting fix (Quest, night, looking east from mid-pond): the shallow pond bed / shore terrain sits only centimetres
+      // under the opaque water, and at a few hundred metres the headset depth buffer can't tell them apart, so bed and water flickered in
+      // crawling bands. The water now writes its depth 0.3% nearer than it really is, so it always wins over anything just beneath it.
+      // The colour and look are unchanged; only the depth test result differs (a waterline strip on hulls of ~3 mm per metre of distance).
+      .replace('#include <logdepthbuf_fragment>', '#include <logdepthbuf_fragment>\n#if defined( USE_LOGDEPTHBUF ) && defined( USE_LOGDEPTHBUF_EXT )\n if (vIsPerspective != 0.0) gl_FragDepthEXT = log2( vFragDepth * 0.997 ) * logDepthBufFC * 0.5;\n#endif')
       .replace('#include <alphamap_fragment>', CLEAR ? 'vec4 wMk = texture2D(alphaMap, vAlphaMapUv); diffuseColor.a *= wMk.g; wDepth = wMk.r;' : '#include <alphamap_fragment>')  // same single mask fetch, R now carries shore distance
       .replace('#include <normal_fragment_maps>', [
       'vec2 wp = vWw.xz;',
@@ -207,7 +212,10 @@ function waterMat(alphaMap, river) {
       LITE ? 'vec2 sl = n1.xy * 0.26 * mix(1.0, 0.1, smoothstep(60.0, 450.0, wd));'
         : 'vec3 n2 = texture2D(wN, mat2(0.8, -0.6, 0.6, 0.8) * wp / 7.5 + vec2(-0.017, 0.012) * wT).xyz * 2.0 - 1.0;\n' +
           'vec2 sl = (n1.xy + n2.xy * 0.55 * (1.0 - smoothstep(25.0, 160.0, wd))) * 0.26 * mix(1.0, 0.1, smoothstep(60.0, 450.0, wd));',
-      'normal = normalize((viewMatrix * vec4(normalize(vec3(sl.x, 1.0, sl.y)), 0.0)).xyz);'].join('\n'))
+      'normal = normalize((viewMatrix * vec4(normalize(vec3(sl.x, 1.0, sl.y)), 0.0)).xyz);',
+      // Nov 26 specular anti-aliasing: where the ripple normal changes a lot from one pixel to the next (far water at a grazing angle) widen
+      // the highlight a little, so sun / moon glints don't sparkle and crawl in the headset; close up fwidth is tiny and the look is unchanged
+      'roughnessFactor = max(roughnessFactor, clamp(length(fwidth(normal)) * 1.6, 0.0, 0.45));'].join('\n'))
       .replace('#include <opaque_fragment>', [
       '{ vec3 vd = normalize(vViewPosition); float cth = clamp(dot(normal, vd), 0.0, 1.0);',
       '  float fr = 0.02 + 0.98 * pow(1.0 - cth, 5.0);',
@@ -222,7 +230,7 @@ function waterMat(alphaMap, river) {
       '  outgoingLight = mix(outgoingLight + body, sky * vec3(0.78, 0.90, 1.0), clamp(fr * 1.1, 0.0, 0.5)); }'].join('\n') : '  outgoingLight = mix(outgoingLight * mix(1.0, 0.8, fr), sky, clamp(fr * 1.15, 0.0, 0.7)); }',
       '#include <opaque_fragment>'].join('\n'));
   };
-  mat.customProgramCacheKey = () => 'jfwater2' + (CLASSIC ? 'c' : 'q') + (alphaMap ? 'a' : '') + (river ? 'r' : '') + (CLEAR ? 'w' : '') + (LITE ? 'l' : '');
+  mat.customProgramCacheKey = () => 'jfwater3' + (CLASSIC ? 'c' : 'q') + (alphaMap ? 'a' : '') + (river ? 'r' : '') + (CLEAR ? 'w' : '') + (LITE ? 'l' : '');
   return mat;
 }
 

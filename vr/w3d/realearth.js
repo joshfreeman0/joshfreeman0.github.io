@@ -72,7 +72,9 @@ function clipMat(mat, mode) {
     sh.fragmentShader = 'uniform float jfNi; uniform float jfOn; uniform sampler2D jfMask; uniform float jfMR; uniform vec4 jfRect[4]; varying vec2 vJfW;\n' +
       'float jfM() { vec2 u = (vJfW + jfMR) / (2.0 * jfMR); float m = 0.0; if (u.x > 0.0 && u.x < 1.0 && u.y > 0.0 && u.y < 1.0) m = texture2D(jfMask, u).r;\n' +
       ' for (int i = 0; i < 4; i++) { vec4 R = jfRect[i]; if (R.z > 0.0) { vec2 d = abs(vJfW - R.xy) - vec2(R.z); m = max(m, clamp(1.0 - max(d.x, d.y) / R.w, 0.0, 1.0)); } } return m; }\n' +
-      'float jfD() { return fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715)))); }\n' +
+      // Nov 26: the seam dither is keyed to the ground position (0.67 m cells), not the screen pixel - a screen-space pattern crawled over
+      // the seam whenever the head moved and differed between the two eyes, which read as shimmer in the headset
+      'float jfD() { vec2 jc = floor(vJfW * 1.5); return fract(52.9829189 * fract(dot(jc, vec2(0.06711056, 0.00583715)))); }\n' +
       (function (fs) { fs = fs.replace(/void\s+main\s*\(\s*\)\s*\{/, 'void main() {\n float jm = 0.0; if (jfOn > 0.5) { jm = jfM(); float jd = 0.5 + (jfD() - 0.5) * 0.08; ' + (mode === 1 ? 'if (jm > jd) discard;' : 'if (jm < jd) discard;') + ' }\n');
         // our ground just inside a cutout edge eases toward the Google ground's colour, so a lawn doesn't read as a pasted-on square
         // night (daynight.js): Google tiles are unlit photos, so darken them toward moonlight
@@ -122,8 +124,8 @@ function start() {
   const draco = new THREE.DRACOLoader(); draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
   T.registerPlugin(new K.GLTFExtensionsPlugin({dracoLoader: draco}));
   T.registerPlugin(new K.TileCompressionPlugin());
-  T.errorTarget = LITE ? 72 : QUEST ? 40 : 24;   // sharper than v1 (80/48/32 looked blurry from flying height); the LRU caps below are unchanged
-  const C = T.lruCache, MB = 1048576; if (C) { C.maxBytesSize = (LITE ? 120 : QUEST ? 300 : 500) * MB; C.minBytesSize = C.maxBytesSize * 0.7; C.maxSize = LITE ? 1500 : 4000; C.minSize = C.maxSize * 0.75; }
+  T.errorTarget = LITE ? 72 : QUEST ? 32 : 24;   // sharper than v1 (80/48/32 looked blurry from flying height); Nov 26: Quest 40 -> 32 (distant scenery east of the pond looked blurry in the headset)
+  const C = T.lruCache, MB = 1048576; if (C) { C.maxBytesSize = (LITE ? 120 : QUEST ? 400 : 500) * MB;   /* Quest 300 -> 400 MB with the sharper target, so tiles aren't evicted and re-fetched as you turn (popping) */ C.minBytesSize = C.maxBytesSize * 0.7; C.maxSize = LITE ? 1500 : 4000; C.minSize = C.maxSize * 0.75; }
   T.addEventListener('load-model', ({scene}) => { scene.traverse(o => { if (o.isMesh) { [].concat(o.material).forEach(m => { m.fog = true; clipMat(m, 1); }); o.receiveShadow = o.castShadow = false; } }); });
   T.addEventListener('load-tile-set', () => { RE.ready = true; });
   T.group.name = 'realearth'; T.group.matrixAutoUpdate = false;

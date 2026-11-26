@@ -245,5 +245,14 @@ function build() {
   let tris = 0; root.traverse(o => { if (o.isMesh && o.geometry) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1); });
   W3D.vestaHouseStats = {tris: Math.round(tris), F, U, T};
 }
+/* Conservatory view (Josh, Nov 26): the conservatory (x 900-952, z -353..-325) sits right against the house's north wall, so looking
+   south from it you saw only brick. While you stand in the conservatory (or the gap between it and the house) the house is not drawn,
+   so the scenery to the south is clear; step out of that zone - and certainly inside the House of the Vestals - and it is solid again.
+   Walls still block walking (collision is separate from drawing). Checked 5x a second from the camera position; works in the headset. */
+const CONS = {x0: 898, x1: 954, z0: -356, z1: Z0};
+function inCons(p) { return p.x > CONS.x0 && p.x < CONS.x1 && p.z > CONS.z0 && p.z < CONS.z1 && W3D.active !== false; }
+const vp = new THREE.Vector3();
+setInterval(() => { const h = W3D.vestaHouse, sc = document.querySelector('a-scene'), cam = sc && sc.camera; if (!h || !cam) return;
+  cam.getWorldPosition(vp); const show = !(inCons(vp) && vp.y < (W3D.conservatory ? W3D.conservatory.y + 14 : 1e9)); if (h.visible !== show) h.visible = show; W3D.vestaHouseClear = !show; }, 200);
 const iv = setInterval(() => { if (W3D.vesta && W3D.lib && W3D.groundAt) { clearInterval(iv); try { build(); } catch (e) { console.warn('vestahouse', e); } } }, 500);
 })();

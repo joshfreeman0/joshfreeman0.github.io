@@ -54,7 +54,7 @@ window.JFVR_LITE = (function () {
 <script src="hd.js?v=6"></script>
 <script src="w3d/seasons.js?v=1"></script>
 <script src="w3d/sphinx.js?v=2"></script>
-<script src="w3d/world.js?v=21k"></script>
+<script src="w3d/world.js?v=21l"></script>
 <script src="w3d/rooms.js?v=5"></script>
 <script src="w3d/cities.js?v=10"></script>
 <script src="w3d/saucer.js?v=9"></script>
@@ -63,7 +63,7 @@ window.JFVR_LITE = (function () {
 <script src="w3d/shore.js?v=1"></script>
 <script src="w3d/doors.js?v=1"></script>
 <script src="w3d/vesta.js?v=4"></script>
-<script src="w3d/vestahouse.js?v=1"></script>
+<script src="w3d/vestahouse.js?v=2"></script>
 <script src="w3d/bank.js?v=10"></script>
 <script src="w3d/showcase.js?v=3"></script>
 <script src="w3d/wildlife.js?v=4"></script>
@@ -76,13 +76,14 @@ window.JFVR_LITE = (function () {
 <script src="w3d/invite.js?v=2"></script>
 <script src="w3d/clickfix.js?v=1"></script>
 <script src="w3d/softgpu.js?v=1"></script>
-<script src="w3d/friends.js?v=1"></script>
+<script src="w3d/friends.js?v=2"></script>
+<script src="w3d/vrpointer.js?v=1"></script>
 <script src="w3d/tiles3d.min.js?v=1"></script>
 <script src="w3d/gk.js?v=1"></script>
-<script src="w3d/realearth.js?v=10"></script>
+<script src="w3d/realearth.js?v=11"></script>
 <script src="w3d/walker.js?v=1"></script>
 <script src="w3d/boats.js?v=1"></script>
-<script src="w3d/houseboat.js?v=1"></script>
+<script src="w3d/houseboat.js?v=2"></script>
 <script src="w3d/daynight.js?v=2"></script>
 <script src="w3d/banktower.js?v=2"></script>
 <script src="w3d/realism.js?v=1"></script>
@@ -116,17 +117,24 @@ AFRAME.registerComponent('touch-pitch', {
 body{margin:0;font-family:system-ui,sans-serif}
 #ui{position:fixed;left:0;right:0;bottom:0;z-index:10;padding:6px 6px calc(14px + env(safe-area-inset-bottom));background:rgba(0,0,0,.65);color:#fff;text-align:center;max-height:45vh;overflow-y:auto;box-sizing:border-box}
 #ui button{font-size:15px;margin:3px;padding:8px 12px;border-radius:8px;border:0;background:#FFD700;color:#111;cursor:pointer}
-#ui.min .grp,#ui.min #note{display:none}
 #uitog{font-size:15px;padding:8px 12px;border-radius:8px;border:0;background:#FFD700;color:#111;position:fixed;right:calc(112px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));z-index:11;display:none}
 #note{display:none}#ui.help #note{display:block}
 #ui button.on{background:#fff}
-#ui .sec{font-size:12px;opacity:.8;margin:0 6px}
 #load{position:fixed;top:40%;left:0;right:0;text-align:center;color:#ffe9a8;font-size:20px;z-index:5;text-shadow:0 0 6px #000;padding:0 16px}
 #load.bg{top:8px;font-size:14px;pointer-events:none}
 #load.fail{top:30%;background:rgba(0,0,0,.8);padding:18px;z-index:30;pointer-events:auto}
 #load.fail button{font-size:17px;margin:10px 6px 0;padding:10px 16px;border-radius:10px;border:0;background:#FFD700;color:#111}
 #note{font-size:12px;opacity:.85;margin-top:4px}
-#ui .tools button{background:#333;color:#ffe9a8;font-size:13px;padding:6px 10px}
+#tabbar{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px}
+#ui #tabbar button.tab{font-size:17px;font-weight:700;padding:10px 16px;background:#3a3320;color:#ffe9a8;border:2px solid #c9a24a;margin:2px}
+#ui #tabbar button.tab.cur{background:#FFD700;color:#111;border-color:#fff}
+#ui #tabbar button.mini{font-size:14px;padding:8px 10px;background:#333;color:#ffe9a8}
+#ui .pane{display:none;margin-top:6px;border-top:1px solid rgba(255,215,0,.35);padding-top:4px}
+#ui .pane.cur{display:block}
+#ui .grp{margin:2px 0 6px}
+#ui .sec{display:block;font-size:13px;opacity:.85;margin:4px 6px 2px;color:#ffe9a8;text-transform:uppercase;letter-spacing:.04em}
+#ui a.lnk{display:inline-block;font-size:15px;margin:3px;padding:8px 12px;border-radius:8px;color:#111;text-decoration:none}
+@media (max-width:600px){#ui #tabbar button.tab{font-size:15px;padding:9px 10px}#ui button{font-size:14px;padding:8px 10px}}
 </style></head><body>
 <a-scene vr-mode-ui="enabled: true" light="defaultLightsEnabled: false" renderer="antialias: true; colorManagement: true; toneMapping: ACESFilmic; exposure: 1.0; highRefreshRate: false; foveationLevel: 1; logarithmicDepthBuffer: true; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160; precision: high" hd-renderer="scale: 1.0" w3d-anim>
   <a-entity id="sky" visible="false"></a-entity>
@@ -135,7 +143,7 @@ body{margin:0;font-family:system-ui,sans-serif}
     <a-entity camera="near: 0.1; far: 30000" look-controls touch-pitch wasd-controls="enabled:false" position="0 1.6 0">
     <a-entity cursor="fuse:false; rayOrigin:mouse" raycaster="objects:.btn; far: 60"></a-entity>
   </a-entity>
-  <a-entity laser-controls="hand:right" snap-turn w3d-teleport raycaster="objects:.btn; far: 60"></a-entity>
+  <a-entity laser-controls="hand:right" snap-turn w3d-teleport jf-pointer raycaster="objects:.btn; far: 60"></a-entity>
   <a-entity laser-controls="hand:left" thumbstick-move menu-toggle raycaster="objects:.btn; far: 60"></a-entity>
   </a-entity>
   <!-- lifts: banking hall (east end) <-> Josh's top-floor office -->
@@ -173,28 +181,51 @@ body{margin:0;font-family:system-ui,sans-serif}
 <button id="uitog">Show menu</button>
 <div id="load">Building Josh's 3D world (USGS terrain + imagery)...</div>
 <div id="ui">
-  <div class="tools"><button id="hidebtn">Hide menu</button><button id="helpbtn">Help / credits</button><button id="speedbtn" data-speed="1" class="speed-label">Speed: Slow</button></div>
-  <div class="grp"><span class="sec">3D world:</span>
+  <div id="tabbar"><button class="tab" data-tab="go">Go to</button><button class="tab" data-tab="worlds">Other worlds</button><button class="tab" data-tab="bank">Bank</button><button class="tab" data-tab="set">Settings</button><button id="hidebtn" class="mini" title="Hide the menu">Hide</button><button id="helpbtn" class="mini" title="Help and credits">Help</button></div>
+  <div class="pane" id="pane-go">
+  <div class="grp" id="go-bank"><span class="sec">Bank compound</span>
   <button data-w="terrace" class="on">Bank terrace</button>
   <button data-w="hall">Banking hall</button>
   <button data-w="vault">Bank vault</button>
   <button data-w="showcase">Wampum World showcase</button>
   <button data-w="office">Josh's office</button>
+  <button data-w="residence">Josh's residence (bank tower L6)</button>
+  <button data-w="guest">Guest apartment (bank tower L5)</button>
   <button data-w="conservatory">Conservatory</button>
   <button data-w="propulsion">Propulsion hall</button>
-  <button data-w="ufo">UFO room</button>
+  <button data-w="ufo">UFO room</button></div>
+  <div class="grp" id="go-pond"><span class="sec">Pond and park</span>
   <button data-w="pond">Fly over the pond</button>
   <button data-w="pyramid">Pyramid park (24/495)</button>
+  <button data-w="houseboat">Houseboat (sleep aboard)</button>
+  <button data-w="home" style="background:#9ffcff">Home: Fowling Pond (H)</button></div>
+  <div class="grp" id="go-far"><span class="sec">Bridgewater and beyond</span>
   <button data-w="launchpad">Launch pad (Bridgewater)</button>
   <button data-w="saucer">Flying saucer</button>
   <button data-w="bridgewater">Corporate Base (Bridgewater)</button>
   <button data-w="aldensquare">Alden Square viewpoint</button>
   <button data-w="rockets">Rocket yard (18)</button>
-  <button data-w="walker">Walker Memorial (Boston)</button>
-  <button data-w="houseboat">Houseboat (sleep aboard)</button>
-  <button data-w="residence">Josh's residence (bank tower L6)</button>
-  <button data-w="guest">Guest apartment (bank tower L5)</button>
-  <button data-w="home" style="background:#9ffcff">Home: Fowling Pond (H)</button></div>
+  <button data-w="walker">Walker Memorial (Boston)</button></div>
+  </div>
+  <div class="pane" id="pane-worlds">
+  <div class="grp" id="worlds-rpl"><span class="sec">Red Planet Lounge (Mars)</span>
+  <button data-w="launchpad">Board the rocket at the launch pad</button>
+  <button id="rplgo" type="button" style="background:#ff9a6b">Go straight to the Red Planet Lounge</button></div>
+  <div class="grp" id="worlds-links"><span class="sec">Websites</span></div>
+  </div>
+  <div class="pane" id="pane-bank">
+  <div class="grp" id="bank-links"><span class="sec">Bank of the United States (play money)</span></div>
+  <div class="grp" id="bank-go"><span class="sec">Visit the bank</span>
+  <button data-w="hall">Banking hall</button>
+  <button data-w="vault">Bank vault</button>
+  <button data-w="terrace">Bank terrace</button></div>
+  </div>
+  <div class="pane" id="pane-set">
+  <div class="grp" id="set-move"><span class="sec">Moving</span><button id="speedbtn" data-speed="1" class="speed-label">Speed: Slow</button><button data-reload="1" type="button">Reload world</button></div>
+  <div class="grp" id="set-people"><span class="sec">People and voice</span></div>
+  <div class="grp" id="set-look"><span class="sec">Sky, sound and view</span></div>
+  <div class="grp" id="set-more"><span class="sec">More</span><span class="tools"></span></div>
+  </div>
   <div id="note">Concept rendering only, not a real institution or engineering design. Terrain: USGS 3DEP elevation. Ground imagery: USGS National Map orthoimagery (public domain), edited to show Fowling Pond Restoration Plan v6 (restored pond and wetlands, herring passage, King's Pond, regraded landfill/quarry, rail tunnel, relocated Thrasher St) approximately. Buildings, plants and animals are procedural concept models; sphinx heads: 3D scan of KAS38, cast of a sphinx with the features of Amenemhat, Royal Cast Collection, SMK - National Gallery of Denmark (public domain); the Propulsion hall and UFO room (through the doors in the banking hall's north wall) use procedural models and summarize public sources; the bank vault (lift in the banking hall, or Bank vault in the menu) and Josh's account board are concept displays, not a real account or balance; panoramas are AI-generated concept art and also light the 3D rooms; photo textures for grass, marble, limestone and wood: ambientCG (CC0). Zoo animals (llama, alpaca, zebra, deer, stag, horse): low-poly models by Quaternius (CC0), via Poly Pizza. Bridgewater detail area: USGS National Map orthoimagery and USGS 3DEP elevation (public domain); the launch pad and rocket are fictional. The flying saucer and its destinations are fictional procedural models; Dubai destination: building footprints, heights and building parts from Overture Maps Foundation (overturemaps.org, buildings theme, ODbL; OpenStreetMap and Microsoft footprints), roads, water and land use from Overture (OpenStreetMap contributors, ODbL). London destination: building footprints and heights from Overture Maps Foundation (overturemaps.org, buildings theme, ODbL), combining OpenStreetMap footprints and Microsoft Global ML Building Footprints (ODbL); roads, paths, trees and land use (c) OpenStreetMap contributors (ODbL), ground elevation EU-DEM v1.1 (Copernicus, via OpenTopoData); the other cities are procedural impressions, not maps. Street names: (c) OpenStreetMap contributors (ODbL).
   Desktop: WASD + mouse (drag to look), Q / E = turn left / right, H = home, F = fly, Space/Shift = up/down. Quest: left stick move, right stick turn, right trigger teleport, A/X or the Fly button on the menu = fly, press left stick or Y = menu.</div>
 </div>
@@ -299,6 +330,8 @@ document.getElementById('hidebtn').onclick=()=>{ui.style.display='none';t.style.
 t.onclick=()=>{ui.style.display='';t.style.display='none';};
 document.getElementById('helpbtn').onclick=()=>ui.classList.toggle('help');})();
 </script>
-<script src="w3d/tesseractlink.js?v=2"></script>
-<script>/* ?nomp=1 (automated tests) skips joining the public voice room */ if (!/[?&]nomp=1/.test(location.search)) { const s = document.createElement('script'); s.src = 'mp.js?v=6'; document.body.appendChild(s); }</script>
+<script src="w3d/tesseractreader.js?v=1"></script>
+<script src="w3d/tesseractlink.js?v=3"></script>
+<script src="w3d/menutabs.js?v=1"></script>
+<script>/* ?nomp=1 (automated tests) skips joining the public voice room */ if (!/[?&]nomp=1/.test(location.search)) { const s = document.createElement('script'); s.src = 'mp.js?v=7'; document.body.appendChild(s); }</script>
 </body></html>

@@ -69,9 +69,10 @@
     const c = MP.status === 'full' ? 'World is full (' + CAP + ')' : MP.status === 'error' ? 'Multiplayer offline' : n + (n === 1 ? ' person here' : ' people here');
     const v = MP.voice === 'off' ? 'Join voice' : MP.voice === 'on' ? 'Mic on - tap to mute' : MP.voice === 'muted' ? 'Mic muted - tap to talk' : MP.voice === 'wait' ? 'Allow microphone...' : 'No microphone';
     if (ui.count) ui.count.textContent = c + ' (you: ' + MP.name + ')';
-    if (ui.btn) { ui.btn.textContent = v; ui.btn.style.background = MP.voice === 'on' ? '#fff' : '#FFD700'; }
+    if (ui.btn) { ui.btn.textContent = v; ui.btn.style.background = MP.voice === 'on' ? '#7dff9a' : MP.voice === 'muted' ? '#ff8a80' : '#FFD700'; }
     if (ui.vrcount) ui.vrcount.setAttribute('value', c);
-    if (ui.vrbtn) { const tx = ui.vrbtn.querySelector('a-text'); tx && tx.setAttribute('value', 'Voice: ' + (MP.voice === 'off' ? 'join' : MP.voice === 'on' ? 'ON (tap to mute)' : MP.voice === 'muted' ? 'muted' : MP.voice === 'wait' ? '...' : 'no mic')); ui.vrbtn.setAttribute('material', 'color', MP.voice === 'on' ? '#ffffff' : '#FFD700'); }
+    if (ui.vrbtn) { const tx = ui.vrbtn.querySelector('a-text'); tx && tx.setAttribute('value', 'Voice: ' + (MP.voice === 'off' ? 'join' : MP.voice === 'on' ? 'ON (tap to mute)' : MP.voice === 'muted' ? 'muted' : MP.voice === 'wait' ? '...' : 'no mic')); ui.vrbtn.setAttribute('material', 'color', MP.voice === 'on' ? '#7dff9a' : MP.voice === 'muted' ? '#ff8a80' : '#FFD700'); }
+    try { window.dispatchEvent(new Event('jfmp-voice')); } catch (e) {}   // keeps the wrist Voice switch in sync
   }
 
   /* ---------- audio ---------- */
@@ -82,6 +83,7 @@
   }
   ['pointerdown', 'keydown', 'touchstart'].forEach(ev => window.addEventListener(ev, () => cam && ensureListener(), { passive: true }));
 
+  MP.toggleVoice = () => toggleVoice();   // left-wrist Voice ON / OFF (friends.js) uses the same switch as the menu buttons
   async function toggleVoice() {
     ensureListener();
     if (!MP.room) return;
