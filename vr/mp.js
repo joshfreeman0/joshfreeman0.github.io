@@ -165,11 +165,12 @@
   }
   function myPose() {
     const o = cam.object3D;
-    return { n: MP.name, s: sceneId(), h: r3(o.getWorldPosition(V3())).concat(r4(o.getWorldQuaternion(Q()))), l: handPos(hands.l), r: handPos(hands.r), v: MP.voice === 'on' ? 1 : 0 };
+    return { n: MP.name, s: sceneId(), h: r3(o.getWorldPosition(V3())).concat(r4(o.getWorldQuaternion(Q()))), l: handPos(hands.l), r: handPos(hands.r), v: MP.voice === 'on' ? 1 : 0, a: MP.acct || undefined };
   }
 
   function onPose(d, peerId) {
     const p = MP.peers[peerId]; if (!p || !d || !d.h) return;
+    if (d.a) p.acct = String(d.a).slice(0, 24);   // account id (fpacct.js) so friends' invites can find this person
     if (d.n && d.n !== p.name) { p.name = String(d.n).slice(0, 24); updateTag(p); if (!p.announced) { p.announced = 1; hud(p.name + ' is here'); } }
     p.scene = d.s;
     const tp = new THREE.Vector3(d.h[0], d.h[1], d.h[2]);

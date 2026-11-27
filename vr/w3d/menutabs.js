@@ -37,13 +37,13 @@
   const TABS = [['go', 'Go to'], ['worlds', 'Other worlds'], ['bank', 'Bank'], ['set', 'Settings']];
   const ORDER = {
     go: ['w:terrace', 'w:hall', 'w:vault', 'w:showcase', 'w:office', 'jfv-residence', 'jfv-guest', 'w:conservatory', 'w:propulsion', 'w:ufo',
-      'w:pond', 'w:pyramid', 'w:houseboat', 'pharosvr', 'w:launchpad', 'w:starfleet', 'w:saucer', 'w:bridgewater', 'w:aldensquare', 'w:rockets', 'w:versailles', 'jfv-worldrooms', 'w:walker', 'placesvr', 'w:home'],
+      'w:pond', 'w:pyramid', 'w:houseboat', 'pharosvr', 'w:launchpad', 'w:starfleet', 'w:founders', 'w:saucer', 'w:bridgewater', 'w:aldensquare', 'w:rockets', 'w:versailles', 'jfv-worldrooms', 'w:walker', 'placesvr', 'w:home'],
     worlds: ['jfv-rplpad', 'jfv-rplgo', 'tesseractvr'],
     bank: ['bankledgervr', 'jfv-bhall', 'jfv-bvault', 'jfv-bterrace'],
     set: ['speed', 'fly', 'reload', 'mpvrvoice', 'mpvrcount', 'invite', 'skylabel', 'nsndlabel', 'realearthvr', 'buildvrbtn']
   };
   const SHORT = {'w:showcase': 'Wampum showcase', 'w:pond': 'Fly over pond', 'w:pyramid': 'Pyramid park', 'w:houseboat': 'Houseboat', 'w:bridgewater': 'Corporate Base',
-    'w:aldensquare': 'Alden Square', 'w:rockets': 'Rocket yard', 'w:starfleet': 'Star Fleet base', 'w:versailles': 'Versailles', 'w:walker': 'Walker Memorial', 'tesseractvr': 'Tesseract reader', 'bankledgervr': 'Bank Ledger'};
+    'w:aldensquare': 'Alden Square', 'w:rockets': 'Rocket yard', 'w:starfleet': 'Star Fleet base', 'w:founders': 'Founders Hall', 'w:versailles': 'Versailles', 'w:walker': 'Walker Memorial', 'tesseractvr': 'Tesseract reader', 'bankledgervr': 'Bank Ledger'};
   const COLS = 4, BW = 1.3, BH = 0.26, DX = 1.4, DY = 0.31, TXW = 2.0, Y0 = 0.55;   // raised + tighter rows: the 6-row Go to tab sank into the floor
   let tabVR = 'go';
   function keyOf(e) { if (e.id) return e.id; const d = e.dataset || {};
