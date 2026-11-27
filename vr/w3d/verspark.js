@@ -226,14 +226,13 @@ function gHook(x, z, y) { if (!built || !grp.visible) return null; const [s, p] 
 /* ---------- far culling: at Versailles the home world (10-12 km west) is entirely past the fog (~4.9 km) but was still drawn - about
    1.5M triangles and ~2,000 draw calls looking west. While you are within 4.5 km of the palace, home-world groups whose nearest point is
    beyond the fog are hidden; they come back as soon as you leave (or a room takes over). ---------- */
-const hidden = new Set(), BX = new Map(), _b = new THREE.Box3(), _bc = new THREE.Vector3(), _bs = new THREE.Vector3();
+const hidden = new Set(), BX = new Map(), _b = new THREE.Box3();
 function farCull(cam, active) {
   const sc = document.querySelector('a-scene'), fog = sc && sc.object3D.fog;
   if (!active || !fog || !fog.far || !W3D.root) { if (hidden.size) { hidden.forEach(o => { o.visible = true; }); hidden.clear(); } return; }
   for (const o of W3D.root.children) { if (o === grp || /ring|versailles|sky/i.test(o.name || '')) continue;
-    let r = BX.get(o); if (!r) { _b.setFromObject(o); if (_b.isEmpty()) { BX.set(o, {skip: true}); continue; } _b.getCenter(_bc); _b.getSize(_bs); let inst = false; o.traverse(m => { if (m.isInstancedMesh) inst = true; });   // instance spreads aren't in the box: assume the whole 8 km home core
-      r = {x: _bc.x, z: _bc.z, h: Math.max(Math.hypot(_bs.x, _bs.z) / 2, inst ? 4100 : 0), skip: _bs.x > 20000}; BX.set(o, r); }
-    if (r.skip) continue; const far = Math.hypot(cam.x - r.x, cam.z - r.z) - r.h > fog.far + 300;
+    let r = BX.get(o); if (!r) { _b.setFromObject(o); r = _b.isEmpty() ? {skip: true} : {box: _b.clone()}; BX.set(o, r); }   // r158 boxes include instance spreads
+    if (r.skip) continue; const far = r.box.distanceToPoint(cam) > fog.far + 300;
     if (far && o.visible) { o.visible = false; hidden.add(o); } else if (!far && hidden.has(o)) { o.visible = true; hidden.delete(o); } }
 }
 /* ---------- lifecycle ---------- */
@@ -244,7 +243,7 @@ function tick() {
   const d = Math.hypot(_c.x - V.GX, _c.z - V.GZ), on = W3D.active !== false && !W3D.inRoom && d < LOAD;
   if (on && !J && !loading) { loading = true; fetch('w3d/vers_park.json?v=1').then(r => r.json()).then(j => { J = j; build(); W3D.gHooks = W3D.gHooks || []; W3D.gHooks.push(gHook);
       W3D.maskHooks = W3D.maskHooks || []; W3D.maskHooks.push(maskHook); if (W3D.realEarth && W3D.realEarth.rebuildMask) W3D.realEarth.rebuildMask(); }).catch(e => { console.warn('verspark', e); }); }
-  farCull(_c, built && W3D.active !== false && !W3D.inRoom && d < 4500);
+  farCull(_c, built && !window.JFVR_verspark.noCull && W3D.active !== false && !W3D.inRoom && d < 4500);
   if (!built) return;
   const vis = W3D.active !== false && !W3D.inRoom && (on || (grp.visible && d < DROP));
   if (grp.visible !== vis) { grp.visible = vis; doors.forEach(o => { o.el.object3D.visible = vis; }); }
@@ -274,5 +273,5 @@ window.JFVR_versailles_return = at => { getV(); const N = J && J.named; const R 
   if (R) return spotAt(...R); if (N) { const q = N.jdp_poly; let mx = -1e9; for (let i = 0; i < q.length; i += 2) mx = Math.max(mx, q[i]); spotAt(mx + 6, N.jdp[1], -1, 0); } else spotAt(-390, -296, -1, 0); };
 for (const k of ['mirrors', 'bedroom', 'hercules', 'queen', 'chapel', 'opera', 'jdp']) SP['versailles-ret-' + k] = () => window.JFVR_versailles_return(k);
 (function reg() { if (!window.W3D || !W3D.spots || !window.JFVR_versailles) return setTimeout(reg, 300); Object.assign(W3D.spots, SP); regRooms(); })();
-window.JFVR_verspark = {hiddenFar: () => hidden.size, stats: () => { let t = 0, m = 0; if (grp) grp.traverse(o => { if (o.isMesh && o.visible) { m++; const c = o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count; t += c / 3 * (o.isInstancedMesh ? o.count : 1); } }); return {built, visible: grp && grp.visible, tris: t, meshes: m}; }, hAt, enter};
+window.JFVR_verspark = {noCull: /[?&]nocull=1/.test(location.search), hiddenFar: () => hidden.size, stats: () => { let t = 0, m = 0; if (grp) grp.traverse(o => { if (o.isMesh && o.visible) { m++; const c = o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count; t += c / 3 * (o.isInstancedMesh ? o.count : 1); } }); return {built, visible: grp && grp.visible, tris: t, meshes: m}; }, hAt, enter};
 })();
