@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<base href="/vr/">
+<meta name="robots" content="noindex">
+<link rel="canonical" href="https://joshfreeman.org/vr-staging/">
+<meta property="og:type" content="website"><meta property="og:site_name" content="joshfreeman.org">
+<meta property="og:title" content="Fowling Pond (staging): realistic world + AI companion"><meta property="og:description" content="Test build of Fowling Pond, Josh Freeman's 3D world: photo sky, photo-real trees, sky-reflecting pond, and a talking AI companion. Works on Meta Quest, desktop and phone.">
+<meta property="og:url" content="https://joshfreeman.org/vr-staging/"><meta property="og:image" content="https://joshfreeman.org/vr-staging/share.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Fowling Pond (staging): realistic world + AI companion"><meta name="twitter:description" content="Test build of Fowling Pond, Josh Freeman's 3D world: photo sky, photo-real trees, sky-reflecting pond, and a talking AI companion. Works on Meta Quest, desktop and phone."><meta name="twitter:image" content="https://joshfreeman.org/vr-staging/share.jpg">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fowling Pond (staging): realistic world + AI companion</title>
+<meta name="description" content="Test build of Fowling Pond, Josh Freeman's 3D world: photo sky, photo-real trees, sky-reflecting pond, and a talking AI companion. Works on Meta Quest, desktop and phone.">
+<link rel="manifest" href="/vr/manifest.webmanifest?v=2">
+<meta name="apple-mobile-web-app-title" content="Fowling Pond">
+<meta name="application-name" content="Fowling Pond">
+<link rel="icon" href="/vr/icon-192.png">
+<link rel="apple-touch-icon" href="/vr/icon-192.png">
+<meta name="theme-color" content="#c9a24a">
+<script src="/vr/xrhold.js?v=1" data-features='{"requiredFeatures":["local-floor"],"optionalFeatures":["bounded-floor"]}'></script>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="/vr-staging/fx/fpreal.js?v=2"></script>
+<script>
+/* Quest cross-site hand-off (Red Planet Lounge <-> Fowling Pond): a page reached by navigating from inside an immersive session gets
+   navigator.xr 'sessiongranted' and may start its own immersive session without a click. Listen as early as possible (before the
+   scene exists), then enter as soon as the scene's renderer is up - never waiting for the world's assets. A-Frame's own listener is
+   registered later (when <a-scene> attaches) and can call enterVR() before the headset check has resolved, which would drop into
+   fake "fullscreen VR"; enterVR() is patched to wait for that check and to merge overlapping calls into one request. */
+(function () {
+  const P = customElements.get('a-scene') && customElements.get('a-scene').prototype;
+  if (P && !P._jfEnterPatched) { const orig = P.enterVR; P._jfEnterPatched = true;
+    P.enterVR = function (ar) { const sc = this; if (sc.is('vr-mode')) return Promise.resolve('Already in VR.'); if (sc._jfEntering) return sc._jfEntering;
+      const go = () => orig.call(sc, ar);
+      const pr = (navigator.xr && !ar && !sc.checkHeadsetConnected() ? navigator.xr.isSessionSupported('immersive-vr').catch(() => false).then(go) : go());
+      sc._jfEntering = Promise.resolve(pr).finally(() => { sc._jfEntering = null; }); return sc._jfEntering; }; }
+  window.JFVR_GRANTED = !!(window.JFXR && window.JFXR.granted);   /* xrhold.js (first script) may already hold the granted session */
+  if (!navigator.xr || !navigator.xr.addEventListener) return;
+  if (window.JFVR_GRANTED) enter(0);
+  navigator.xr.addEventListener('sessiongranted', () => { window.JFVR_GRANTED = true; console.log('xr: sessiongranted'); enter(0); });
+  function enter(n) { const sc = document.querySelector('a-scene');
+    if (!sc || !sc.renderer || !sc.systems || !sc.systems.webxr) { if (n < 600) setTimeout(() => enter(n + 1), 50); return; }
+    if (sc.is('vr-mode')) return; sc.enterVR().catch(e => console.warn('xr: granted enterVR failed', e)); }
+})();
+</script>
+<script>
+/* A-Frame's text shader (msdf, a raw shader) has no logarithmic-depth code, so with logarithmicDepthBuffer on every a-text
+   lands at the wrong depth and hides behind its own button plane (the "all yellow" menu). Give it the same log depth as three. */
+(function () { const S = AFRAME.shaders.msdf && AFRAME.shaders.msdf.Shader.prototype; if (!S || S.vertexShader.indexOf('vFragDepth') >= 0) return;
+  S.vertexShader = S.vertexShader.replace('out vec2 vUV;', 'out vec2 vUV;\nout float vFragDepth;').replace('vUV = uv;', 'vUV = uv;\n  vFragDepth = 1.0 + gl_Position.w;');
+  S.fragmentShader = S.fragmentShader.replace('in vec2 vUV;', 'in vec2 vUV;\nin float vFragDepth;\nuniform float logDepthBufFC;').replace('void main() {', 'void main() {\n  gl_FragDepth = log2(vFragDepth) * logDepthBufFC * 0.5 - 0.0002;');
+})();
+</script>
+<script>
+/* Lite tier for phones/tablets (iOS Safari has a tight WebGL memory limit): iOS/Android, iPadOS, or navigator.deviceMemory <= 4.
+   The Quest browser is never lite. ?lite=1 forces it on, ?full=1 forces it off. */
+window.JFVR_LITE = (function () {
+  const q = location.search, ua = navigator.userAgent || '';
+  if (/[?&]lite=1/.test(q)) return true; if (/[?&]full=1/.test(q)) return false;
+  if (/OculusBrowser|Quest|Pico/i.test(ua)) return false;
+  if (/iPhone|iPad|iPod|Android/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return true;
+  return !!(navigator.deviceMemory && navigator.deviceMemory <= 4);
+})();
+</script>
+<script src="locomotion.js?v=18"></script>
+<script src="hd.js?v=6"></script>
+<script src="w3d/seasons.js?v=1"></script>
+<script src="w3d/sphinx.js?v=2"></script>
+<script src="w3d/world.js?v=21n"></script>
+<script src="w3d/rooms.js?v=5"></script>
+<script src="w3d/cities.js?v=10"></script>
+<script src="w3d/saucer.js?v=9"></script>
+<script src="w3d/office.js?v=1"></script>
+<script src="w3d/roam.js?v=4"></script>
+<script src="w3d/shore.js?v=1"></script>
+<script src="w3d/doors.js?v=1"></script>
+<script src="w3d/vesta.js?v=4"></script>
+<script src="w3d/vestahouse.js?v=2"></script>
+<script src="w3d/bank.js?v=10"></script>
+<script src="w3d/showcase.js?v=3"></script>
+<script src="w3d/wildlife.js?v=4"></script>
+<script src="w3d/watersound.js?v=1"></script>
+<script src="w3d/streets.js?v=11"></script>
+<script src="w3d/zoo.js?v=2"></script>
+<script src="w3d/transit.js?v=2"></script>
+<script src="w3d/fprooms.js?v=2"></script>
+<script src="w3d/launch.js?v=7"></script>
+<script src="w3d/starfleet.js?v=2"></script>
+<script src="w3d/exhibits/kit.js?v=1"></script>
+<script src="w3d/exhibits/hangar.js?v=1"></script>
+<script src="w3d/exhibits/phreaklab.js?v=1"></script>
+<script src="w3d/exhibits/foresight.js?v=1"></script>
+<script src="w3d/exhibits/spacecampus.js?v=1"></script>
+<script src="w3d/t30site.js?v=1"></script>
+<script src="w3d/versailles.js?v=2"></script>
+<script src="w3d/raynham.js?v=1"></script>
+<script src="w3d/verspark.js?v=2"></script>
+<script src="w3d/prison.js?v=1"></script>
+<script src="w3d/invite.js?v=2"></script>
+<script src="w3d/clickfix.js?v=1"></script>
+<script src="w3d/softgpu.js?v=1"></script>
+<script src="w3d/friends.js?v=4"></script>
+<script src="fpacct.js?v=1"></script>
+<script src="fpacct-ui.js?v=1"></script>
+<script src="w3d/founders.js?v=1"></script>
+<script src="w3d/vrpointer.js?v=1"></script>
+<script src="w3d/tiles3d.min.js?v=1"></script>
+<script src="w3d/gk.js?v=1"></script>
+<script src="w3d/realearth.js?v=13"></script>
+<script src="w3d/walker.js?v=1"></script>
+<script src="w3d/boats.js?v=1"></script>
+<script src="w3d/houseboat.js?v=2"></script>
+<script src="w3d/daynight.js?v=3"></script>
+<script src="w3d/banktower.js?v=2"></script>
+<script src="w3d/realism.js?v=1"></script>
+<script src="w3d/pharos.js?v=2"></script>
+<script src="w3d/grass.js?v=3"></script>
+<script src="w3d/home3d.js?v=4"></script>
+<script src="w3d/coverup.js?v=4"></script>
+<script src="w3d/build.js?v=2"></script>
+<script>
+/* Drag-to-look up/down on touch-style pointers (Quest browser 2D view): A-Frame look-controls only turns left/right for touch. */
+AFRAME.registerComponent('touch-pitch', {
+  init: function () {
+    let lastY = null; const c = this.el.sceneEl;
+    const lc = () => this.el.components['look-controls'];
+    const setup = () => {
+      const cv = c.canvas;
+      cv.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') lastY = e.clientY; });
+      cv.addEventListener('pointermove', e => {
+        if (lastY === null || c.is('vr-mode')) return;
+        const l = lc(); if (!l || !l.pitchObject) return;
+        const dy = e.clientY - lastY; lastY = e.clientY;
+        const r = l.pitchObject.rotation; r.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, r.x + dy * 0.004));
+      });
+      ['pointerup','pointercancel','pointerleave'].forEach(ev => cv.addEventListener(ev, () => lastY = null));
+    };
+    if (c.hasLoaded) setup(); else c.addEventListener('loaded', setup);
+  }
+});
+</script>
+<style>
+body{margin:0;font-family:system-ui,sans-serif}
+#ui{position:fixed;left:0;right:0;bottom:0;z-index:10;padding:6px 6px calc(14px + env(safe-area-inset-bottom));background:rgba(0,0,0,.65);color:#fff;text-align:center;max-height:45vh;overflow-y:auto;box-sizing:border-box}
+#ui button{font-size:15px;margin:3px;padding:8px 12px;border-radius:8px;border:0;background:#FFD700;color:#111;cursor:pointer}
+#uitog{font-size:15px;padding:8px 12px;border-radius:8px;border:0;background:#FFD700;color:#111;position:fixed;right:calc(112px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));z-index:11;display:none}
+#note{display:none}#ui.help #note{display:block}
+#ui button.on{background:#fff}
+#load{position:fixed;top:40%;left:0;right:0;text-align:center;color:#ffe9a8;font-size:20px;z-index:5;text-shadow:0 0 6px #000;padding:0 16px}
+#load.bg{top:8px;font-size:14px;pointer-events:none}
+#load.fail{top:30%;background:rgba(0,0,0,.8);padding:18px;z-index:30;pointer-events:auto}
+#load.fail button{font-size:17px;margin:10px 6px 0;padding:10px 16px;border-radius:10px;border:0;background:#FFD700;color:#111}
+#note{font-size:12px;opacity:.85;margin-top:4px}
+#tabbar{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px}
+#ui #tabbar button.tab{font-size:17px;font-weight:700;padding:10px 16px;background:#3a3320;color:#ffe9a8;border:2px solid #c9a24a;margin:2px}
+#ui #tabbar button.tab.cur{background:#FFD700;color:#111;border-color:#fff}
+#ui #tabbar button.mini{font-size:14px;padding:8px 10px;background:#333;color:#ffe9a8}
+#ui .pane{display:none;margin-top:6px;border-top:1px solid rgba(255,215,0,.35);padding-top:4px}
+#ui .pane.cur{display:block}
+#ui .grp{margin:2px 0 6px}
+#ui .sec{display:block;font-size:13px;opacity:.85;margin:4px 6px 2px;color:#ffe9a8;text-transform:uppercase;letter-spacing:.04em}
+#ui .vsub a{color:#ffd700;text-decoration:none}
+#ui a.lnk{display:inline-block;font-size:15px;margin:3px;padding:8px 12px;border-radius:8px;color:#111;text-decoration:none}
+@media (max-width:600px){#ui #tabbar button.tab{font-size:15px;padding:9px 10px}#ui button{font-size:14px;padding:8px 10px}}
+</style></head><body>
+<a-scene device-orientation-permission-ui="enabled: false" vr-mode-ui="enabled: true" light="defaultLightsEnabled: false" renderer="antialias: true; colorManagement: true; toneMapping: ACESFilmic; exposure: 1.0; highRefreshRate: false; foveationLevel: 1; logarithmicDepthBuffer: true; anisotropy: 16; maxCanvasWidth: 3840; maxCanvasHeight: 2160; precision: high" hd-renderer="scale: 1.0" w3d-anim>
+  <a-entity id="sky" visible="false"></a-entity>
+  <a-entity id="rig" wasd-controls="acceleration: 25" w3d-physics w3d-keys>
+    <!-- the winged-sun fly disk that hovered overhead is gone; Fly is a button on the menu (A/X still toggles it) -->
+    <a-entity camera="near: 0.1; far: 30000" look-controls="magicWindowTrackingEnabled: false" touch-pitch wasd-controls="enabled:false" position="0 1.6 0">
+    <a-entity cursor="fuse:false; rayOrigin:mouse" raycaster="objects:.btn; far: 60"></a-entity>
+  </a-entity>
+  <a-entity laser-controls="hand:right" snap-turn w3d-teleport jf-pointer raycaster="objects:.btn; far: 60"></a-entity>
+  <a-entity laser-controls="hand:left" thumbstick-move menu-toggle raycaster="objects:.btn; far: 60"></a-entity>
+  </a-entity>
+  <!-- lifts: banking hall (east end) <-> Josh's top-floor office -->
+  <a-entity position="962 34.36 -380"><a-circle class="btn" w3d-lift="to: office" radius="1.1" rotation="-90 0 0" material="shader:flat;color:#FFD700;opacity:0.85;transparent:true"></a-circle><a-text value="LIFT - Josh's office (click)" align="center" position="0 1.9 0" rotation="0 -90 0" width="5" color="#FFD700"></a-text></a-entity>
+  <a-entity position="968 64.06 -376"><a-circle class="btn" w3d-lift="to: hall" radius="0.9" rotation="-90 0 0" material="shader:flat;color:#FFD700;opacity:0.85;transparent:true"></a-circle><a-text value="LIFT - banking hall (click)" align="center" position="0 1.6 0" rotation="0 90 0" width="4" color="#FFD700"></a-text></a-entity>
+  <!-- lifts: banking hall (centre aisle) <-> bank vault below (see w3d/bank.js) -->
+  <a-entity position="945 34.33 -380"><a-circle class="btn" bank-lift="to: vault" radius="1.1" rotation="-90 0 0" material="shader:flat;color:#FFD700;opacity:0.85;transparent:true"></a-circle><a-text value="LIFT - bank vault (click)" align="center" position="0 1.9 0" rotation="0 -90 0" width="5" color="#FFD700"></a-text></a-entity>
+  <a-entity position="929 24.03 -380"><a-circle class="btn" bank-lift="to: hall" radius="0.9" rotation="-90 0 0" material="shader:flat;color:#FFD700;opacity:0.85;transparent:true"></a-circle><a-text value="LIFT - banking hall (click)" align="center" position="0 1.7 0" rotation="0 90 0" width="4" color="#FFD700"></a-text></a-entity>
+  <a-entity id="vrbar" class="vr-menu" position="0 0.6 -2.2" rotation="-20 0 0" visible="false">
+    <a-text value="3D WORLD" align="center" color="#FFD700" position="0 0.3 0" width="2.2"></a-text>
+    <a-plane class="btn" data-w="terrace" position="-2.52 0 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Bank terrace" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-w="hall" position="-1.68 0 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Banking hall" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-w="office" position="-0.84 0 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Josh's office" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-w="conservatory" position="0.00 0 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Conservatory" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-w="propulsion" position="0.84 0 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Propulsion hall" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-w="ufo" position="1.68 0 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="UFO room" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-w="pond" position="2.52 0 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Fly over pond" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-w="vault" position="-2.55 -0.4 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Bank vault" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-w="showcase" position="-1.7 -0.4 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Wampum showcase" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-speed="1" position="-0.75 -0.4 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text class="speed-label" value="Speed: Slow" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-reload="1" position="0.75 -0.4 0" width="1.4" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Reload world" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="launchpad" position="-1.7 -0.8 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Launch pad" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-w="pyramid" position="0 -0.8 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Pyramid park (24/495)" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="saucer" position="1.7 -0.8 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Flying saucer" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" data-w="walker" position="1.9 -1.2 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Walker Memorial (Boston)" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="houseboat" position="0 -1.6 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Houseboat (sleep aboard)" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="bridgewater" position="-1.9 -2.0 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Corporate Base (Bridgewater)" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="aldensquare" position="0 -2.0 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Alden Square viewpoint" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="rockets" position="1.9 -2.0 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Rocket yard (18)" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="starfleet" position="0 -2.0 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Star Fleet base" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="founders" position="-1.9 -2.4 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Founders Hall" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="hangar" position="0 -2.8 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Drone Hangar + labs" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="versailles" position="1.9 -2.4 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Versailles" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="versailles-mirrors" position="1.9 -3.2 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Hall of Mirrors" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="home" position="0 -1.2 0" width="1.6" height="0.26" material="shader:flat;color:#9ffcff"><a-text value="Home: Fowling Pond" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-invite="world" position="-1.7 -1.2 0" width="0.8" height="0.26" material="shader:flat;color:#9ffcff"><a-text value="Invite" align="center" color="#111" width="1.9"></a-text></a-plane>
+    <a-plane class="btn" fly-toggle position="2.1 -0.4 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text id="flylabel" value="Fly: OFF" align="center" color="#111" width="1.9"></a-text></a-plane>
+  </a-entity>
+</a-scene>
+<button id="uitog">Show menu</button>
+<div id="load">Building Josh's 3D world (USGS terrain + imagery)...</div>
+<div id="ui">
+  <div id="tabbar"><button class="tab" data-tab="go">Go to</button><button class="tab" data-tab="worlds">Other worlds</button><button class="tab" data-tab="bank">Bank</button><button class="tab" data-tab="set">Settings</button><button id="hidebtn" class="mini" title="Hide the menu">Hide</button><button id="helpbtn" class="mini" title="Help and credits">Help</button></div>
+  <div class="pane" id="pane-go">
+  <div class="grp" id="go-bank"><span class="sec">Bank compound</span>
+  <button data-w="terrace" class="on">Bank terrace</button>
+  <button data-w="hall">Banking hall</button>
+  <button data-w="vault">Bank vault</button>
+  <button data-w="showcase">Wampum World showcase</button>
+  <button data-w="office">Josh's office</button>
+  <button data-w="residence">Josh's residence (bank tower L6)</button>
+  <button data-w="guest">Guest apartment (bank tower L5)</button>
+  <button data-w="conservatory">Conservatory</button>
+  <button data-w="propulsion">Propulsion hall</button>
+  <button data-w="ufo">UFO room</button></div>
+  <div class="grp" id="go-pond"><span class="sec">Pond and park</span>
+  <button data-w="pond">Fly over the pond</button>
+  <button data-w="pyramid">Pyramid park (24/495)</button>
+  <button data-w="houseboat">Houseboat (sleep aboard)</button>
+  <button data-w="home" style="background:#9ffcff">Home: Fowling Pond (H)</button></div>
+  <div class="grp" id="go-far"><span class="sec">Bridgewater and beyond</span>
+  <button data-w="launchpad">Launch pad (Bridgewater)</button>
+  <button data-w="starfleet">Department of the Star Fleet (base)</button>
+  <button data-w="founders">Founders Hall (projects &amp; people)</button>
+  <button data-w="hangar">Drone Hangar + labs (H18, phreaking, Foresight, Tesla, SpaceX)</button>
+  <button data-w="saucer">Flying saucer</button>
+  <button data-w="bridgewater">Corporate Base (Bridgewater)</button>
+  <button data-w="aldensquare">Alden Square viewpoint</button>
+  <button data-w="versailles">Ch&acirc;teau de Versailles</button>
+  <span class="vsub" style="display:block;margin:2px 0 6px 10px;font-size:12px">Versailles: <a href="#" data-w="versailles-gardens">Gardens</a> &middot; <a href="#" data-w="versailles-canal">Grand Canal</a> &middot; <a href="#" data-w="versailles-trianon">Trianon</a> &middot; <a href="#" data-w="versailles-town">Town</a><br>Inside: <a href="#" data-w="versailles-mirrors">Hall of Mirrors</a> &middot; <a href="#" data-w="versailles-bedroom">King's bedroom</a> &middot; <a href="#" data-w="versailles-apartments">State Apartments</a> &middot; <a href="#" data-w="versailles-chapel">Chapel</a> &middot; <a href="#" data-w="versailles-opera">Opera</a> &middot; <a href="#" data-w="versailles-jeudepaume">Jeu de Paume</a></span>
+  <button data-w="rockets">Rocket yard (18)</button>
+  <button data-w="walker">Walker Memorial (Boston)</button></div>
+  </div>
+  <div class="pane" id="pane-worlds">
+  <div class="grp" id="worlds-rpl"><span class="sec">Red Planet Lounge (Mars)</span>
+  <button data-w="launchpad">Board the rocket at the launch pad</button>
+  <button id="rplgo" type="button" style="background:#ff9a6b">Go straight to the Red Planet Lounge</button></div>
+  <div class="grp" id="worlds-links"><span class="sec">Websites</span></div>
+  </div>
+  <div class="pane" id="pane-bank">
+  <div class="grp" id="bank-links"><span class="sec">Bank of the United States (play money)</span></div>
+  <div class="grp" id="bank-go"><span class="sec">Visit the bank</span>
+  <button data-w="hall">Banking hall</button>
+  <button data-w="vault">Bank vault</button>
+  <button data-w="terrace">Bank terrace</button></div>
+  </div>
+  <div class="pane" id="pane-set">
+  <div class="grp" id="set-move"><span class="sec">Moving</span><button id="speedbtn" data-speed="1" class="speed-label">Speed: Slow</button><button data-reload="1" type="button">Reload world</button></div>
+  <div class="grp" id="set-people"><span class="sec">People and voice</span></div>
+  <div class="grp" id="set-look"><span class="sec">Sky, sound and view</span></div>
+  <div class="grp" id="set-more"><span class="sec">More</span><span class="tools"></span></div>
+  </div>
+  <div id="note">Concept rendering only, not a real institution or engineering design. Terrain: USGS 3DEP elevation. Ground imagery: USGS National Map orthoimagery (public domain), edited to show Fowling Pond Restoration Plan v6 (restored pond and wetlands, herring passage, King's Pond, regraded landfill/quarry, rail tunnel, relocated Thrasher St) approximately. Buildings, plants and animals are procedural concept models; sphinx heads: 3D scan of KAS38, cast of a sphinx with the features of Amenemhat, Royal Cast Collection, SMK - National Gallery of Denmark (public domain); the Propulsion hall and UFO room (through the doors in the banking hall's north wall) use procedural models and summarize public sources; the bank vault (lift in the banking hall, or Bank vault in the menu) and Josh's account board are concept displays, not a real account or balance; panoramas are AI-generated concept art and also light the 3D rooms; photo textures for grass, marble, limestone and wood: ambientCG (CC0). Zoo animals (llama, alpaca, zebra, deer, stag, horse): low-poly models by Quaternius (CC0), via Poly Pizza. Bridgewater detail area: USGS National Map orthoimagery and USGS 3DEP elevation (public domain); the launch pad and rocket are fictional. The flying saucer and its destinations are fictional procedural models; Dubai destination: building footprints, heights and building parts from Overture Maps Foundation (overturemaps.org, buildings theme, ODbL; OpenStreetMap and Microsoft footprints), roads, water and land use from Overture (OpenStreetMap contributors, ODbL). London destination: building footprints and heights from Overture Maps Foundation (overturemaps.org, buildings theme, ODbL), combining OpenStreetMap footprints and Microsoft Global ML Building Footprints (ODbL); roads, paths, trees and land use (c) OpenStreetMap contributors (ODbL), ground elevation EU-DEM v1.1 (Copernicus, via OpenTopoData); the other cities are procedural impressions, not maps. Street names: (c) OpenStreetMap contributors (ODbL). Staging additions: sky photo "Kloofendal 48d Partly Cloudy (Pure Sky)" by Greg Zaal and Jarod Guest, Poly Haven (CC0); trees baked from Poly Haven "Fir Sapling Medium" and "Tree Small 02" (CC0); companion avatars: Microsoft Rocketbox avatar library (MIT License, (c) Microsoft Corporation); companion replies are AI-generated (OpenRouter), the characters are fictional adults.
+  Desktop: WASD + mouse (drag to look), Q / E = turn left / right, H = home, F = fly, Space/Shift = up/down. Quest: left stick move, right stick turn, right trigger teleport, A/X or the Fly button on the menu = fly, press left stick or Y = menu.</div>
+</div>
+<script>
+const scn = document.querySelector('a-scene'), rig = document.querySelector('#rig'), bar = document.querySelector('#vrbar');
+let mode = 'world';
+function mark(sel, key){ document.querySelectorAll('#ui button').forEach(b => b.classList.toggle('on', b.matches(sel) && (b.dataset.w===key || b.dataset.t===key))); }
+function worldLimits(on){
+  if (on) { JFVR.flyRadius = 1e7; JFVR.flyMaxY = 1e5;   /* free roaming: no wall, up to 100 km high; past the 16 km terrain roam.js draws a simple global ground. Home: Fowling Pond brings you back */ JFVR.groundAt = W3D.groundAt; }
+  else { JFVR.flyRadius = 400; JFVR.flyMaxY = 400; JFVR.groundAt = null; }
+}
+function bringMenu(){ if (bar.object3D.visible && JFVR.placeInFront) setTimeout(() => JFVR.placeInFront(bar, 2.4, 0.4), 50); }
+function goWorld(spot){
+  if (!W3D.root) return;
+  if (W3D.saucer && W3D.saucer.seat() >= 0) { if (W3D.saucer.S.mode === 'fly') { if (JFVR.hud) JFVR.hud('The saucer is flying - wait for the landing'); return; } W3D.saucer.leave(true); }
+  if (W3D.cities) W3D.cities.leave();
+  mode = 'world'; W3D.active = true; W3D.root.visible = true; worldLimits(true);
+  const s3 = scn.object3D; s3.fog = W3D.fog; s3.environment = W3D.env || null; s3.background = W3D.bg || null;
+  document.querySelector('#sky').setAttribute('visible', false);
+  if (spot !== 'pond' && spot !== 'home' && JFVR.fly) { JFVR.fly = false; const l = document.querySelector('#flylabel'); if (l) l.setAttribute('value', 'Fly: OFF'); }
+  (W3D.spots[spot] || W3D.spots.terrace)(); mark('[data-w]', spot); bringMenu();
+}
+function show(t){ // 360 concept panorama, in this same page
+  mode = 'pano'; W3D.active = false; if (W3D.root) W3D.root.visible = false; worldLimits(false);
+  const s3 = scn.object3D; s3.fog = null; s3.environment = null; s3.background = null;
+  JFVR.fly = false; const l = document.querySelector('#flylabel'); if (l) l.setAttribute('value', 'Fly: OFF');
+  rig.object3D.position.set(0, 0, 0); rig.object3D.rotation.set(0, 0, 0);
+  const sky = document.querySelector('#sky'); sky.setAttribute('hd-sky', 'src', 'pano/pano_' + t + '.jpg?v=4'); sky.setAttribute('visible', true);
+  mark('[data-t]', t); bringMenu();
+}
+function wire(el){
+  el.addEventListener('click', ev => { if (el.tagName === 'A') ev.preventDefault();
+    if (el.dataset.w) goWorld(el.dataset.w);
+    else if (el.dataset.t) show(el.dataset.t);
+    else if (el.dataset.back) goWorld('terrace');
+    else if (el.dataset.speed) JFVR.cycleSpeed();
+    else if (el.dataset.reload) { const u = new URL(location.href); u.searchParams.set('r', Date.now()); location.replace(u.toString()); }
+  });
+}
+document.querySelectorAll('#ui button, #ui .vsub a, #vrbar .btn').forEach(wire);
+document.querySelectorAll('.speed-label').forEach(e => e.tagName === 'A-TEXT' ? e.setAttribute('value', JFVR.speedLabel()) : (e.textContent = JFVR.speedLabel()));
+scn.addEventListener('enter-vr', () => { setTimeout(() => JFVR.hud && JFVR.hud('Press the left stick or Y for the menu'), 1500); }); // menu stays hidden until asked for
+scn.addEventListener('exit-vr', () => bar.setAttribute('visible', false));
+/* Clear failure message with Try again (and, on the full tier, a lighter version) instead of hanging on the loading text. */
+window.JFVR_fail = function (why) {
+  if (window.JFVR_failed) return; window.JFVR_failed = true;
+  let d = document.querySelector('#load'); if (!d) { d = document.createElement('div'); d.id = 'load'; document.body.appendChild(d); }
+  d.dataset.failed = 1; d.className = 'fail';
+  const u = new URL(location.href); u.searchParams.set('r', Date.now()); const again = u.toString(); u.searchParams.set('lite', '1'); u.searchParams.delete('full');
+  d.innerHTML = '';
+  const p = document.createElement('div'); p.textContent = why; d.appendChild(p);
+  const b = document.createElement('button'); b.textContent = 'Try again'; b.onclick = () => location.replace(again); d.appendChild(b);
+  if (!window.JFVR_LITE) { const l = document.createElement('button'); l.textContent = 'Try the lighter version'; l.onclick = () => location.replace(u.toString()); d.appendChild(l); }
+};
+function watchGL(){
+  const cv = scn.canvas; if (!cv) return;
+  cv.addEventListener('webglcontextlost', e => { e.preventDefault(); window.JFVR_fail('The 3D view stopped because this device ran out of graphics memory (WebGL context lost).'); });
+}
+if (scn.canvas) watchGL(); else scn.addEventListener('render-target-loaded', watchGL);
+setTimeout(() => { if (!window.W3D_READY) window.JFVR_fail('The 3D world is taking too long to load (over 3 minutes). Check the connection and try again.'); }, 180000);
+/* ?spot=<id> lands you at a named spot (invite links, Red Planet Lounge return shuttle); ?from=redplanetlounge says welcome back
+   and, with no spot, lands at the Bridgewater launch pad beside the rocket */
+const QS = new URLSearchParams(location.search), FROM_MARS = /^redplanet/i.test(QS.get('from') || '');
+const SPOT_ALIAS = {pond: 'marker', temple: 'temple', bank: 'hall', vesta: 'vesta', saucer: 'saucer', launchpad: 'launchpad', starfleet: 'starfleet', 'star-fleet': 'starfleet', founders: 'founders', 'founders-hall': 'founders', hangar: 'hangar', drone: 'hangar', 'drone-hangar': 'hangar', h18: 'hangar', phreaklab: 'phreaklab', lab: 'phreaklab', phreak: 'phreaklab', crunch: 'phreaklab', foresight: 'foresight', planet: 'planet', starmind: 'starmind', terafab: 'terafab', tesla: 'tesla', boring: 'boring', loop: 'boring', solarcity: 'solarcity', 'solar-city': 'solarcity', campus: 'campus', 'launch-pad': 'launchpad', pad: 'launchpad',
+  terrace: 'terrace', hall: 'hall', vault: 'vault', office: 'office', conservatory: 'conservatory', propulsion: 'propulsion', ufo: 'ufo', showcase: 'showcase', pyramid: 'pyramid', marker: 'marker', home: 'home', walker: 'walker', 'walker-memorial': 'walker', pharos: 'pharos', lighthouse: 'pharos', houseboat: 'houseboat', 'house-boat': 'houseboat', residence: 'residence', guest: 'guest', tower: 'tower', bridgewater: 'bridgewater', base: 'bridgewater', aldensquare: 'aldensquare', alden: 'aldensquare', 'alden-square': 'aldensquare', rockets: 'rockets', versailles: 'versailles', chateau: 'versailles', 'versailles-court': 'versailles-court', 'versailles-canal': 'versailles-canal', 'versailles-gardens': 'versailles-gardens', 'versailles-trianon': 'versailles-trianon', 'versailles-town': 'versailles-town', 'versailles-mirrors': 'versailles-mirrors', 'hall-of-mirrors': 'versailles-mirrors', 'versailles-bedroom': 'versailles-bedroom', 'versailles-apartments': 'versailles-apartments', 'versailles-queen': 'versailles-queen', 'versailles-chapel': 'versailles-chapel', 'versailles-opera': 'versailles-opera', 'versailles-jeudepaume': 'versailles-jeudepaume', 'jeu-de-paume': 'versailles-jeudepaume'};
+function arrivalSpot(){ const sp = (QS.get('spot') || '').toLowerCase(), k = SPOT_ALIAS[sp];
+  if (!W3D.spots.temple) W3D.spots.temple = () => W3D.teleportTo(866, undefined, -380, -90);   // between the sphinxes, facing the gate
+  if (FROM_MARS && (!k || k === 'launchpad') && W3D.spots.padland) return 'padland';   // back from Mars: on the pad deck beside the rocket
+  if (k && W3D.spots[k]) return k; return FROM_MARS ? 'launchpad' : 'terrace'; }
+function arrivalToast(){ if (FROM_MARS && !(W3D.arrival && W3D.arrival.active)) setTimeout(() => { if (W3D.toast) W3D.toast('Welcome back from Mars', 4000); else if (JFVR.hud) JFVR.hud('Welcome back from Mars'); }, 600); }
+/* XR before the world is ready (sessiongranted auto-enter starts the session while assets still load): a black cover around the head
+   with a small 'Loading' line, removed as soon as the world is built. W3D.arrivalCover lets the Mars-arrival flight take over. */
+function xrCover(){ if (window.W3D_READY || window.JFVR_COVER || (window.W3D && W3D.arrivalCover)) return; const camE = document.querySelector('[camera]'); if (!camE) return;
+  const g = new THREE.Group(); const m = new THREE.Mesh(new THREE.SphereGeometry(3, 16, 8), new THREE.MeshBasicMaterial({color: 0x000000, side: THREE.BackSide, depthTest: false, depthWrite: false, fog: false}));
+  m.renderOrder = 1e6; g.add(m); const c = document.createElement('canvas'); c.width = 512; c.height = 64; const x = c.getContext('2d'); x.fillStyle = '#c9a24a'; x.font = '32px sans-serif'; x.textAlign = 'center'; x.fillText('Loading Fowling Pond...', 256, 42);
+  const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; const t = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.2), new THREE.MeshBasicMaterial({map: tx, transparent: true, depthTest: false, depthWrite: false, fog: false}));
+  t.position.set(0, 0, -2); t.renderOrder = 1e6 + 1; g.add(t); camE.object3D.add(g); window.JFVR_COVER = g;
+  const iv = setInterval(() => { if (!window.W3D_READY) return; clearInterval(iv); camE.object3D.remove(g); m.geometry.dispose(); m.material.dispose(); t.geometry.dispose(); t.material.dispose(); tx.dispose(); window.JFVR_COVER = null; }, 200); }
+scn.addEventListener('enter-vr', xrCover); if (scn.is && scn.is('vr-mode')) xrCover();
+function start(){
+  W3D.onImagery = (done, total) => { const d = document.querySelector('#load'); if (!d || d.dataset.failed) return; if (done >= total) d.remove(); else d.textContent = 'Loading imagery ' + done + '/' + total + '...'; };
+  W3D.build(scn.object3D, scn).then(() => {
+      if (window.JFVR_failed) return;
+      const d = document.querySelector('#load'); if (d) { if (window.W3D_LOADING) { d.className = 'bg'; d.textContent = 'Loading imagery...'; } else d.remove(); }
+      goWorld(arrivalSpot()); window.W3D_READY = true; arrivalToast(); })
+    .catch(e => { console.error(e); window.JFVR_fail('The 3D world did not load (' + (e && e.message || e) + ').'); });
+}
+if (scn.hasLoaded) start(); else scn.addEventListener('loaded', start);
+</script>
+<div id="installbox" style="position:fixed;top:10px;right:10px;z-index:20;font-family:system-ui,sans-serif">
+<button id="installbtn" style="display:none;padding:10px 14px;border-radius:10px;border:0;background:#c9a24a;color:#111;font-weight:600">Add to Quest home</button>
+</div>
+<script>
+/* staging: no service worker */
+let dp=null;const ib=document.getElementById('installbtn');
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e;ib.style.display='inline-block';});
+ib.addEventListener('click',async()=>{if(!dp)return;dp.prompt();await dp.userChoice;dp=null;ib.style.display='none';});
+</script>
+<script>
+(function(){const ui=document.getElementById('ui'),t=document.getElementById('uitog');
+document.getElementById('hidebtn').onclick=()=>{ui.style.display='none';t.style.display='block';};
+t.onclick=()=>{ui.style.display='';t.style.display='none';};
+document.getElementById('helpbtn').onclick=()=>ui.classList.toggle('help');})();
+</script>
+<script src="w3d/tesseractreader.js?v=2"></script>
+<script src="w3d/diareader.js?v=1"></script>
+<script src="w3d/tesseractlink.js?v=3"></script>
+<script src="w3d/tesseractgate.js?v=1"></script>
+<script src="w3d/ballroomgate.js?v=1"></script>
+<script src="w3d/menutabs.js?v=10"></script>
+<script src="w3d/worldrooms.js?v=1"></script>
+<script>/* ?nomp=1 (automated tests) skips joining the public voice room */ if (!/[?&]nomp=1/.test(location.search)) { const s = document.createElement('script'); s.src = 'mp.js?v=8'; document.body.appendChild(s); }</script>
+<script type="module" src="/vr-staging/fx/fphost.js?v=2"></script>
+</body></html>

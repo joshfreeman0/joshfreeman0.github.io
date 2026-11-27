@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Companion demo</title><meta name="robots" content="noindex">
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script></head><body>
+<a-scene renderer="colorManagement: true; toneMapping: ACESFilmic" background="color: #9cb8d6" shadow="type: pcfsoft">
+  <a-entity light="type: hemisphere; color: #dfeaff; groundColor: #6b5a44; intensity: 0.9"></a-entity>
+  <a-entity light="type: directional; intensity: 2.2; castShadow: true" position="-3 6 4"></a-entity>
+  <a-plane rotation="-90 0 0" width="40" height="40" color="#7d8a5c" shadow="receive: true"></a-plane>
+  <a-entity id="rig" position="0 0 2.2"><a-camera look-controls wasd-controls position="0 1.6 0"></a-camera></a-entity>
+  <a-entity id="companions"></a-entity>
+</a-scene>
+<script type="module">
+  import {mount} from './companion.js';
+  const scene = document.querySelector('a-scene'), root = document.querySelector('#companions');
+  const go = async () => {
+    const q = new URLSearchParams(location.search);
+    window.fpc = await mount(scene, root, {playerId: 'demo', world: 'earth', pick: q.get('pick') || undefined, spawn: {x: 0, y: 0, z: 0, yaw: 0}, follow: false,
+      onEvent: e => console.log('[fpc]', JSON.stringify(e))});
+  };
+  scene.hasLoaded ? go() : scene.addEventListener('loaded', go);
+</script></body></html>
