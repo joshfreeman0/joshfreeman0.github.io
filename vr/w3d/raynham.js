@@ -274,7 +274,7 @@ AFRAME.registerSystem('w3d-raynham', {
     sc.addEventListener('enter-vr', () => { if (ride) ride.vr = true; }); sc.addEventListener('exit-vr', () => { if (ride) ride.vr = false; }); },
   tick(t, dt) {
     if (!window.W3D_READY || !W3D.root || !dt) return;
-    if (!D) { if (!this.loading) { this.loading = true; fetch('/vr/w3d/raynham.json?v=1').then(r => r.json()).then(j => { D = j; buildSamples(); }).catch(e => console.warn('raynham data unavailable', e)); } return; }
+    if (!D) { if (!this.loading) { this.loading = true; fetch('/vr/w3d/raynham.json?v=2').then(r => r.json()).then(j => { D = j; buildSamples(); }).catch(e => console.warn('raynham data unavailable', e)); } return; }
     const sec = Math.min(dt, 100) / 1000; if (ride) tickRide(sec);
     const sc = this.el, cam = sc.camera; if (!cam) return; cam.getWorldPosition(_v); const cx = _v.x, cz = _v.z;
     for (const b of boards) if (b.mesh && b.mesh.visible) b.mesh.rotation.y = Math.atan2(cx - b.x, cz - b.z);
