@@ -103,7 +103,7 @@
   function buildWrist() { const L = document.querySelector('[laser-controls*="left"]'), sc = document.querySelector('a-scene'); if (!L || !sc || wrist) return wrist;
     wrist = document.createElement('a-entity'); wrist.id = 'wristpanel'; sc.appendChild(wrist); wrist.object3D.visible = false;   // not the visible attribute: it applies late and would hide a panel just shown
     const c = document.createElement('canvas'); c.width = 512; c.height = 64 * ROWS + 48; pCtx = c.getContext('2d'); pTex = new THREE.CanvasTexture(c); pTex.colorSpace = THREE.SRGBColorSpace;
-    const H = 0.035 * ROWS + 0.026, FH = 0.06, TOT = H + FH;
+    const H = 0.035 * ROWS + 0.026, FH = 0.11, TOT = H + FH;   // footer: Voice / Range row, then the big DIA Papers button (T-28)
     const bg = new THREE.Mesh(new THREE.PlaneGeometry(PW, TOT + 0.008), new THREE.MeshBasicMaterial({color: 0x0b1d26, transparent: true, opacity: 0.92, depthTest: false, depthWrite: false, toneMapped: false}));
     bg.position.set(0, -FH / 2, -0.0005); bg.renderOrder = 2999; wrist.object3D.add(bg);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(0.2, H), new THREE.MeshBasicMaterial({map: pTex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false}));
@@ -115,7 +115,7 @@
       lbl(b, 0.045, 0.028, '#ffd700').set('Go');
       b.addEventListener('click', ev => { if (fromLeft(ev)) return; const r = rows[i]; if (r) FR.go(r.id); }); b.object3D.renderOrder = 3001; goBtns.push(b); }
     // Voice ON / OFF (big, left) and voice range (right) along the bottom
-    const vy = -H / 2 - FH / 2;
+    const vy = -H / 2 - 0.03;
     const vb = plane(wrist, 0.12, 0.04, -0.043, vy, 0.002, 'shader:flat;transparent:true;opacity:0;depthTest:false;depthWrite:false', 'btn'); vb.id = 'wristvoice';
     const vc = document.createElement('canvas'); vc.width = 256; vc.height = 80; vCtx = vc.getContext('2d'); vTex = new THREE.CanvasTexture(vc); vTex.colorSpace = THREE.SRGBColorSpace;
     const vm = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.0375), new THREE.MeshBasicMaterial({map: vTex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false}));
@@ -125,6 +125,10 @@
     const vtt = lbl(vt, 0.08, 0.0375, '#9ffcff');
     vt.addEventListener('click', ev => { if (fromLeft(ev)) return; FR.setRange(FR.range === 'auto' ? 'near' : 'auto'); }); wrist.userData.vt = vtt; renderBtns(); vSig = ''; drawVoice();
     window.addEventListener('jfmp-voice', () => { vSig = ''; drawVoice(); });
+    // DIA Papers (T-28): opens the 37 DIRDs in the in-world reader (diareader.js) about 1 m in front of you, DIRD 13 first
+    const db = plane(wrist, 0.2, 0.042, 0, -H / 2 - 0.08, 0.002, 'shader:flat;transparent:true;opacity:0;depthTest:false;depthWrite:false', 'btn'); db.id = 'wristdia'; db.object3D.renderOrder = 3001;
+    lbl(db, 0.2, 0.04, '#FFD700').set('DIA Papers  (37 DIRDs)');
+    db.addEventListener('click', ev => { if (fromLeft(ev)) return; if (window.JFVR_diaReader) window.JFVR_diaReader.open(); else hud('DIA Papers reader is still loading'); });
     setTimeout(() => document.querySelectorAll('[raycaster]').forEach(r => r.components.raycaster && r.components.raycaster.refreshObjects()), 300);
     [500, 1500, 4000].forEach(t => setTimeout(fixOrder, t));
     return wrist; }
