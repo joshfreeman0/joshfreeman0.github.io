@@ -72,13 +72,13 @@ Mars is an in-page room: `CATALOG.mars.module` = `/vr/rooms/mars.js`, an adapter
 
 ## Tesseract room (built Nov 27 2026, T-21)
 
-`vr/rooms/tesseract.js`, entered from the walk-in gateway in the Star Fleet base, the "Tesseract room" portal on the bank terrace, the Other worlds tab, `W3D.spots.tesseract`, or `https://joshfreeman.org/vr/?room=tesseract` (also `?spot=tesseract`). Gateways: `vr/w3d/tesseractgate.js`. Inside: Tesseract website bays (DIRDs via the DIA Papers reader, AAWSAP, UnLAB, Roswell/claims via the Tesseract reader), the propulsion lab corner, the multiverse map hub, and the USE Eagle exchange desk (1 Eagle = 10 Fowling Pond dollars, play-money calculator; no ledger writes). Doors home lead to the Star Fleet base or the bank terrace.
+`vr/rooms/tesseract.js`, entered from the walk-in gateway in the Star Fleet base, the "Tesseract room" portal on the bank terrace, the menu (Go to > Space), `W3D.spots.tesseract`, or `https://joshfreeman.org/vr/?room=tesseract` (also `?spot=tesseract`). Gateways: `vr/w3d/tesseractgate.js`. Inside: Tesseract website bays (DIRDs via the DIA Papers reader, AAWSAP, UnLAB, Roswell/claims via the Tesseract reader), the propulsion lab corner, the multiverse map hub, and the USE Eagle exchange desk (1 Eagle = 10 Fowling Pond dollars, play-money calculator; no ledger writes). Doors home lead to the Star Fleet base or the bank terrace.
 
 ### Original plan
 
 The Tesseract site, repo, branding and artwork stay exactly as they are. The room only reads the live public pages (https://tesseractprogram.pages.dev/), the way the in-world reader already does.
 
-1. **Room `tesseract`** in `vr/rooms/tesseract.js`, our own module, in Fowling Pond style: a walk-in hall with a central exhibit. Reach it from Other worlds, and from the Star Fleet base door (`?spot=starfleet`).
+1. **Room `tesseract`** in `vr/rooms/tesseract.js`, our own module, in Fowling Pond style: a walk-in hall with a central exhibit. Reach it from the menu (Go to > Space), and from the Star Fleet base door (`?spot=starfleet`).
 2. **Content:** fetch the live pages' HTML at mount, extract headings, paragraphs and images, and show them on in-world panels (canvas text). Same approach as the reader, so it always matches the site, and nothing from it is copied into our repo. Images are shown as published, not edited.
 3. **Sections:** one panel bay per site section (Star Fleet, programs, history). A "read more" button opens the in-world reader on that page.
 4. **Later (Saturday or after):** the walk-in propulsion-science lab and multiverse plan (T-21) as further bays, built from the same live content.
@@ -153,3 +153,12 @@ Then call `FPX.mount('hangar', sceneEl, marsRoot, {position: {...}, groundAt: ma
 - `solarcity`
 
 **Menu:** one entry, "Drone Hangar + labs".
+
+## Menus (v2, Nov 27 2026)
+
+`vr/w3d/menutabs.js` lays out both the 2D menu and the in-headset menu as **Go to | People | Read | Settings**. Go to has six
+sections: Fowling Pond, Bank compound, Rooms, Earth places, Space, Exhibits (Versailles' spots are a sub-list / sub-page under
+Earth places). Modules keep adding buttons the old way (`#ui .tools`, the old group ids such as `worlds-links`, or `#vrbar`); the
+file files each by key (`P2` for 2D, `PV` for VR) and anything unknown lands in Settings > More, so add a new room's key there.
+The left-wrist panel ends in four favourites: Home (family house, where the page has one) or Bank terrace, Pond view, DIA Papers,
+and More (opens the menu).

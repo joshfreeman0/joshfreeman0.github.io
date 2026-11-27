@@ -103,7 +103,7 @@
   function buildWrist() { const L = document.querySelector('[laser-controls*="left"]'), sc = document.querySelector('a-scene'); if (!L || !sc || wrist) return wrist;
     wrist = document.createElement('a-entity'); wrist.id = 'wristpanel'; sc.appendChild(wrist); wrist.object3D.visible = false;   // not the visible attribute: it applies late and would hide a panel just shown
     const c = document.createElement('canvas'); c.width = 512; c.height = 64 * ROWS + 48; pCtx = c.getContext('2d'); pTex = new THREE.CanvasTexture(c); pTex.colorSpace = THREE.SRGBColorSpace;
-    const H = 0.035 * ROWS + 0.026, FH = 0.11, TOT = H + FH;   // footer: Voice / Range row, then the big DIA Papers button (T-28)
+    const H = 0.035 * ROWS + 0.026, FH = 0.16, TOT = H + FH;   // footer: Voice / Range row, then 2 x 2 favourites (menu v2, Nov 27)
     const bg = new THREE.Mesh(new THREE.PlaneGeometry(PW, TOT + 0.008), new THREE.MeshBasicMaterial({color: 0x0b1d26, transparent: true, opacity: 0.92, depthTest: false, depthWrite: false, toneMapped: false}));
     bg.position.set(0, -FH / 2, -0.0005); bg.renderOrder = 2999; wrist.object3D.add(bg);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(0.2, H), new THREE.MeshBasicMaterial({map: pTex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false}));
@@ -125,10 +125,17 @@
     const vtt = lbl(vt, 0.08, 0.0375, '#9ffcff');
     vt.addEventListener('click', ev => { if (fromLeft(ev)) return; FR.setRange(FR.range === 'auto' ? 'near' : 'auto'); }); wrist.userData.vt = vtt; renderBtns(); vSig = ''; drawVoice();
     window.addEventListener('jfmp-voice', () => { vSig = ''; drawVoice(); });
-    // DIA Papers (T-28): opens the 37 DIRDs in the in-world reader (diareader.js) about 1 m in front of you, DIRD 13 first
-    const db = plane(wrist, 0.2, 0.042, 0, -H / 2 - 0.08, 0.002, 'shader:flat;transparent:true;opacity:0;depthTest:false;depthWrite:false', 'btn'); db.id = 'wristdia'; db.object3D.renderOrder = 3001;
-    lbl(db, 0.2, 0.04, '#FFD700').set('DIA Papers  (37 DIRDs)');
-    db.addEventListener('click', ev => { if (fromLeft(ev)) return; if (window.JFVR_diaReader) window.JFVR_diaReader.open(); else hud('DIA Papers reader is still loading'); });
+    /* favourites (menu v2, Nov 27): Home (the family house, where the page has one; else Bank terrace) | Pond view, then
+       DIA Papers (T-28: the 37 DIRDs in the in-world reader, DIRD 13 first) | More (opens the full menu). 10 x 4.2 cm targets. */
+    const FW = 0.104, FHt = 0.042, fx = [-0.054, 0.054], fy = [-H / 2 - 0.08, -H / 2 - 0.128];
+    const fav = (id, x, y, txt, col, fn) => { const b = plane(wrist, FW, FHt, x, y, 0.002, 'shader:flat;transparent:true;opacity:0;depthTest:false;depthWrite:false', 'btn'); b.id = id; b.object3D.renderOrder = 3001;
+      lbl(b, FW, FHt - 0.002, col).set(txt); b.addEventListener('click', ev => { if (fromLeft(ev)) return; fn(); }); return b; };
+    const goW = w => { if (typeof window.goWorld === 'function') window.goWorld(w); };
+    if (window.FP_HOME && !document.getElementById('wristhome')) fav('wristhome', fx[0], fy[0], 'Home', '#ffd9a0', () => goW('familyhome'));
+    else fav('wristfav1', fx[0], fy[0], 'Bank terrace', '#FFD700', () => goW('terrace'));
+    fav('wristpond', fx[1], fy[0], 'Pond view', '#9ffcff', () => goW('home'));
+    fav('wristdia', fx[0], fy[1], 'DIA Papers', '#FFD700', () => { if (window.JFVR_diaReader) window.JFVR_diaReader.open(); else hud('DIA Papers reader is still loading'); });
+    fav('wristmore', fx[1], fy[1], 'More  >', '#ffffff', () => { if (window.JFVR_openMenuVR) window.JFVR_openMenuVR(); });
     setTimeout(() => document.querySelectorAll('[raycaster]').forEach(r => r.components.raycaster && r.components.raycaster.refreshObjects()), 300);
     [500, 1500, 4000].forEach(t => setTimeout(fixOrder, t));
     return wrist; }
