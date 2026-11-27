@@ -230,7 +230,10 @@ RE.places = () => placesHere().map(p => p[0]);
    o.back = metres south of the target, o.up = height over the Google ground; returns the arrival point (camera faces north, at the target). */
 RE.goLatLon = (name, lat, lon, o) => { o = o || {}; if (!RE.on) setOn(true);
   const c = W3D.cities && W3D.cities.current && W3D.cities.current(); if (c && ANCH[c] && RE.anchor !== c && RE.tiles) { setAnchor(c); calTries = 0; RE.calDone = null; }
-  const A = c && ANCH[c] ? ANCH[c] : ANCH.home; if (!A.kx) Object.assign(A, kxy(A.lat));
+  let A = c && ANCH[c] ? ANCH[c] : ANCH.home; if (!A.kx) Object.assign(A, kxy(A.lat));
+  if (o.pin && !RE.tiles && RE.on) start();   // ?spot=ldn-* arrives before the w3d-ready start
+  if (o.pin && !RE.tiles) { if (!RE.failed && (o.tries = (o.tries || 0) + 1) < 60) setTimeout(() => { const p = RE.goLatLon(name, lat, lon, o); if (p && o.done) o.done(p); }, 500); return null; }
+  if (o.pin) { A = {lat, lon, x: 200000, z: -200000 - (o.back || 900), yOff: o.pin.yOff || 0, cal: 0}; setAnchor('free', A); RE.pin = true; }   // far city with no scene of ours (London): pin a free anchor out at 200 km
   const qx = A.x + (lon - A.lon) * A.kx, qz = A.z - (lat - A.lat) * A.ky, back = o.back || 900, zz = qz + back, dt = Math.hypot(qx - A.x, zz - A.z);
   const gy = o.ground || 0, y = gy - dt * dt / 12742000 + (o.up || 320);   // the Google ground drops with distance from the anchor (stays so after a 'free' re-anchor)
   if (window.JFVR) JFVR.fly = true; W3D.teleportTo(qx, y, zz, 0); if (window.JFVR) JFVR.fly = true;
@@ -291,7 +294,7 @@ function collide(t, sc) {
     if (havePrev) { _d.subVectors(P, _pr); const L = _d.length();
       if (L > 0.05 && L < 200) { _d.normalize(); const eye = _c.y - P.y; _rc.set(_o.set(_pr.x, _pr.y + eye, _pr.z), _d); _rc.far = L + 1.5;
         const h = _rc.intersectObject(T.group, true)[0]; if (h && h.point.y - (W3D.terrainH ? W3D.terrainH(h.point.x, h.point.z) : 0) > 2.5) { P.copy(_pr); RE.bumps = (RE.bumps || 0) + 1; } } }
-    const top = HC.get(key(_c.x, _c.z)); if (top && top.y !== null && _c.y < top.y + 1.6 && top.y - gnd > 2.5) P.y += top.y + 1.6 - _c.y;   // stand on the roof
+    const top = HC.get(key(_c.x, _c.z)); if (top && top.y !== null && _c.y < top.y + 1.6 && top.y + 1.6 - _c.y < 40 && top.y - gnd > 2.5) P.y += top.y + 1.6 - _c.y;   // stand on the roof (a step, never a 1 km jump from a stale sample right after an anchor switch)
     _pr.copy(P); havePrev = true;
   } else havePrev = false;
 }

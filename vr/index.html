@@ -96,8 +96,9 @@ window.JFVR_LITE = (function () {
 <script src="w3d/vrpointer.js?v=1"></script>
 <script src="w3d/tiles3d.min.js?v=1"></script>
 <script src="w3d/gk.js?v=1"></script>
-<script src="w3d/realearth.js?v=14"></script>
-<script src="w3d/bostonarea.js?v=1"></script>
+<script src="w3d/realearth.js?v=15"></script>
+<script src="w3d/bostonarea.js?v=2"></script>
+<script src="w3d/londonarea.js?v=1"></script>
 <script src="w3d/walker.js?v=1"></script>
 <script src="w3d/boats.js?v=1"></script>
 <script src="w3d/houseboat.js?v=2"></script>
@@ -319,7 +320,7 @@ setTimeout(() => { if (!window.W3D_READY) window.JFVR_fail('The 3D world is taki
 const QS = new URLSearchParams(location.search), FROM_MARS = /^redplanet/i.test(QS.get('from') || '');
 const SPOT_ALIAS = {pond: 'marker', temple: 'temple', bank: 'hall', vesta: 'vesta', saucer: 'saucer', launchpad: 'launchpad', starfleet: 'starfleet', 'star-fleet': 'starfleet', founders: 'founders', 'founders-hall': 'founders', hangar: 'hangar', drone: 'hangar', 'drone-hangar': 'hangar', h18: 'hangar', phreaklab: 'phreaklab', lab: 'phreaklab', phreak: 'phreaklab', crunch: 'phreaklab', foresight: 'foresight', planet: 'planet', starmind: 'starmind', terafab: 'terafab', tesla: 'tesla', boring: 'boring', loop: 'boring', solarcity: 'solarcity', 'solar-city': 'solarcity', campus: 'campus', 'launch-pad': 'launchpad', pad: 'launchpad', mars: 'launchpad', rpl: 'launchpad', 'red-planet': 'launchpad',
   terrace: 'terrace', hall: 'hall', vault: 'vault', office: 'office', conservatory: 'conservatory', propulsion: 'propulsion', ufo: 'ufo', showcase: 'showcase', pyramid: 'pyramid', marker: 'marker', home: 'home', walker: 'walker', 'walker-memorial': 'walker', pharos: 'pharos', lighthouse: 'pharos', houseboat: 'houseboat', 'house-boat': 'houseboat', residence: 'residence', guest: 'guest', tower: 'tower', bridgewater: 'bridgewater', base: 'bridgewater', aldensquare: 'aldensquare', alden: 'aldensquare', 'alden-square': 'aldensquare', rockets: 'rockets', versailles: 'versailles', chateau: 'versailles', 'versailles-court': 'versailles-court', 'versailles-canal': 'versailles-canal', 'versailles-gardens': 'versailles-gardens', 'versailles-trianon': 'versailles-trianon', 'versailles-town': 'versailles-town', 'versailles-mirrors': 'versailles-mirrors', 'hall-of-mirrors': 'versailles-mirrors', 'versailles-bedroom': 'versailles-bedroom', 'versailles-apartments': 'versailles-apartments', 'versailles-queen': 'versailles-queen', 'versailles-chapel': 'versailles-chapel', 'versailles-opera': 'versailles-opera', 'versailles-jeudepaume': 'versailles-jeudepaume', 'jeu-de-paume': 'versailles-jeudepaume'};
-function arrivalSpot(){ const sp = (QS.get('spot') || '').toLowerCase(), k = SPOT_ALIAS[sp] || (/^bos-[a-z]+$/.test(sp) ? sp : sp === 'boston' ? 'bos-common' : '');
+function arrivalSpot(){ const sp = (QS.get('spot') || '').toLowerCase(), k = SPOT_ALIAS[sp] || (/^(bos|ldn)-[a-z]+$/.test(sp) ? sp : sp === 'boston' ? 'bos-common' : sp === 'london' ? 'ldn-stpauls' : '');
   if (!W3D.spots.temple) W3D.spots.temple = () => W3D.teleportTo(866, undefined, -380, -90);   // between the sphinxes, facing the gate
   if (FROM_MARS && (!k || k === 'launchpad') && W3D.spots.padland) return 'padland';   // back from Mars: on the pad deck beside the rocket
   if (k && W3D.spots[k]) return k; return FROM_MARS ? 'launchpad' : 'terrace'; }
@@ -363,7 +364,7 @@ document.getElementById('helpbtn').onclick=()=>ui.classList.toggle('help');})();
 <script src="w3d/tesseractlink.js?v=3"></script>
 <script src="w3d/tesseractgate.js?v=1"></script>
 <script src="w3d/ballroomgate.js?v=1"></script>
-<script src="w3d/menutabs.js?v=13"></script>
+<script src="w3d/menutabs.js?v=14"></script>
 <script src="w3d/worldrooms.js?v=2"></script>
 <script>/* ?nomp=1 (automated tests) skips joining the public voice room */ if (!/[?&]nomp=1/.test(location.search)) { const s = document.createElement('script'); s.src = 'mp.js?v=8'; document.body.appendChild(s); }</script>
 </body></html>

@@ -63,7 +63,7 @@ const SP = [   // id, menu label, lat, lon, frame, metres back, metres up, board
      'Plymouth Rock rests under a granite portico built in 1921. Mayflower II, a replica built in England, sailed here in 1957.']]
 ];
 window.FP_BOSAREA = SP.map(s => [s[0], s[1]]);
-let board = null, boardAt = null;
+let board = null, boardAt = null, foot = '';
 function wrap(g, t, w) { const out = []; let line = ''; t.split(' ').forEach(wd => { const n = line ? line + ' ' + wd : wd; if (g.measureText(n).width > w && line) { out.push(line); line = wd; } else line = n; }); if (line) out.push(line); return out; }
 function boardTex(title, lines) {
   const c = document.createElement('canvas'); c.width = 1024; c.height = 512; const g = c.getContext('2d');
@@ -71,17 +71,20 @@ function boardTex(title, lines) {
   g.fillStyle = '#ffe08a'; g.font = 'bold 56px system-ui, sans-serif'; g.fillText(title, 40, 88);
   g.fillStyle = '#eef4f6'; g.font = '33px system-ui, sans-serif'; let y = 146;
   lines.forEach(l => { wrap(g, l, 944).forEach(r => { if (y < 470) g.fillText(r, 40, y); y += 41; }); y += 6; });
-  g.fillStyle = '#9fb4bd'; g.font = '22px system-ui, sans-serif'; g.fillText('Boston & area  -  Google 3D tiles', 44, 488);
+  g.fillStyle = '#9fb4bd'; g.font = '22px system-ui, sans-serif'; g.fillText(foot + '  -  Google 3D tiles', 44, 488);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
 function dropBoard() { if (!board) return; board.parent && board.parent.remove(board); board.geometry.dispose(); board.material.map.dispose(); board.material.dispose(); board = null; boardAt = null; }
-function showBoard(s, p) { dropBoard(); const sc = document.querySelector('a-scene'); if (!sc) return;
+function showBoard(s, p, f) { dropBoard(); foot = f; const sc = document.querySelector('a-scene'); if (!sc) return;
   board = new THREE.Mesh(new THREE.PlaneGeometry(18, 9), new THREE.MeshBasicMaterial({map: boardTex(s[7], s[8]), fog: false, toneMapped: false, side: THREE.DoubleSide}));
   board.name = 'bosarea-board'; board.position.set(p.x - 16, p.y + 1, p.z - 36); board.rotation.y = Math.atan2(16, 36); board.rotation.x = -0.06;   /* up and to the left: the place itself stays clear in the middle */ sc.object3D.add(board); boardAt = p; }
 setInterval(() => { if (!board) return; const sc = document.querySelector('a-scene'); if (!sc || !sc.camera) return; const v = new THREE.Vector3(); sc.camera.getWorldPosition(v);
   if (Math.hypot(v.x - board.position.x, v.z - board.position.z) > 2500) dropBoard(); }, 2000);
-function go(s) { const W = window.W3D, RE = W && W.realEarth; if (!RE || !RE.goLatLon) return;
-  const fly = () => { const p = RE.goLatLon(s[7], s[2], s[3], {back: s[5], up: s[6]}); if (p) showBoard(s, p); };
+/* frame: 'boston' = the Boston city frame, 'home' = home frame, {lat, lon, yOff} = a pinned free anchor out at 200 km (London: no city scene loaded) */
+function go(s, f) { const W = window.W3D, RE = W && W.realEarth; if (!RE || !RE.goLatLon) return;
+  const fly = () => { const p = RE.goLatLon(s[7], s[2], s[3], {back: s[5], up: s[6], pin: typeof s[4] === 'object' ? s[4] : null, ground: s[4].ground, done: q => showBoard(s, q, f)}); if (p) showBoard(s, p, f); };
   if (s[4] === B && W.cities) { W.cities.enter('boston'); Promise.resolve(W.cities.load('boston')).then(fly); } else { dropBoard(); fly(); } }
-(function addSpots() { const W = window.W3D; if (!W || !W.spots) return setTimeout(addSpots, 50); SP.forEach(s => { W.spots['bos-' + s[0]] = () => go(s); }); })();
+/* shared by londonarea.js: register a list of spots as ?spot=<prefix>-<id> */
+window.FP_PLACESET = (prefix, list, f) => { (function addSpots() { const W = window.W3D; if (!W || !W.spots) return setTimeout(addSpots, 50); list.forEach(s => { W.spots[prefix + '-' + s[0]] = () => go(s, f); }); })(); return list.map(s => [s[0], s[1]]); };
+window.FP_PLACESET('bos', SP, 'Boston & area');
 window.FP_BOSAREA_stats = () => ({spots: SP.length, board: board ? board.name : null, at: boardAt});
 })();

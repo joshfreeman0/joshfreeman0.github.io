@@ -19,7 +19,7 @@
     ['tesla', 'Tesla'], ['boring', 'Boring Loop'], ['solarcity', 'SolarCity']];
   const VERS = [['gardens', 'Gardens'], ['canal', 'Grand Canal'], ['trianon', 'Trianon'], ['town', 'Town'], ['mirrors', 'Hall of Mirrors'], ['bedroom', "King's bedroom"],
     ['apartments', 'State Apartments'], ['chapel', 'Chapel'], ['opera', 'Opera'], ['jeudepaume', 'Jeu de Paume']];
-  const BOS = window.FP_BOSAREA || [];   // Boston & area sub-list (bostonarea.js, loaded first)
+  const BOS = window.FP_BOSAREA || [], LDN = window.FP_LDNAREA || [];   // London sub-list (londonarea.js)   // Boston & area sub-list (bostonarea.js, loaded first)
   const ROOMS = [['nz', 'New Zealand'], ['australia', 'Australia'], ['samoa', 'Samoa'], ['hawaii', 'Hawaii'], ['royal', 'Royal Family']];
   const TABS = [['go', 'Go to'], ['people', 'People'], ['read', 'Read'], ['set', 'Settings']];
   const SECS = [['pond', 'Fowling Pond'], ['bank', 'Bank compound'], ['rooms', 'Rooms'], ['earth', 'Earth places'], ['space', 'Space'], ['exh', 'Exhibits']];
@@ -44,6 +44,7 @@
   };
   VERS.forEach(([k], i) => { P2['w:versailles-' + k] = ['gs-vers', i + 1]; });
   BOS.forEach(([k], i) => { P2['w:bos-' + k] = ['gs-bos', i]; });
+  LDN.forEach(([k], i) => { P2['w:ldn-' + k] = ['gs-ldn', i]; });
   EXH.forEach(([k], i) => { P2['w:' + k] = ['gs-exh', i + 2]; });
   const DROP2 = {'w:pond': 1};   // same spot as Pond view
   function key2D(e) { const d = e.dataset || {};
@@ -86,6 +87,8 @@
     vs.style.order = 6; body('gs-earth').appendChild(vs);
     if (BOS.length) { const bs = el('details', {class: 'jf-sec jf-sub', id: 'gs-bos'}); bs.appendChild(el('summary', {}, 'Boston &amp; area<span class="n"></span>')); bs.appendChild(el('div', {class: 'jf-body'}));
       bs.style.order = 7; body('gs-earth').appendChild(bs); }
+    if (LDN.length) { const ls = el('details', {class: 'jf-sec jf-sub', id: 'gs-ldn'}); ls.appendChild(el('summary', {}, 'London<span class="n"></span>')); ls.appendChild(el('div', {class: 'jf-body'}));
+      ls.style.order = 8; body('gs-earth').appendChild(ls); }
     const grp = (pane, id, l) => { const g = el('div', {class: 'jf-grp', id}); g.appendChild(el('span', {class: 'sec'}, l)); g.appendChild(el('div', {class: 'jf-body'})); pane.appendChild(g); };
     grp(mkPane('people'), 'pp', 'People, voice and account');
     grp(mkPane('read'), 'rd', 'Read in the world');
@@ -95,6 +98,7 @@
       b.addEventListener('click', ev => { ev.stopPropagation(); fn(); }); inbox.appendChild(b); };
     EXH.forEach(([k, l]) => mk('jf-x-' + k, l, go(k), k));
     BOS.forEach(([k, l]) => mk('jf-b-' + k, l, go('bos-' + k), 'bos-' + k));
+    LDN.forEach(([k, l]) => mk('jf-l-' + k, l, go('ldn-' + k), 'ldn-' + k));
   }
   function companion2D() { const A = fpc(); const inbox = document.getElementById('jf-inbox'); if (!A || !inbox || document.getElementById('jf-fpc-come')) return;
     const mk = (id, label, fn) => { const b = el('button', {id, type: 'button'}); b.textContent = label; b.style.background = '#ffd9a0'; b.addEventListener('click', ev => { ev.stopPropagation(); fn(); }); inbox.appendChild(b); };
@@ -117,7 +121,7 @@
       const o = String(pl ? pl[1] : 50); if (e.style.order !== o) e.style.order = o;
       if (pl && pl[2] && !e.dataset.jfl) { e.dataset.jfl = 1; e.textContent = pl[2]; }
     });
-    ui.querySelectorAll('.jf-sec').forEach(d => { const n = d.querySelectorAll(':scope > .jf-body > button, :scope > .jf-body > a').length + (d.id === 'gs-earth' ? 1 + (BOS.length ? 1 : 0) : 0); const s = d.querySelector(':scope > summary .n'); if (s && s.textContent !== String(n)) s.textContent = String(n); });
+    ui.querySelectorAll('.jf-sec').forEach(d => { const n = d.querySelectorAll(':scope > .jf-body > button, :scope > .jf-body > a').length + (d.id === 'gs-earth' ? 1 + (BOS.length ? 1 : 0) + (LDN.length ? 1 : 0) : 0); const s = d.querySelector(':scope > summary .n'); if (s && s.textContent !== String(n)) s.textContent = String(n); });
     const more = document.getElementById('st-more'); if (more) more.style.display = body('st-more').children.length ? '' : 'none';
   }
   function setTab2D(t) { const ui = document.getElementById('ui'); if (!ui) return;
@@ -147,7 +151,7 @@
     'jfv-guest': ['bank', 6], 'w:conservatory': ['bank', 7], 'w:propulsion': ['bank', 8], 'w:ufo': ['bank', 9],
     'jfv-ballroom': ['rooms', 0], 'jfv-room-nz': ['rooms', 1], 'jfv-room-australia': ['rooms', 2], 'jfv-room-samoa': ['rooms', 3], 'jfv-room-hawaii': ['rooms', 4], 'jfv-room-royal': ['rooms', 5], 'jfv-room-back': ['rooms', 9],
     raynhamvr: ['earth', 0, 'Raynham Center'], dunkinvr: ['earth', 1, "Dunkin'"], 'w:bridgewater': ['earth', 2, 'Corporate Base'], 'w:aldensquare': ['earth', 3, 'Alden Square'], 'w:walker': ['earth', 4, 'Walker Memorial'],
-    'jfv-vers-open': ['earth', 5], 'jfv-bos-open': ['earth', 6], placesvr: ['earth', 9], 'jfv-bos-back': ['bos', 0],
+    'jfv-vers-open': ['earth', 5], 'jfv-bos-open': ['earth', 6], 'jfv-ldn-open': ['earth', 7], placesvr: ['earth', 9], 'jfv-bos-back': ['bos', 0], 'jfv-ldn-back': ['ldn', 0],
     'jfv-vers-back': ['vers', 0], 'w:versailles': ['vers', 1, 'Château'], 'w:versailles-mirrors': ['vers', 6, 'Hall of Mirrors'],
     'jfv-rplgo': ['space', 0], 'w:launchpad': ['space', 1, 'Launch pad'], 'w:rockets': ['space', 2, 'Rocket yard'], 'w:starfleet': ['space', 3, 'Star Fleet base'], 'w:saucer': ['space', 4], 'jfv-tessroom': ['space', 5],
     'w:founders': ['exh', 0, 'Founders Hall'], 'w:hangar': ['exh', 1, 'Drone Hangar (H18)'],
@@ -158,8 +162,9 @@
   VERS.forEach(([k], i) => { if (k !== 'mirrors') PV['jfv-v-' + k] = ['vers', i + 2]; });
   EXH.forEach(([k], i) => { PV['jfv-x-' + k] = ['exh', i + 2]; });
   BOS.forEach(([k], i) => { PV['jfv-b-' + k] = ['bos', i + 1]; });
+  LDN.forEach(([k], i) => { PV['jfv-l-' + k] = ['ldn', i + 1]; });
   const DROPV = {'w:pond': 1, 'jfv-worldrooms': 1, 'jfv-rplpad': 1, 'jfv-bhall': 1, 'jfv-bvault': 1, 'jfv-bterrace': 1};
-  const SECV = SECS.map(s => s[0]).concat('vers', 'bos'), TABOF = k => SECV.includes(k) ? 'go' : k;
+  const SECV = SECS.map(s => s[0]).concat('vers', 'bos', 'ldn'), TABOF = k => SECV.includes(k) ? 'go' : k;
   const COLS = 4, BW = 1.3, BH = 0.26, DX = 1.4, DY = 0.31, TXW = 2.0;
   let tabVR = 'go', secVR = 'pond';
   function keyOf(e) { if (e.id) return e.id; const d = e.dataset || {};
@@ -185,6 +190,9 @@
     if (BOS.length) { mkBtn(bar, 'jfv-bos-open', 'Boston & area  >', '#9fe3ff', () => { secVR = 'bos'; layoutVR(); });
       mkBtn(bar, 'jfv-bos-back', '<  Earth places', '#c9a24a', () => { secVR = 'earth'; layoutVR(); });
       BOS.forEach(([k, l]) => mkBtn(bar, 'jfv-b-' + k, l, '#9fe3ff', go('bos-' + k))); }
+    if (LDN.length) { mkBtn(bar, 'jfv-ldn-open', 'London  >', '#ffc6a8', () => { secVR = 'ldn'; layoutVR(); });
+      mkBtn(bar, 'jfv-ldn-back', '<  Earth places', '#c9a24a', () => { secVR = 'earth'; layoutVR(); });
+      LDN.forEach(([k, l]) => mkBtn(bar, 'jfv-l-' + k, l, '#ffc6a8', go('ldn-' + k))); }
     EXH.forEach(([k, l]) => mkBtn(bar, 'jfv-x-' + k, l, '#FFD700', go(k)));
     mkBtn(bar, 'jfv-dia', 'DIA Papers (37)', '#FFD700', dia);
     if (fpc() && !document.getElementById('jfv-fpc-come')) {
@@ -215,7 +223,7 @@
       if (e.tagName === 'A-PLANE') { e.setAttribute('width', BW); e.setAttribute('height', BH); const tx = e.querySelector('a-text'); if (tx) { tx.setAttribute('width', TXW); const r = PV[k]; if (r && r[2]) tx.setAttribute('value', r[2]); } }
       else if (e.tagName === 'A-TEXT') e.setAttribute('width', TXW); });
     TABS.forEach(([k]) => { const p = document.getElementById('jfv-tab-' + k); if (p) p.setAttribute('material', 'shader:flat;color:' + (k === tabVR ? '#ffffff' : '#c9a24a')); });
-    const curSec = secVR === 'vers' || secVR === 'bos' ? 'earth' : secVR;
+    const curSec = secVR === 'vers' || secVR === 'bos' || secVR === 'ldn' ? 'earth' : secVR;
     SECS.forEach(([k]) => { const p = document.getElementById('jfv-sec-' + k); if (!p) return; const on = tabVR === 'go'; p.setAttribute('visible', on); if (p.object3D) p.object3D.visible = on;
       p.setAttribute('material', 'shader:flat;color:' + (k === curSec ? '#ffe9a8' : '#8a7440')); });
     const h = document.getElementById('jfv-hint'); if (h) { h.setAttribute('value', !list.length ? 'Nothing here yet.  Left stick or Y hides the menu.' : 'Left stick or Y hides the menu.');
