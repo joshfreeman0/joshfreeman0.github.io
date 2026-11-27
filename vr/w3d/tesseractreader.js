@@ -9,7 +9,7 @@
   'use strict';
   const SITE = 'https://tesseractprogram.pages.dev/';
   const SECTIONS = [['home', 'Home', ''], ['dirds', 'DIRDs', 'dirds/'], ['research', 'Research', 'research/'], ['aawsap', 'AAWSAP', 'aawsap/'],
-    ['construction', 'Construction', 'construction/'], ['claims', 'Claims', 'claims/'], ['episodes', 'Episodes', 'episodes/'], ['host', 'Hosts', 'host/']];
+    ['construction', 'Construction', 'construction/'], ['claims', 'Claims', 'claims/'], ['episodes', 'Episodes', 'episodes/'], ['host', 'Hosts', 'host/'], ['starfleet', 'Star Fleet', 'star-fleet/']];
   const FALLBACK = {
     home: ['Tesseract Program', 'A podcast and research site about UAP, advanced propulsion and the people who study them. Episodes, research notes, the DIRDs papers, AAWSAP history and claim reviews.'],
     dirds: ['The DIRDs', 'Defense Intelligence Reference Documents: 37 released papers written for AAWSAP on propulsion, power, materials, the far edge of physics and the human side of future flight.'],
@@ -18,7 +18,8 @@
     construction: ['Construction', 'Notes on building and engineering topics discussed on the program.'],
     claims: ['Claims', 'Claims made in public about UAP and advanced technology, with what supports or undercuts each one.'],
     episodes: ['Episodes', 'All episodes of the Tesseract Program, with guests and short summaries.'],
-    host: ['Hosts', 'The people behind the Tesseract Program.']
+    host: ['Hosts', 'The people behind the Tesseract Program.'],
+    starfleet: ['Department of the Star Fleet', 'The Department of the Star Fleet is a department of the Tesseract Program. It works on better ways for people to travel, on Earth and to Mars, and is building the Raynham Ground Station.']
   };
   const cache = {};
   function textOf(el) { const BL = /^(DIV|P|H[1-6]|SMALL|TIME|SPAN|STRONG|EM|B)$/;
@@ -65,7 +66,7 @@
     e.object3D.add(m);
     const back = document.createElement('a-plane'); back.className = 'btn'; back.dataset.blocker = '1'; back.setAttribute('width', W + 0.1); back.setAttribute('height', H + 0.42); back.setAttribute('position', '0 0.02 -0.01');
     back.setAttribute('material', 'shader:flat;color:#0b1d26;side:double'); e.appendChild(back);
-    SECTIONS.forEach(([id, label], i) => { const p = btn(e, label, ((i - 3.5) * 0.235).toFixed(3), (H / 2 + 0.1).toFixed(3), 0.225, 0.12, '#c9a24a', () => show(id), 1.0); p.dataset.sec = id; });
+    SECTIONS.forEach(([id, label], i) => { const p = btn(e, label, ((i - (SECTIONS.length - 1) / 2) * 0.208).toFixed(3), (H / 2 + 0.1).toFixed(3), 0.2, 0.12, '#c9a24a', () => show(id), 1.0); p.dataset.sec = id; });
     const by = -(H / 2 + 0.09);
     btn(e, '< Prev page', -0.62, by, 0.42, 0.12, '#FFD700', () => { if (S.page > 0) { S.page--; draw(); } }, 1.1);
     btn(e, 'Next page >', 0.12, by, 0.42, 0.12, '#FFD700', () => { if (S.page < S.pages.length - 1) { S.page++; draw(); } }, 1.1);
