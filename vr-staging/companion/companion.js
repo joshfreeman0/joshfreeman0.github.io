@@ -3,7 +3,7 @@
    Replies come from an LLM through a server-side proxy (Cloudflare Worker; the OpenRouter key never reaches the browser).
    See README.md next to this file. */
 const HERE = new URL('./', import.meta.url).href;
-export const VERSION = '1.2.0';
+export const VERSION = '1.2.1';
 export const DEFAULT_PROXY = 'https://fp-companion.tesseractprogram.workers.dev/chat';
 export const WORLDS = {
   earth: 'Earth, Fowling Pond: a restored pond in Raynham, Massachusetts, on real terrain. Above it stands an Egyptian-style concept bank compound (terrace pavilion, banking hall, vault, Josh\'s office, conservatory, sphinxes and temple gate). Around it: a pyramid park at Route 24 and I-495, a houseboat, the Pharos lighthouse, King\'s Pond and the Forge River, Vesta\'s house, a zoo, and a launch pad in Bridgewater with a rocket to Mars. Flying saucers visit other cities.',
@@ -12,7 +12,7 @@ export const WORLDS = {
 const MAX_KEEP = 40, SEND = 16;
 const FAMILY = r => r === 'wife' || r === 'child';
 // family placeholder near the Fowling Pond terrace, used only when neither roster `home`, api.setHome() nor window.FP_HOME gives a spot
-export const FAMILY_PLACEHOLDER = {wife: {x: 844.5, z: -381.5, yaw: 200}, kids: [{x: 840.5, z: -382.5, yaw: 150}, {x: 841.5, z: -376.5, yaw: 120}, {x: 845.5, z: -377.0, yaw: 230}], play: {x: 842.0, z: -379.5, r: 2.5}};
+export const FAMILY_PLACEHOLDER = {wife: {x: 844.5, z: -381.5, yaw: 200}, kids: [{x: 840.5, z: -382.5, yaw: 150}, {x: 841.5, z: -376.5, yaw: 120}], play: {x: 842.0, z: -379.5, r: 2.5}};
 
 /* storage adapter: anything with async-or-sync get(key) / set(key, value). Swap for a shared accounts backend later. */
 export const localStore = {
@@ -149,7 +149,7 @@ class Companion {
     if (prevPos) this.holder.position.copy(prevPos); else if (this.o.spawn) { const s = this.o.spawn; this.placeWorld(s.x, s.y, s.z, s.yaw); }
     this.sub.sprite.position.set(0, (this.modelH || c.height || 1.7) + 0.32, 0); this.fitHit();
     if (this.ui) this.ui.sel.value = c.id, this.ui.btn.textContent = 'Talk to ' + c.name;
-    if (!this.resident) { this.emit('pick', {name: c.name, role: c.role}); this.syncFamily(); }
+    if (!this.resident) { this.emit('pick', {name: c.name, role: c.role}); if (this.o.family !== false) this.syncFamily(); }
     if (!first && !this.hist.length) this.subtitle(c.name);
   }
   // per-character look: roster `texture` (replaces the main body/clothing texture) and `tint` (recolours clothing, skin kept)
