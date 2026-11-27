@@ -28,14 +28,15 @@ const q = location.search, forced = /[?&]realearth=1/.test(q) ? true : /[?&]real
 function pref() { if (forced !== null) return forced; const v = localStorage.getItem(PREF); return v ? v === 'on' : !LITE; }
 const RE = W3D.realEarth = {on: pref(), ready: false, tiles: null, anchor: 'home', count: dayCount, setOn, toggle: () => setOn(!RE.on), stats: () => stats()};
 RE.clipOurs = m => clipMat(m, 2);   // late-built layers of ours (home3d houses) clip to the cutouts too
+RE.rebuildMask = () => { if (clipU.jfMask.value && W3D.water) { const o = clipU.jfMask.value; buildMask(); if (o !== clipU.jfMask.value) o.dispose(); } };   // after a late site adds a W3D.maskHooks entry
 
 function today() { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
 function dayLog() { let o = null; try { o = JSON.parse(localStorage.getItem(LS) || 'null'); } catch (e) {} if (!o || o.day !== today()) o = {day: today(), n: 0, log: []}; return o; }
 function dayCount() { return dayLog().n; }
 function bump() { const o = dayLog(); o.n++; o.log.push(new Date().toTimeString().slice(0, 8)); localStorage.setItem(LS, JSON.stringify(o)); return o.n; }
 
-/* ---------- cutout mask (local frame, +-12288 m) ---------- */
-const MR = 12288, MN = LITE ? 1024 : 2048;
+/* ---------- cutout mask (local frame, +-13312 m; was 12288 until Nov 27 - Versailles town reaches x ~12.9 km) ---------- */
+const MR = 13312, MN = LITE ? 1024 : 2048;
 const clipU = W3D.clipU = {jfNi: {value: 0}, jfOn: {value: 0}, jfMask: {value: null}, jfMR: {value: MR}, jfRect: {value: [new THREE.Vector4(0, 0, -1, 0), new THREE.Vector4(0, 0, -1, 0), new THREE.Vector4(0, 0, -1, 0), new THREE.Vector4(0, 0, -1, 0)]}};
 function buildMask() {
   const c = document.createElement('canvas'); c.width = c.height = MN; const g = c.getContext('2d'), s = MN / (2 * MR);
@@ -53,6 +54,7 @@ function buildMask() {
   if (wj.zoo) { const a = P(wj.zoo.x, wj.zoo.z); g.beginPath(); g.arc(a[0], a[1], (wj.zoo.r + 40) * s, 0, 7); g.fill(); }
   if (wj.footbridge) line([wj.footbridge.a, wj.footbridge.b], 40);
   rect(820, -440, 1010, -280, 15);                                                                 // temple / bank / Vesta court / office
+  (W3D.maskHooks || []).forEach(f => { try { f({rect, line, poly}); } catch (e) {} });                 // late sites (verspark.js: Versailles gardens + town)
   // every named hand-built site group in the world root (its bounding box + margin)
   const SITE = /pharos|bank|temple|vesta|sphinx|pyramid|office|showcase|zoo|lift|footbridge|weir|bridge-|kings|beach|shore|saucer|bridgewater|launch|campus|pad/i, bx = new THREE.Box3();
   (W3D.root ? W3D.root.children : []).forEach(o => { if (!SITE.test(o.name || '') || /patch/.test(o.name)) return; bx.setFromObject(o); if (bx.isEmpty()) return;

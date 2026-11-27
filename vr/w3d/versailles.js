@@ -130,7 +130,7 @@ function build() {
   }
   /* terrace edge: balustraded stone retaining walls down to the ground (terrain is 4-20 m) */
   const D = -16, Lp = [[S0, -P1], [S1, -P1], [S1, P1], [S0, P1]];
-  for (let k = 0; k < 4; k++) { const a = Lp[k], b = Lp[(k + 1) % 4]; vwall(St, a[0], a[1], b[0], b[1], D, 0.0, 3); vwall(St, a[0], a[1], b[0], b[1], 0.0, 1.0, 1); }
+  for (let k = 0; k < 4; k++) { const a = Lp[k], b = Lp[(k + 1) % 4]; vwall(St, a[0], a[1], b[0], b[1], D, 0.0, 3); if (k === 1) { vwall(St, S1, -P1, S1, -42, 0.0, 1.0, 1); vwall(St, S1, 42, S1, P1, 0.0, 1.0, 1); } else vwall(St, a[0], a[1], b[0], b[1], 0.0, 1.0, 1); }   // phase 2: opening at the head of the Latona steps
   /* gilded Royal Gate between the Cour d'Honneur and the Cour Royale, outer gate at the Place d'Armes */
   grp = new THREE.Group(); grp.name = 'versailles'; grp.position.set(GX, Y0, GZ); grp.rotation.y = ROTY;
   for (const [B, m, n] of [[F, mFac, 'facade'], [Br, mBrick, 'brick'], [R, mSlate, 'slate'], [T, mLead, 'roofs-flat'], [Pv, mPave, 'paving'], [Mb, mMarble, 'marble-court'], [Pa, mPar, 'parterre'], [Gr, mGrav, 'gravel'], [St, mStone, 'stone'], [Wa, mWater, 'pools']])
@@ -167,9 +167,9 @@ setInterval(() => {
   near.visible = vis && d < NEAR;
 }, 800);
 /* ?spot=versailles / Go to: on the Parterre d'Eau between the pools, facing the garden front (ESE, 111.84 deg) */
-function go() { const [x, z] = toW(150, 0); const yaw = Math.atan2(-(-UX), -(-UZ)) * 180 / Math.PI; const t = () => W3D.teleportTo(x, Y0 + 0.12, z, yaw); t(); setTimeout(t, 1500);
+function go() { const [x, z] = toW(150, 0); const yaw = Math.atan2(-(-UX), -(-UZ)) * 180 / Math.PI; const t = () => !W3D.inRoom && W3D.teleportTo(x, Y0 + 0.12, z, yaw); t(); setTimeout(t, 1500);
   setTimeout(() => { t(); if (window.JFVR && JFVR.hud) JFVR.hud('Ch\u00e2teau de Versailles - garden front (phase 1)'); }, 4000); }
-function goCourt() { const [x, z] = toW(-330, 0); const yaw = Math.atan2(-UX, -UZ) * 180 / Math.PI; W3D.teleportTo(x, Y0 + 0.12, z, yaw); setTimeout(() => W3D.teleportTo(x, Y0 + 0.12, z, yaw), 1500); }
+function goCourt() { const [x, z] = toW(-330, 0); const yaw = Math.atan2(-UX, -UZ) * 180 / Math.PI; W3D.teleportTo(x, Y0 + 0.12, z, yaw); setTimeout(() => { if (!W3D.inRoom) W3D.teleportTo(x, Y0 + 0.12, z, yaw); }, 1500); }
 V.go = go; V.goCourt = goCourt; V.stats = () => ({built, visible: grp && grp.visible, Y0, tris: grp ? (() => { let t = 0; grp.traverse(o => { if (o.isMesh && o.geometry.index) t += o.geometry.index.count / 3 * (o.isInstancedMesh ? o.count : 1); }); return t; })() : 0});
 (function reg() { if (!window.W3D || !W3D.spots) return setTimeout(reg, 300); W3D.spots.versailles = go; W3D.spots['versailles-court'] = goCourt; })();
 })();

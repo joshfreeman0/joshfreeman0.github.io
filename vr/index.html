@@ -82,7 +82,8 @@ window.JFVR_LITE = (function () {
 <script src="w3d/exhibits/foresight.js?v=1"></script>
 <script src="w3d/exhibits/spacecampus.js?v=1"></script>
 <script src="w3d/t30site.js?v=1"></script>
-<script src="w3d/versailles.js?v=1"></script>
+<script src="w3d/versailles.js?v=2"></script>
+<script src="w3d/verspark.js?v=1"></script>
 <script src="w3d/prison.js?v=1"></script>
 <script src="w3d/invite.js?v=2"></script>
 <script src="w3d/clickfix.js?v=1"></script>
@@ -94,7 +95,7 @@ window.JFVR_LITE = (function () {
 <script src="w3d/vrpointer.js?v=1"></script>
 <script src="w3d/tiles3d.min.js?v=1"></script>
 <script src="w3d/gk.js?v=1"></script>
-<script src="w3d/realearth.js?v=12"></script>
+<script src="w3d/realearth.js?v=13"></script>
 <script src="w3d/walker.js?v=1"></script>
 <script src="w3d/boats.js?v=1"></script>
 <script src="w3d/houseboat.js?v=2"></script>
@@ -147,6 +148,7 @@ body{margin:0;font-family:system-ui,sans-serif}
 #ui .pane.cur{display:block}
 #ui .grp{margin:2px 0 6px}
 #ui .sec{display:block;font-size:13px;opacity:.85;margin:4px 6px 2px;color:#ffe9a8;text-transform:uppercase;letter-spacing:.04em}
+#ui .vsub a{color:#ffd700;text-decoration:none}
 #ui a.lnk{display:inline-block;font-size:15px;margin:3px;padding:8px 12px;border-radius:8px;color:#111;text-decoration:none}
 @media (max-width:600px){#ui #tabbar button.tab{font-size:15px;padding:9px 10px}#ui button{font-size:14px;padding:8px 10px}}
 </style></head><body>
@@ -191,6 +193,7 @@ body{margin:0;font-family:system-ui,sans-serif}
     <a-plane class="btn" data-w="founders" position="-1.9 -2.4 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Founders Hall" align="center" color="#111" width="2.4"></a-text></a-plane>
     <a-plane class="btn" data-w="hangar" position="0 -2.8 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Drone Hangar + labs" align="center" color="#111" width="2.4"></a-text></a-plane>
     <a-plane class="btn" data-w="versailles" position="1.9 -2.4 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Versailles" align="center" color="#111" width="2.4"></a-text></a-plane>
+    <a-plane class="btn" data-w="versailles-mirrors" position="1.9 -3.2 0" width="1.6" height="0.26" material="shader:flat;color:#FFD700"><a-text value="Hall of Mirrors" align="center" color="#111" width="2.4"></a-text></a-plane>
     <a-plane class="btn" data-w="home" position="0 -1.2 0" width="1.6" height="0.26" material="shader:flat;color:#9ffcff"><a-text value="Home: Fowling Pond" align="center" color="#111" width="2.4"></a-text></a-plane>
     <a-plane class="btn" data-invite="world" position="-1.7 -1.2 0" width="0.8" height="0.26" material="shader:flat;color:#9ffcff"><a-text value="Invite" align="center" color="#111" width="1.9"></a-text></a-plane>
     <a-plane class="btn" fly-toggle position="2.1 -0.4 0" width="0.8" height="0.26" material="shader:flat;color:#FFD700"><a-text id="flylabel" value="Fly: OFF" align="center" color="#111" width="1.9"></a-text></a-plane>
@@ -226,6 +229,7 @@ body{margin:0;font-family:system-ui,sans-serif}
   <button data-w="bridgewater">Corporate Base (Bridgewater)</button>
   <button data-w="aldensquare">Alden Square viewpoint</button>
   <button data-w="versailles">Ch&acirc;teau de Versailles</button>
+  <span class="vsub" style="display:block;margin:2px 0 6px 10px;font-size:12px">Versailles: <a href="#" data-w="versailles-gardens">Gardens</a> &middot; <a href="#" data-w="versailles-canal">Grand Canal</a> &middot; <a href="#" data-w="versailles-trianon">Trianon</a> &middot; <a href="#" data-w="versailles-town">Town</a><br>Inside: <a href="#" data-w="versailles-mirrors">Hall of Mirrors</a> &middot; <a href="#" data-w="versailles-bedroom">King's bedroom</a> &middot; <a href="#" data-w="versailles-apartments">State Apartments</a> &middot; <a href="#" data-w="versailles-chapel">Chapel</a> &middot; <a href="#" data-w="versailles-opera">Opera</a> &middot; <a href="#" data-w="versailles-jeudepaume">Jeu de Paume</a></span>
   <button data-w="rockets">Rocket yard (18)</button>
   <button data-w="walker">Walker Memorial (Boston)</button></div>
   </div>
@@ -279,7 +283,7 @@ function show(t){ // 360 concept panorama, in this same page
   mark('[data-t]', t); bringMenu();
 }
 function wire(el){
-  el.addEventListener('click', () => {
+  el.addEventListener('click', ev => { if (el.tagName === 'A') ev.preventDefault();
     if (el.dataset.w) goWorld(el.dataset.w);
     else if (el.dataset.t) show(el.dataset.t);
     else if (el.dataset.back) goWorld('terrace');
@@ -287,7 +291,7 @@ function wire(el){
     else if (el.dataset.reload) { const u = new URL(location.href); u.searchParams.set('r', Date.now()); location.replace(u.toString()); }
   });
 }
-document.querySelectorAll('#ui button, #vrbar .btn').forEach(wire);
+document.querySelectorAll('#ui button, #ui .vsub a, #vrbar .btn').forEach(wire);
 document.querySelectorAll('.speed-label').forEach(e => e.tagName === 'A-TEXT' ? e.setAttribute('value', JFVR.speedLabel()) : (e.textContent = JFVR.speedLabel()));
 scn.addEventListener('enter-vr', () => { setTimeout(() => JFVR.hud && JFVR.hud('Press the left stick or Y for the menu'), 1500); }); // menu stays hidden until asked for
 scn.addEventListener('exit-vr', () => bar.setAttribute('visible', false));
@@ -312,7 +316,7 @@ setTimeout(() => { if (!window.W3D_READY) window.JFVR_fail('The 3D world is taki
    and, with no spot, lands at the Bridgewater launch pad beside the rocket */
 const QS = new URLSearchParams(location.search), FROM_MARS = /^redplanet/i.test(QS.get('from') || '');
 const SPOT_ALIAS = {pond: 'marker', temple: 'temple', bank: 'hall', vesta: 'vesta', saucer: 'saucer', launchpad: 'launchpad', starfleet: 'starfleet', 'star-fleet': 'starfleet', founders: 'founders', 'founders-hall': 'founders', hangar: 'hangar', drone: 'hangar', 'drone-hangar': 'hangar', h18: 'hangar', phreaklab: 'phreaklab', lab: 'phreaklab', phreak: 'phreaklab', crunch: 'phreaklab', foresight: 'foresight', planet: 'planet', starmind: 'starmind', terafab: 'terafab', tesla: 'tesla', boring: 'boring', loop: 'boring', solarcity: 'solarcity', 'solar-city': 'solarcity', campus: 'campus', 'launch-pad': 'launchpad', pad: 'launchpad',
-  terrace: 'terrace', hall: 'hall', vault: 'vault', office: 'office', conservatory: 'conservatory', propulsion: 'propulsion', ufo: 'ufo', showcase: 'showcase', pyramid: 'pyramid', marker: 'marker', home: 'home', walker: 'walker', 'walker-memorial': 'walker', pharos: 'pharos', lighthouse: 'pharos', houseboat: 'houseboat', 'house-boat': 'houseboat', residence: 'residence', guest: 'guest', tower: 'tower', bridgewater: 'bridgewater', base: 'bridgewater', aldensquare: 'aldensquare', alden: 'aldensquare', 'alden-square': 'aldensquare', rockets: 'rockets', versailles: 'versailles', chateau: 'versailles', 'versailles-court': 'versailles-court'};
+  terrace: 'terrace', hall: 'hall', vault: 'vault', office: 'office', conservatory: 'conservatory', propulsion: 'propulsion', ufo: 'ufo', showcase: 'showcase', pyramid: 'pyramid', marker: 'marker', home: 'home', walker: 'walker', 'walker-memorial': 'walker', pharos: 'pharos', lighthouse: 'pharos', houseboat: 'houseboat', 'house-boat': 'houseboat', residence: 'residence', guest: 'guest', tower: 'tower', bridgewater: 'bridgewater', base: 'bridgewater', aldensquare: 'aldensquare', alden: 'aldensquare', 'alden-square': 'aldensquare', rockets: 'rockets', versailles: 'versailles', chateau: 'versailles', 'versailles-court': 'versailles-court', 'versailles-canal': 'versailles-canal', 'versailles-gardens': 'versailles-gardens', 'versailles-trianon': 'versailles-trianon', 'versailles-town': 'versailles-town', 'versailles-mirrors': 'versailles-mirrors', 'hall-of-mirrors': 'versailles-mirrors', 'versailles-bedroom': 'versailles-bedroom', 'versailles-apartments': 'versailles-apartments', 'versailles-queen': 'versailles-queen', 'versailles-chapel': 'versailles-chapel', 'versailles-opera': 'versailles-opera', 'versailles-jeudepaume': 'versailles-jeudepaume', 'jeu-de-paume': 'versailles-jeudepaume'};
 function arrivalSpot(){ const sp = (QS.get('spot') || '').toLowerCase(), k = SPOT_ALIAS[sp];
   if (!W3D.spots.temple) W3D.spots.temple = () => W3D.teleportTo(866, undefined, -380, -90);   // between the sphinxes, facing the gate
   if (FROM_MARS && (!k || k === 'launchpad') && W3D.spots.padland) return 'padland';   // back from Mars: on the pad deck beside the rocket
@@ -357,7 +361,7 @@ document.getElementById('helpbtn').onclick=()=>ui.classList.toggle('help');})();
 <script src="w3d/tesseractlink.js?v=3"></script>
 <script src="w3d/tesseractgate.js?v=1"></script>
 <script src="w3d/ballroomgate.js?v=1"></script>
-<script src="w3d/menutabs.js?v=8"></script>
+<script src="w3d/menutabs.js?v=9"></script>
 <script src="w3d/worldrooms.js?v=1"></script>
 <script>/* ?nomp=1 (automated tests) skips joining the public voice room */ if (!/[?&]nomp=1/.test(location.search)) { const s = document.createElement('script'); s.src = 'mp.js?v=8'; document.body.appendChild(s); }</script>
 </body></html>
