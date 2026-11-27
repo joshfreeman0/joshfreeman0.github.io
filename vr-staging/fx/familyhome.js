@@ -105,7 +105,7 @@
 
     /* ---------- interior: living room (west), kitchen + dining (east) ---------- */
     inn.box(HW * 2 - T, 0.04, HD * 2 - T, 0, FY + 0.02, 0, COL.wood);
-    inn.box(HW * 2 - T, 0.06, HD * 2 - T, 0, FY + WH - 0.03, 0, COL.cream);
+    glow.box(HW * 2 - T, 0.06, HD * 2 - T, 0, FY + WH - 0.03, 0, '#d8ccb4');   // ceiling: unlit soft cream (a lit ceiling only sees the dark ground light)
     inn.box(3.4, 0.02, 2.4, -3.0, FY + 0.05, 0.6, COL.rug);
     inn.box(2.5, 0.42, 0.9, -3.0, FY + 0.25, 2.8, COL.sofa); inn.box(2.5, 0.55, 0.22, -3.0, FY + 0.7, 3.15, COL.sofa); for (const s of [-1, 1]) inn.box(0.22, 0.6, 0.9, -3.0 + s * 1.2, FY + 0.32, 2.8, COL.sofa);
     inn.box(1.2, 0.08, 0.6, -3.0, FY + 0.42, 1.0, COL.wood); for (const [x, z] of [[-3.5, 0.8], [-2.5, 0.8], [-3.5, 1.2], [-2.5, 1.2]]) inn.box(0.05, 0.4, 0.05, x, FY + 0.2, z, COL.dark);
