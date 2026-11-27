@@ -3,7 +3,7 @@
    Replies come from an LLM through a server-side proxy (Cloudflare Worker; the OpenRouter key never reaches the browser).
    See README.md next to this file. */
 const HERE = new URL('./', import.meta.url).href;
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 export const DEFAULT_PROXY = 'https://fp-companion.tesseractprogram.workers.dev/chat';
 export const WORLDS = {
   earth: 'Earth, Fowling Pond: a restored pond in Raynham, Massachusetts, on real terrain. Above it stands an Egyptian-style concept bank compound (terrace pavilion, banking hall, vault, Josh\'s office, conservatory, sphinxes and temple gate). Around it: a pyramid park at Route 24 and I-495, a houseboat, the Pharos lighthouse, King\'s Pond and the Forge River, Vesta\'s house, a zoo, and a launch pad in Bridgewater with a rocket to Mars. Flying saucers visit other cities.',
@@ -18,8 +18,9 @@ export const localStore = {
 };
 
 let inst = null;
-export async function mount(sceneEl, rootEl, opts) { if (inst) unmount(); inst = new Companion(sceneEl, rootEl, opts || {}); try { await inst.init(); } catch (e) { const i = inst; inst = null; i.destroy(); throw e; } return inst.api; }
-export function unmount() { if (inst) { inst.destroy(); inst = null; } }
+export async function mount(sceneEl, rootEl, opts) { if (inst) unmount(); const me = inst = new Companion(sceneEl, rootEl, opts || {}); try { await me.init(); } catch (e) { if (inst === me) inst = null; me.destroy(); throw e; }
+  if (inst !== me) return me.api; try { window.FP_COMPANION = me.api; } catch (e) {} return me.api; }   // hosts (e.g. Mars) look for window.FP_COMPANION
+export function unmount() { if (inst) { const i = inst; inst = null; try { if (window.FP_COMPANION && window.FP_COMPANION === i.api) delete window.FP_COMPANION; } catch (e) { window.FP_COMPANION = undefined; } i.destroy(); } }
 export function current() { return inst ? inst.api : null; }
 
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -83,6 +84,7 @@ class Companion {
     if (this.dead) return; const m = g.scene; m.name = 'fpc-' + c.id;
     m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; o.frustumCulled = false;
       for (const mt of [].concat(o.material)) { if (mt.map) mt.map.anisotropy = 4; if (mt.alphaTest > 0) mt.alphaToCoverage = !!(this.o.quest); mt.envMapIntensity = 0.6; } } });
+    await this.applyLook(m, c); if (this.dead) return;
     this.fit(m, c); this.holder.add(m); this.model = m; this.rig(c);
     this.hist = (await (this.store.get && this.store.get(this.key()))) || [];
     if (this.store.set) this.store.set('fpc:v1:' + this.playerId + ':pick', c.id);
@@ -91,6 +93,24 @@ class Companion {
     if (this.ui) this.ui.sel.value = c.id, this.ui.btn.textContent = 'Talk to ' + c.name;
     this.emit('pick', {name: c.name});
     if (!first && !this.hist.length) this.subtitle(c.name);
+  }
+  // per-character look: roster `texture` (replaces the main body/clothing texture) and `tint` (recolours clothing, skin kept)
+  async applyLook(m, c) {
+    if (!c.tint && !c.texture) return; const T = this.T, mats = [];
+    m.traverse(o => { if (o.isMesh) for (const mt of [].concat(o.material)) if (!mats.includes(mt)) mats.push(mt); });
+    const main = mats.find(mt => /body/i.test(mt.name || '')) || mats.filter(mt => mt.map && !(mt.alphaTest > 0) && mt.transparent !== true)[0] || mats[0]; if (!main) return;
+    if (c.texture) { try { const old = main.map, tx = await new T.TextureLoader().loadAsync(new URL(c.texture, this.rosterBase).href);
+      tx.flipY = old ? old.flipY : false; tx.colorSpace = T.SRGBColorSpace || tx.colorSpace; if (old) { tx.wrapS = old.wrapS; tx.wrapT = old.wrapT; tx.channel = old.channel; } tx.anisotropy = 4;
+      main.map = tx; main.needsUpdate = true; if (old) old.dispose(); } catch (e) { console.warn('[fpc] texture', c.texture, e); } }
+    if (c.tint) { const col = new T.Color(c.tint), k = Math.max(0, Math.min(1, c.tintStrength === undefined ? 0.75 : +c.tintStrength));
+      const sep = !!main.map && c.tintSkin !== true;   // skin-tone pixels keep their colour (hands, arms, neck on the body texture)
+      main.onBeforeCompile = sh => { sh.uniforms.fpcTint = {value: col}; sh.uniforms.fpcTintK = {value: k};
+        sh.fragmentShader = 'uniform vec3 fpcTint; uniform float fpcTintK;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        { vec3 c0 = diffuseColor.rgb; float l = dot(c0, vec3(0.299, 0.587, 0.114));
+          float skin = ${sep ? 'smoothstep(0.02, 0.10, c0.r - c0.g) * smoothstep(0.0, 0.05, c0.g - c0.b) * smoothstep(0.03, 0.12, l) * (1.0 - smoothstep(0.55, 0.8, (c0.r - c0.b) / max(c0.r, 1e-3) - 0.25))' : '0.0'};
+          vec3 rc = clamp(fpcTint * (l * 1.8 + 0.04), 0.0, 1.0);
+          diffuseColor.rgb = mix(c0, rc, fpcTintK * (1.0 - skin)); }`); };
+      main.customProgramCacheKey = () => 'fpctint' + (sep ? 's' : '') + col.getHexString() + k; main.needsUpdate = true; }
   }
   key() { return 'fpc:v1:' + this.playerId + ':' + this.ch.id; }
   save() { if (this.store.set) this.store.set(this.key(), this.hist.slice(-MAX_KEEP)); }
@@ -249,8 +269,16 @@ class Companion {
   // ---------- passphrase ----------
   pass() { if (this.o.passphrase) return this.o.passphrase; try { const u = new URLSearchParams(location.search).get('fppass'); if (u) this.setPass(u); return localStorage.getItem('fpc.pass') || ''; } catch (e) { return ''; } }
   setPass(p) { try { localStorage.setItem('fpc.pass', String(p || '').trim().toLowerCase()); } catch (e) {} }
-  needPass() { if (!this.inXR && this.ui) { this.ui.el.classList.add('open'); this.subtitle('Enter the companion passphrase in the box (bottom left), then talk to me again.', ' ', 7000); }
-    else this.subtitle('I need the passphrase first. Take off the headset and enter it on the page (bottom left).', ' ', 7000); this.emit('error', {error: 'passphrase'}); }
+  needPass(reason) { reason = reason || 'missing'; this.emit('error', {error: 'passphrase', reason});
+    if (typeof this.o.onNeedPass === 'function') {   // host shows its own prompt (Mars: in-world VR keyboard)
+      const self = this; let used = false;
+      try { this.o.onNeedPass({reason, character: this.ch && {id: this.ch.id, name: this.ch.name},
+        submit(pass, retryText) { if (used || self.dead) return false; used = true; pass = String(pass || '').trim(); if (!pass) return false; self.setPass(pass); if (retryText) self.send(String(retryText)); return true; },
+        cancel() { used = true; }}); } catch (e) { console.warn('[fpc] onNeedPass', e); }
+      return; }
+    const txt = this.o.passPromptText;
+    if (!this.inXR && this.ui) { this.ui.el.classList.add('open'); this.subtitle(txt || 'Enter the companion passphrase in the box (bottom left), then talk to me again.', ' ', 7000); }
+    else this.subtitle(txt || 'I need the passphrase first. Take off the headset and enter it on the page (bottom left).', ' ', 7000); }
 
   // ---------- listening ----------
   async listen(hold) {
@@ -293,7 +321,7 @@ class Companion {
     } catch (e) { res = {status: 0, reply: ''}; }
     if (this.dead || this.ch !== c) return;
     this.state = 'idle';
-    if (res.status === 401) { if (text) this.hist.pop(); try { localStorage.removeItem('fpc.pass'); } catch (e) {} return this.needPass(); }
+    if (res.status === 401) { if (text) this.hist.pop(); try { localStorage.removeItem('fpc.pass'); } catch (e) {} return this.needPass('wrong'); }
     if (res.heard) { this.hist.push({role: 'user', content: res.heard}); this.emit('heard', {text: res.heard}); }
     if (!res.reply) { if (text) this.hist.pop(); this.subtitle(res.error === 'no speech' ? 'I didn\'t catch that.' : 'I can\'t reach my thoughts right now. Try again in a moment.', ' ', 4000); this.emit('error', {error: res.error || res.status}); return; }
     if (res.limited) { this.subtitle(res.reply, ' ', 5000); return; }

@@ -44,8 +44,12 @@ opts | meaning
 `spawn` | `{x, y, z, yaw}` world position. `groundAt(x, z)` floor height. `follow` (default true) + `followDist` (14 m): a `canTravel` companion reappears beside you when you are far away (teleports, rooms, rocket).
 `storage` | adapter `{get(key), set(key, value)}` (sync or async). Default `localStore` (localStorage). Swap in B's shared accounts backend later; keys are `fpc:v1:<playerId>:<characterId>` and `fpc:v1:<playerId>:pick`.
 `passphrase` | optional; otherwise the player enters it once in the 2D panel (stored in localStorage `fpc.pass`), or `?fppass=...` in the URL.
+`onNeedPass(handle)` | optional (v1.1). Called instead of the built-in subtitle when the passphrase is missing (`reason: 'missing'`) or rejected (`reason: 'wrong'`). `handle = {reason, character: {id, name}, submit(pass, retryText?) -> bool, cancel()}`: show your own prompt / VR keyboard, then call `handle.submit(pass)` (stores it; with `retryText` it also sends that line). Each handle works once.
+`passPromptText` | optional (v1.1) string that replaces the built-in passphrase subtitle (used when there is no `onNeedPass`). Earth default unchanged.
 `ui` (true), `hideUiInXR` (true), `voice` (true), `talkRange` (6 m), `quest` | small 2D panel bottom-left; speech output; distance for the controller button.
 `THREE`, `GLTFLoader`, `camera`, `renderer`, `autoTick` | for non-A-Frame hosts.
+
+On mount the api is also published as `window.FP_COMPANION` (v1.1); `unmount()` removes it if it still points at that instance.
 
 api: `list()`, `current()`, `pick(id)`, `talk(text?)` (no text = listen), `listen()`, `say(text)`, `setWorld(world, desc)`, `moveTo(x, y, z, yaw)`, `comeHere()`, `forget()`, `setPassphrase(p)`, `update(dt)`, `unmount()`, `object3D`.
 
@@ -64,6 +68,10 @@ Talking: click/tap her, or the "Talk to ..." button, or hold **B** (right contro
 
 - `avatar`: rigged GLB, relative to the roster file. `rig`: `rocketbox` (Bip01 bones), `mixamo` or `vrm` bone names; the module poses the arms down, breathes, looks at you, turns to face you and moves the jaw while speaking. Avatars from another rig still load and turn to face you.
 - `ageNote`: every character is an adult (21+). `persona` is the character; the proxy always adds the safety rules (warm and friendly, flirty at most, never explicit; adults only; never claims to be human) plus the world name and description.
+- `tint` (v1.1, optional): hex colour such as `"#a8323a"` that recolours the clothing on the main (body) material while skin-tone pixels keep their colour (shading kept). `tintStrength` 0..1 (default 0.75); `tintSkin: true` tints the whole material.
+- `texture` (v1.1, optional): alternate texture URL (relative to the roster) for the main body/clothing material; must use the same UV layout as the avatar's own body texture. `tint` can be combined with it.
+  Example: Mars-only `{"id": "tess", ..., "avatar": "avatars/freya.glb", "tint": "#2f5f9e"}` looks different from Freya. Keep every character adult and clothed.
+  Preview: `demo.html?pick=freya&tint=%23a8323a`.
 - `voice.prefer`: voice-name substrings tried in order; `female` / `male` match any voice with that word.
 
 Default roster: Lila (girlfriend, default pick), Freya, Maya, Nina, Daniel, Marcus. Avatars: Microsoft Rocketbox (MIT License, (c) Microsoft Corporation), converted to GLB with 1024 px textures (~1 MB each, ~10k triangles).

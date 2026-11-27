@@ -13,7 +13,10 @@
   const scene = document.querySelector('a-scene'), root = document.querySelector('#companions');
   const go = async () => {
     const q = new URLSearchParams(location.search);
-    window.fpc = await mount(scene, root, {playerId: 'demo', world: 'earth', pick: q.get('pick') || undefined, spawn: {x: 0, y: 0, z: 0, yaw: 0}, follow: false,
+    // ?pick=freya&tint=%23b03030&texture=URL previews the per-character look options on the picked character
+    let roster; if (q.get('tint') || q.get('texture')) { roster = await fetch('./roster.json').then(r => r.json());
+      const c = roster.characters.find(x => x.id === (q.get('pick') || roster.default)); if (c) { if (q.get('tint')) c.tint = q.get('tint'); if (q.get('texture')) c.texture = q.get('texture'); } }
+    window.fpc = await mount(scene, root, {playerId: 'demo', world: 'earth', roster, pick: q.get('pick') || undefined, spawn: {x: 0, y: 0, z: 0, yaw: 0}, follow: false,
       onEvent: e => console.log('[fpc]', JSON.stringify(e))});
   };
   scene.hasLoaded ? go() : scene.addEventListener('loaded', go);
