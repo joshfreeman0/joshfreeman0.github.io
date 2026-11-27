@@ -12,7 +12,7 @@
   const okUrl = u => typeof u === 'string' && /^\/vr\/rooms\/[\w-]+\.js$/.test(u);
   const CATALOG = {
     mars: {title: 'Red Planet Lounge', module: null, fallbackUrl: '/vr/mars/?spot=pad&from=joshfreeman-vr'},   // module: set when Me ships mountRPL
-    tesseract: {title: 'Tesseract Program', module: null, fallbackUrl: null},                                   // planned, see ROOMS.md
+    tesseract: {title: 'Tesseract room', module: '/vr/rooms/tesseract.js?v=1', fallbackUrl: null},                     // T-21, entered via tesseractgate.js
     stub: {title: 'Test room', module: '/vr/rooms/stub.js?v=1', fallbackUrl: null}
   };
   for (const k of Object.keys(CATALOG)) { const u = QS.get('room_' + k); if (okUrl(u)) CATALOG[k].module = u; }

@@ -74,9 +74,16 @@
     hit.addEventListener('click', openPage); e.appendChild(hit); e.addEventListener('loaded', () => { e.object3D.add(pb); });
     (document.querySelector('a-scene')).appendChild(e); SF.btn = e;
     const hint = panel(3.7, 0.5, [{t: 'Opens in the Tesseract reader - you stay in Fowling Pond', s: 'small'}], {center: true}); hint.position.set(X0 + T + 0.02, fy + 0.85, ZC + 4.3); hint.rotation.y = Math.PI / 2; grp.add(hint);
+    // T-21: walk-in gateway to the Tesseract room (tesseractgate.js / vr/rooms/tesseract.js): a gold frame with a glowing doorway, facing the entrance
+    const GX = X1 - 2.6; for (const s of [-1, 1]) box(0.18, 3.0, 0.18, GX, fy + 1.5, ZC + s * 1.3, gold); box(0.22, 0.22, 2.8, GX, fy + 3.05, ZC, gold);
+    const door = new THREE.Mesh(new THREE.PlaneGeometry(2.42, 2.9), new THREE.MeshBasicMaterial({color: 0x59e1ff, transparent: true, opacity: 0.33, side: THREE.DoubleSide, depthWrite: false})); door.position.set(GX, fy + 1.45, ZC); door.rotation.y = Math.PI / 2; grp.add(door);
+    const gs = panel(2.8, 0.5, [{t: 'TESSERACT ROOM - walk in', s: 'title', fit: true}], {center: true}); gs.position.set(GX + 0.13, fy + 3.45, ZC); gs.rotation.y = Math.PI / 2; grp.add(gs);
+    const ge = document.createElement('a-entity'); ge.id = 'starfleet-gate'; ge.setAttribute('position', GX + ' ' + (y + fy + 1.45) + ' ' + ZC); ge.setAttribute('rotation', '0 90 0');
+    const gh = document.createElement('a-plane'); gh.setAttribute('class', 'btn'); gh.setAttribute('width', 2.4); gh.setAttribute('height', 2.9); gh.setAttribute('material', 'shader:flat;transparent:true;opacity:0;side:double');
+    gh.addEventListener('click', () => { if (window.JFVR_enterTesseract) window.JFVR_enterTesseract(); }); ge.appendChild(gh); (document.querySelector('a-scene')).appendChild(ge); SF.gate = ge; SF.gateX = GX;
     colliders(y); setTimeout(() => document.querySelectorAll('[raycaster]').forEach(r => r.components.raycaster && r.components.raycaster.refreshObjects()), 300);
   }
-  function setVis(v) { if (grp) grp.visible = v; if (SF.btn) { SF.btn.object3D.visible = v; const h = SF.btn.querySelector('a-plane'); if (h) { if (v) h.classList.add('btn'); else h.classList.remove('btn'); } } }
+  function setVis(v) { if (grp) grp.visible = v; if (SF.gate) { SF.gate.object3D.visible = v; const g = SF.gate.querySelector('a-plane'); if (g) { if (v) g.classList.add('btn'); else g.classList.remove('btn'); } } if (SF.btn) { SF.btn.object3D.visible = v; const h = SF.btn.querySelector('a-plane'); if (h) { if (v) h.classList.add('btn'); else h.classList.remove('btn'); } } }
   const _c = new THREE.Vector3();
   setInterval(() => {
     if (!window.W3D_READY || !W3D.root || !W3D.active) { if (grp && grp.visible) setVis(false); return; }
@@ -85,6 +92,10 @@
       if (!grp.visible) setVis(true); }
     else if (d > DROP && grp && grp.visible) setVis(false);
   }, 700);
+  // walking through the Tesseract gateway steps into the room (checked often, but only while the base is shown)
+  setInterval(() => { if (!grp || !grp.visible || !SF.gate || !window.JFVR_enterTesseract || (window.FP_ROOMS && (FP_ROOMS.current || FP_ROOMS.busy))) return;
+    const cam = document.querySelector('a-scene').camera; if (!cam) return; cam.getWorldPosition(_c);
+    if (Math.abs(_c.x - SF.gateX) < 0.45 && Math.abs(_c.z - ZC) < 1.1 && _c.y < gy + 4) window.JFVR_enterTesseract(); }, 150);
   /* ?spot=starfleet and the Go to menu: stand on the front step looking in (west) */
   function go() { if (W3D.spots.launchpad) W3D.spots.launchpad(); const t = () => W3D.teleportTo(X1 + 7, undefined, ZC, 90); t(); setTimeout(t, 1500); setTimeout(() => { t(); if (window.JFVR && JFVR.hud) JFVR.hud('Department of the Star Fleet'); }, 4000); }
   (function reg() { if (!window.W3D || !W3D.spots) return setTimeout(reg, 300); W3D.spots.starfleet = go; })();

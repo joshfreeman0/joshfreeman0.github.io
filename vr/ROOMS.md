@@ -79,7 +79,11 @@ Me exports `mountRPL(sceneEl, rootEntity)` / `unmountRPL()` after the Sat Nov 28
 
 **Test:** `https://joshfreeman.org/vr/?room_mars=/vr/rooms/YOURFILE.js` uses any `/vr/rooms/*.js` file as the Mars room (only that path pattern is accepted). `?room_mars=/vr/rooms/stub.js` is the stub.
 
-## Tesseract room (plan only, not built)
+## Tesseract room (built Nov 27 2026, T-21)
+
+`vr/rooms/tesseract.js`, entered from the walk-in gateway in the Star Fleet base, the "Tesseract room" portal on the bank terrace, the Other worlds tab, `W3D.spots.tesseract`, or `https://joshfreeman.org/vr/?room=tesseract` (also `?spot=tesseract`). Gateways: `vr/w3d/tesseractgate.js`. Inside: Tesseract website bays (DIRDs via the DIA Papers reader, AAWSAP, UnLAB, Roswell/claims via the Tesseract reader), the propulsion lab corner, the multiverse map hub, and the USE Eagle exchange desk (1 Eagle = 10 Fowling Pond dollars, play-money calculator; no ledger writes). Doors home lead to the Star Fleet base or the bank terrace.
+
+### Original plan
 
 The Tesseract site, repo, branding and artwork stay exactly as they are. The room only reads the live public pages (https://tesseractprogram.pages.dev/), the way the in-world reader already does.
 
