@@ -161,9 +161,19 @@ let going = false;
 function goMars() { if (going) return; going = true; window.location.assign(MARS_URL); }
 // Same-page Mars (FP_ROOMS, vr/ROOMS.md): when a Mars room module exists, the rocket lands you in it with no page change at all.
 const marsRoom = () => !!(window.FP_ROOMS && FP_ROOMS.has('mars'));
-function goMarsRoom() { if (going) return; going = true;
-  FP_ROOMS.enter('mars', {via: 'rocket'}).then(ok => { if (ok) going = false; else window.location.assign(MARS_URL); }); }   // fallback: /vr/mars/ hand-off
-W3D.goMars = goMars;
+async function goMarsRoom(via, spot) { if (going) return; const R = window.FP_ROOMS;
+  if (R.current === 'mars' || R.busy) return; going = true;
+  if (R.current) await R.leave({});                                                     // from another room (Tesseract, ballroom ...): step out first
+  const ok = await R.enter('mars', {via: via || 'rocket', spot: spot || 'pad'});
+  if (ok) going = false; else window.location.assign(MARS_URL); }                       // fallback: /vr/mars/ hand-off (same-origin, keeps VR)
+// menus, saucer, Tesseract link: straight into the in-page Mars room when it exists, else the old page hand-off
+W3D.goMars = () => marsRoom() ? goMarsRoom('menu') : goMars();
+// ?room=mars / ?spot=mars (also mars-<RPL spot>, e.g. ?room=mars-bar): land at the launch pad as usual, then go to Mars once the world is ready
+(function () { const QS = new URLSearchParams(location.search), q = (QS.get('room') || QS.get('spot') || '').toLowerCase(), m = /^(mars|rpl|red-planet)(?:-([a-z]+))?$/.exec(q);
+  if (!m) return; (function wait(n) { if (n > 360) return;
+    const ready = window.W3D_READY && W3D.root && window.FP_ROOMS && !FP_ROOMS.busy && !(W3D.arrival && W3D.arrival.active);
+    if (!ready) return setTimeout(() => wait(n + 1), 500);
+    setTimeout(() => { if (marsRoom()) goMarsRoom('link', m[2] || 'pad'); else goMars(); }, 1500); })(0); })();
 
 /* ---------- the flight: built on demand, disposed afterwards ---------- */
 const T = {count: 3, lift: 9, space: 11.5, moon0: 11, moon1: 16, stars: 16.5, end: 18};   // seconds: 3 s shared countdown, then ~15 s Earth half (lift-off, climb, Earth shrinking, Moon flyby, stars only); RPL plays the Mars half
@@ -234,7 +244,7 @@ function startFlight(o) {
   }
   let ending = null;
   function stepEnd() { if (!ending || ending.fin) return; const k = Math.min(1, (performance.now() - ending.t) / 700); fade.material.opacity = Math.max(fade.material.opacity, k); if (k >= 1) endNow(); }
-  function endNow() { if (!ending || ending.fin) return; ending.fin = true; fade.material.opacity = 1; if (!ending.toMars) restore(); else if (marsRoom()) { restore(); goMarsRoom(); } else goMars(); }
+  function endNow() { if (!ending || ending.fin) return; ending.fin = true; fade.material.opacity = 1; if (!ending.toMars) restore(); else if (marsRoom()) { restore(); goMarsRoom('rocket'); } else goMars(); }
   function restore() {
     rig.removeAttribute('w3d-ride'); sc.removeEventListener('bbuttondown', onB); window.removeEventListener('keydown', onKey);
     [bSkip, bCancel].forEach(b => b.parentNode && b.parentNode.removeChild(b)); ov.remove();

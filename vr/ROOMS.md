@@ -59,25 +59,16 @@ Rules for a guest module:
 - **Memory:** keep it to about 150 MB GPU on Quest 3S, much less on lite (iPhone 12).
 - **Clean up everything in `unmount()`:** audio, WebRTC (Trystero) rooms, intervals, DOM you added.
 
-## Red Planet Lounge (Me)
+## Red Planet Lounge (Me), wired in Nov 27 2026 (T-2)
 
-Me exports `mountRPL(sceneEl, rootEntity)` / `unmountRPL()` after the Sat Nov 28 reset, once the RPL wrist menu / XR-exit work is done. Until Me sends the exact entry point, FP depends on nothing inside RPL.
+Mars is an in-page room: `CATALOG.mars.module` = `/vr/rooms/mars.js`, an adapter around Me's `mountRPL` / `unmountRPL` from `https://redplanetlounge.pages.dev/rpl-module.js` (docs: `https://redplanetlounge.pages.dev/README-mount.md`). RPL is Me's: nothing in RPL or its repo is changed from here.
 
-**To wire it up (B):**
-
-1. Set `CATALOG.mars.module` in `fprooms.js` to the module URL. A tiny adapter file in `vr/rooms/mars.js` can import Me's module and call `register('mars', {mount: (s, r, c) => mountRPL(s, r, c), unmount: unmountRPL, env, spawn, ground, blocked})`.
-2. Bump `?v=`. From then on the rocket lands you in Mars with no page change.
-3. The `/vr/mars/` page stays as the fallback, and for anyone who opens it directly.
-
-**What RPL's module needs (Me):**
-
-- Build into the `rootEntity` given (three.js objects under `rootEntity.object3D`), with no renderer, scene or `VRButton`.
-- Its own Return-to-Earth shuttle calls `ctx.leave({arrive: true})`, or `window.FP_ROOMS.leave({arrive: true})`, instead of `location.href`.
-- Its Mars arrival ride (journey) starts in `mount()`, since `opts.via === 'rocket'`. The Earth half has already played.
-- Ground and walls go through `ground()` / `blocked()` (FP walks the rig), or tell B if RPL needs its own player controller.
-- The standalone redplanetlounge.pages.dev site keeps working unchanged.
-
-**Test:** `https://joshfreeman.org/vr/?room_mars=/vr/rooms/YOURFILE.js` uses any `/vr/rooms/*.js` file as the Mars room (only that path pattern is accepted). `?room_mars=/vr/rooms/stub.js` is the stub.
+- **Ways in:** the rocket at the Bridgewater launch pad (board, Launch; after the ~15 s Earth half you land on RPL's pad, same page, same XR session), `W3D.goMars()` (the "Red Planet: go now" buttons, the saucer's Mars trip, the Tesseract link), and the links `?room=mars` / `?spot=mars` (also `rpl`, `red-planet`, or `mars-<RPL spot>` such as `?room=mars-bar`; you land at the launch pad first, then go to Mars once the world is ready).
+- **Way out:** RPL's ARES-7 shuttle / Return to Earth fires `rpl-exit-request`; the adapter calls `FP_ROOMS.leave({arrive: true})`: rocket ride home onto the launch pad. In 2D there is also a "Return to Earth" button at the bottom of the screen. The Fowling Pond menu buttons (`goWorld`) leave Mars first, then go to the spot.
+- **Room flag `ownRig: true`:** RPL places and drives the rig, so FP_ROOMS skips its spawn teleport. RPL holds the room entity at identity (absolute coordinates, pad about (-24, 0, 146)).
+- **While mounted** the adapter pauses `w3d-physics` / `w3d-keys` on `#rig`, pauses and hides both `laser-controls` entities (snap turn, teleport, stick walking, menu toggle, pointer) and the desktop cursor, and closes the VR menu bar. RPL hides the other top-level scene children (`hideHost`) and swaps tone mapping, fog, background and environment. FP_ROOMS hides the home world and Real Earth (`W3D.spaceView`; tiles are hidden and not reloaded, no new `root.json`). All of it is put back on unmount, plus the rig pose and three's `DefaultLoadingManager` handlers (RPL's texture loader sets them).
+- **Fallback:** if the module fails to load (RPL down, offline, 60 s timeout), FP_ROOMS rolls back and the rocket uses the same-origin `/vr/mars/` page, which stays for anyone who opens it directly.
+- **Tested** headless with `realearth=0`: rocket, menu and direct-link entries, mount / ready / exit three times in a row, XR session kept throughout (IWER Quest 3 emulation). `?room_mars=/vr/rooms/stub.js` still swaps in the stub room.
 
 ## Tesseract room (built Nov 27 2026, T-21)
 

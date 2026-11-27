@@ -4,14 +4,14 @@
    trimmed to free memory, sky/fog/camera far are swapped, the room is built under its own <a-entity> at ROOM_ORIGIN (far from
    everything at home; three computes model-view in doubles, so large offsets don't wobble), physics uses the room's ground/walls.
    leave(): unmount, dispose, restore everything; {arrive:true} replays the rocket arrival (transit.js) onto the launch pad.
-   Mars uses its module only once one is listed in CATALOG (Me's mountRPL, after Sat); until then the rocket keeps the
-   same-origin /vr/mars/ hand-off. Test: ?room_mars=/vr/rooms/stub.js swaps in the stub room (only /vr/rooms/*.js accepted). */
+   Mars (T-2): vr/rooms/mars.js wraps Me's mountRPL; if it fails to load the rocket falls back to the same-origin /vr/mars/ hand-off.
+   A room with ownRig: true places and moves the rig itself (RPL), so no spawn teleport. Test: ?room_mars=/vr/rooms/stub.js swaps in the stub room (only /vr/rooms/*.js accepted). */
 (function () {
   const QS = new URLSearchParams(location.search);
   const ROOM_ORIGIN = {x: 0, y: 0, z: 400000};
   const okUrl = u => typeof u === 'string' && /^\/vr\/rooms\/[\w-]+\.js$/.test(u);
   const CATALOG = {
-    mars: {title: 'Red Planet Lounge', module: null, fallbackUrl: '/vr/mars/?spot=pad&from=joshfreeman-vr'},   // module: set when Me ships mountRPL
+    mars: {title: 'Red Planet Lounge', module: '/vr/rooms/mars.js?v=1', fallbackUrl: '/vr/mars/?spot=pad&from=joshfreeman-vr'},   // adapter around Me's mountRPL (T-2); /vr/mars/ stays the fallback
     tesseract: {title: 'Tesseract room', module: '/vr/rooms/tesseract.js?v=1', fallbackUrl: null},                     // T-21, entered via tesseractgate.js
     stub: {title: 'Test room', module: '/vr/rooms/stub.js?v=1', fallbackUrl: null}
   };
@@ -75,7 +75,7 @@
         teleport: (x, y, z, yaw) => W3D.teleportTo(O.x + x, O.y + (y || 0), O.z + z, yaw)};
       cur.ctx = ctx;
       await room.mount(s, el, ctx);
-      const sp = room.spawn || {x: 0, y: 0, z: 0, yaw: 0}; ctx.teleport(sp.x, sp.y || 0, sp.z, sp.yaw || 0);
+      if (!room.ownRig) { const sp = room.spawn || {x: 0, y: 0, z: 0, yaw: 0}; ctx.teleport(sp.x, sp.y || 0, sp.z, sp.yaw || 0); }
       if (rig && rig.components['w3d-physics']) rig.components['w3d-physics'].vy = 0;
       setFade(false); busy = false; log('entered ' + name); return true;
     } catch (e) {

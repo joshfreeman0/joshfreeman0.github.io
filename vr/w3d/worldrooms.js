@@ -61,7 +61,7 @@
   }
   // the Fowling Pond menu buttons (goWorld) also work from inside a room: leave the room first
   function wrapGoWorld() { const og = window.goWorld; if (typeof og !== 'function' || og._wr) return; const w = function (spot) {
-      if (window.FP_ROOMS && FP_ROOMS.current && FP_ROOMS.current !== 'mars') { back = null; FP_ROOMS.leave({}).then(() => og(spot)); return; } return og(spot); };
+      if (window.FP_ROOMS && FP_ROOMS.current) { back = null; FP_ROOMS.leave({}).then(() => og(spot)); return; } return og(spot); };
     w._wr = 1; window.goWorld = w; }
   function boot() { catalog(); menus(); wrapGoWorld();
     const q = (new URLSearchParams(location.search).get('room') || '').toLowerCase(), k = ALIAS[q];

@@ -56,7 +56,7 @@ window.JFVR_LITE = (function () {
 <script src="hd.js?v=6"></script>
 <script src="w3d/seasons.js?v=1"></script>
 <script src="w3d/sphinx.js?v=2"></script>
-<script src="w3d/world.js?v=21n"></script>
+<script src="w3d/world.js?v=21o"></script>
 <script src="w3d/rooms.js?v=5"></script>
 <script src="w3d/cities.js?v=10"></script>
 <script src="w3d/saucer.js?v=9"></script>
@@ -73,8 +73,8 @@ window.JFVR_LITE = (function () {
 <script src="w3d/streets.js?v=11"></script>
 <script src="w3d/zoo.js?v=2"></script>
 <script src="w3d/transit.js?v=2"></script>
-<script src="w3d/fprooms.js?v=2"></script>
-<script src="w3d/launch.js?v=7"></script>
+<script src="w3d/fprooms.js?v=3"></script>
+<script src="w3d/launch.js?v=8"></script>
 <script src="w3d/starfleet.js?v=2"></script>
 <script src="w3d/exhibits/kit.js?v=1"></script>
 <script src="w3d/exhibits/hangar.js?v=1"></script>
@@ -299,7 +299,7 @@ scn.addEventListener('exit-vr', () => bar.setAttribute('visible', false));
 /* Clear failure message with Try again (and, on the full tier, a lighter version) instead of hanging on the loading text. */
 window.JFVR_fail = function (why) {
   if (window.JFVR_failed) return; window.JFVR_failed = true;
-  let d = document.querySelector('#load'); if (!d) { d = document.createElement('div'); d.id = 'load'; document.body.appendChild(d); }
+  let d = document.querySelector('body > #load'); if (!d) { d = document.createElement('div'); d.id = 'load'; document.body.appendChild(d); }
   d.dataset.failed = 1; d.className = 'fail';
   const u = new URL(location.href); u.searchParams.set('r', Date.now()); const again = u.toString(); u.searchParams.set('lite', '1'); u.searchParams.delete('full');
   d.innerHTML = '';
@@ -316,7 +316,7 @@ setTimeout(() => { if (!window.W3D_READY) window.JFVR_fail('The 3D world is taki
 /* ?spot=<id> lands you at a named spot (invite links, Red Planet Lounge return shuttle); ?from=redplanetlounge says welcome back
    and, with no spot, lands at the Bridgewater launch pad beside the rocket */
 const QS = new URLSearchParams(location.search), FROM_MARS = /^redplanet/i.test(QS.get('from') || '');
-const SPOT_ALIAS = {pond: 'marker', temple: 'temple', bank: 'hall', vesta: 'vesta', saucer: 'saucer', launchpad: 'launchpad', starfleet: 'starfleet', 'star-fleet': 'starfleet', founders: 'founders', 'founders-hall': 'founders', hangar: 'hangar', drone: 'hangar', 'drone-hangar': 'hangar', h18: 'hangar', phreaklab: 'phreaklab', lab: 'phreaklab', phreak: 'phreaklab', crunch: 'phreaklab', foresight: 'foresight', planet: 'planet', starmind: 'starmind', terafab: 'terafab', tesla: 'tesla', boring: 'boring', loop: 'boring', solarcity: 'solarcity', 'solar-city': 'solarcity', campus: 'campus', 'launch-pad': 'launchpad', pad: 'launchpad',
+const SPOT_ALIAS = {pond: 'marker', temple: 'temple', bank: 'hall', vesta: 'vesta', saucer: 'saucer', launchpad: 'launchpad', starfleet: 'starfleet', 'star-fleet': 'starfleet', founders: 'founders', 'founders-hall': 'founders', hangar: 'hangar', drone: 'hangar', 'drone-hangar': 'hangar', h18: 'hangar', phreaklab: 'phreaklab', lab: 'phreaklab', phreak: 'phreaklab', crunch: 'phreaklab', foresight: 'foresight', planet: 'planet', starmind: 'starmind', terafab: 'terafab', tesla: 'tesla', boring: 'boring', loop: 'boring', solarcity: 'solarcity', 'solar-city': 'solarcity', campus: 'campus', 'launch-pad': 'launchpad', pad: 'launchpad', mars: 'launchpad', rpl: 'launchpad', 'red-planet': 'launchpad',
   terrace: 'terrace', hall: 'hall', vault: 'vault', office: 'office', conservatory: 'conservatory', propulsion: 'propulsion', ufo: 'ufo', showcase: 'showcase', pyramid: 'pyramid', marker: 'marker', home: 'home', walker: 'walker', 'walker-memorial': 'walker', pharos: 'pharos', lighthouse: 'pharos', houseboat: 'houseboat', 'house-boat': 'houseboat', residence: 'residence', guest: 'guest', tower: 'tower', bridgewater: 'bridgewater', base: 'bridgewater', aldensquare: 'aldensquare', alden: 'aldensquare', 'alden-square': 'aldensquare', rockets: 'rockets', versailles: 'versailles', chateau: 'versailles', 'versailles-court': 'versailles-court', 'versailles-canal': 'versailles-canal', 'versailles-gardens': 'versailles-gardens', 'versailles-trianon': 'versailles-trianon', 'versailles-town': 'versailles-town', 'versailles-mirrors': 'versailles-mirrors', 'hall-of-mirrors': 'versailles-mirrors', 'versailles-bedroom': 'versailles-bedroom', 'versailles-apartments': 'versailles-apartments', 'versailles-queen': 'versailles-queen', 'versailles-chapel': 'versailles-chapel', 'versailles-opera': 'versailles-opera', 'versailles-jeudepaume': 'versailles-jeudepaume', 'jeu-de-paume': 'versailles-jeudepaume'};
 function arrivalSpot(){ const sp = (QS.get('spot') || '').toLowerCase(), k = SPOT_ALIAS[sp];
   if (!W3D.spots.temple) W3D.spots.temple = () => W3D.teleportTo(866, undefined, -380, -90);   // between the sphinxes, facing the gate
@@ -333,10 +333,10 @@ function xrCover(){ if (window.W3D_READY || window.JFVR_COVER || (window.W3D && 
   const iv = setInterval(() => { if (!window.W3D_READY) return; clearInterval(iv); camE.object3D.remove(g); m.geometry.dispose(); m.material.dispose(); t.geometry.dispose(); t.material.dispose(); tx.dispose(); window.JFVR_COVER = null; }, 200); }
 scn.addEventListener('enter-vr', xrCover); if (scn.is && scn.is('vr-mode')) xrCover();
 function start(){
-  W3D.onImagery = (done, total) => { const d = document.querySelector('#load'); if (!d || d.dataset.failed) return; if (done >= total) d.remove(); else d.textContent = 'Loading imagery ' + done + '/' + total + '...'; };
+  W3D.onImagery = (done, total) => { const d = document.querySelector('body > #load'); if (!d || d.dataset.failed) return; if (done >= total) d.remove(); else d.textContent = 'Loading imagery ' + done + '/' + total + '...'; };
   W3D.build(scn.object3D, scn).then(() => {
       if (window.JFVR_failed) return;
-      const d = document.querySelector('#load'); if (d) { if (window.W3D_LOADING) { d.className = 'bg'; d.textContent = 'Loading imagery...'; } else d.remove(); }
+      const d = document.querySelector('body > #load'); if (d) { if (window.W3D_LOADING) { d.className = 'bg'; d.textContent = 'Loading imagery...'; } else d.remove(); }
       goWorld(arrivalSpot()); window.W3D_READY = true; arrivalToast(); })
     .catch(e => { console.error(e); window.JFVR_fail('The 3D world did not load (' + (e && e.message || e) + ').'); });
 }
@@ -363,6 +363,6 @@ document.getElementById('helpbtn').onclick=()=>ui.classList.toggle('help');})();
 <script src="w3d/tesseractgate.js?v=1"></script>
 <script src="w3d/ballroomgate.js?v=1"></script>
 <script src="w3d/menutabs.js?v=10"></script>
-<script src="w3d/worldrooms.js?v=1"></script>
+<script src="w3d/worldrooms.js?v=2"></script>
 <script>/* ?nomp=1 (automated tests) skips joining the public voice room */ if (!/[?&]nomp=1/.test(location.search)) { const s = document.createElement('script'); s.src = 'mp.js?v=8'; document.body.appendChild(s); }</script>
 </body></html>
