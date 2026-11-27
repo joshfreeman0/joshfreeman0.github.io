@@ -3,13 +3,16 @@
    Replies come from an LLM through a server-side proxy (Cloudflare Worker; the OpenRouter key never reaches the browser).
    See README.md next to this file. */
 const HERE = new URL('./', import.meta.url).href;
-export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
 export const DEFAULT_PROXY = 'https://fp-companion.tesseractprogram.workers.dev/chat';
 export const WORLDS = {
   earth: 'Earth, Fowling Pond: a restored pond in Raynham, Massachusetts, on real terrain. Above it stands an Egyptian-style concept bank compound (terrace pavilion, banking hall, vault, Josh\'s office, conservatory, sphinxes and temple gate). Around it: a pyramid park at Route 24 and I-495, a houseboat, the Pharos lighthouse, King\'s Pond and the Forge River, Vesta\'s house, a zoo, and a launch pad in Bridgewater with a rocket to Mars. Flying saucers visit other cities.',
   mars: 'Mars, Red Planet Lounge: a colony on the red planet with a domed club and lounge, music and dancing, an orbital station with a cantina and a glass floor, and an ice mine. The rocket and shuttle link it to Fowling Pond on Earth.'
 };
 const MAX_KEEP = 40, SEND = 16;
+const FAMILY = r => r === 'wife' || r === 'child';
+// family placeholder near the Fowling Pond terrace, used only when neither roster `home`, api.setHome() nor window.FP_HOME gives a spot
+export const FAMILY_PLACEHOLDER = {wife: {x: 844.5, z: -381.5, yaw: 200}, kids: [{x: 840.5, z: -382.5, yaw: 150}, {x: 841.5, z: -376.5, yaw: 120}, {x: 845.5, z: -377.0, yaw: 230}], play: {x: 842.0, z: -379.5, r: 2.5}};
 
 /* storage adapter: anything with async-or-sync get(key) / set(key, value). Swap for a shared accounts backend later. */
 export const localStore = {
@@ -23,7 +26,17 @@ export async function mount(sceneEl, rootEl, opts) { if (inst) unmount(); const 
 export function unmount() { if (inst) { const i = inst; inst = null; try { if (window.FP_COMPANION && window.FP_COMPANION === i.api) delete window.FP_COMPANION; } catch (e) { window.FP_COMPANION = undefined; } i.destroy(); } }
 export function current() { return inst ? inst.api : null; }
 
+/* preview(sceneEl, rootEl, characters, {spacing, z, THREE, GLTFLoader, rosterBase}) -> Promise<api[]>: static line-up of roster characters (no talking, no UI); for comparison shots */
+const previews = [];
+export async function preview(sceneEl, rootEl, chars, o) { o = o || {}; clearPreview(); const sp = o.spacing || 0.9, n = chars.length;
+  const list = chars.map((c, i) => { const r = new Companion(sceneEl, rootEl, Object.assign({}, o, {resident: true, noInput: true, character: c, ui: false, follow: false, voice: false, rosterBase: o.rosterBase || HERE})); previews.push(r);
+    return r.init().then(() => { r.placeWorld((i - (n - 1) / 2) * sp, 0, o.z || 0, 0); r.previewOnly = true; return {id: c.id, name: c.name, height: r.modelH, object3D: r.holder}; }); });
+  return Promise.all(list); }
+export function clearPreview() { while (previews.length) previews.pop().destroy(); }
+
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+// Rocketbox adults use 'Bip01 …' bones, children 'Bip02 …': match either
+const bone = (n, o) => { const k = norm(o.name); return k === n || (/^bip01/.test(n) && /^bip0\d/.test(k) && k.slice(5) === n.slice(5)); };
 const RIGS = {
   rocketbox: {hips: 'bip01pelvis', spine: 'bip01spine1', chest: 'bip01spine2', neck: 'bip01neck', head: 'bip01head', lUp: 'bip01lupperarm', lFore: 'bip01lforearm', lHand: 'bip01lhand',
     rUp: 'bip01rupperarm', rFore: 'bip01rforearm', rHand: 'bip01rhand', jaw: 'bip01mjaw', lip: 'bip01mbottomlip', lEye: 'bip01leye', rEye: 'bip01reye'},
@@ -40,7 +53,7 @@ class Companion {
     this.store = o.storage || localStore; this.world = o.world || 'earth'; this.worldDesc = o.worldDesc || WORLDS[this.world] || '';
     this.playerId = String(o.playerId || 'guest'); this.playerName = o.playerName || '';
     this.proxy = o.proxyUrl || DEFAULT_PROXY; this.emit = (type, d) => { try { o.onEvent && o.onEvent(Object.assign({type, character: this.ch && this.ch.id}, d || {})); } catch (e) {} };
-    this.state = 'idle'; this.t = 0; this.hist = []; this.cleanup = []; this.dead = false; this.jaw = 0; this.look = {yaw: 0, pitch: 0}; this.talkUntil = 0; this.lastTap = 0;
+    this.resident = !!o.resident; this.homes = o.homes || {}; this.family = new Map(); this.state = 'idle'; this.t = 0; this.hist = []; this.cleanup = []; this.dead = false; this.jaw = 0; this.look = {yaw: 0, pitch: 0}; this.talkUntil = 0; this.lastTap = 0;
   }
   get root3d() { const r = this.rootEl; return r && r.object3D ? r.object3D : r; }
   get camera() { const s = this.sceneEl; return this.o.camera || (s && s.camera) || null; }
@@ -48,6 +61,7 @@ class Companion {
   get inXR() { const r = this.renderer; return !!(r && r.xr && r.xr.isPresenting); }
 
   async init() {
+    if (this.resident) return this.initResident();
     const T = this.T; let ro = this.o.roster || 'roster.json';
     if (typeof ro === 'string') ro = await fetch(new URL(ro, HERE).href).then(r => r.json());
     if (Array.isArray(ro)) ro = {characters: ro};
@@ -57,7 +71,8 @@ class Companion {
     this.holder = new T.Group(); this.holder.name = 'fp-companion'; this.root3d.add(this.holder);
     this.sub = this.makeSubtitle(); this.holder.add(this.sub.sprite);
     this.hookTick(); this.hookInput(); if (this.o.ui !== false) this.makeUI();
-    const pick = this.o.pick || this.store.get && (await this.store.get('fpc:v1:' + this.playerId + ':pick')) || ro.default || this.roster[0].id;
+    let pick = this.o.pick || this.store.get && (await this.store.get('fpc:v1:' + this.playerId + ':pick')) || ro.default || this.roster[0].id;
+    { const pc = this.roster.find(r => r.id === pick); if (!pc || pc.role === 'child' || !this.inWorld(pc)) pick = this.firstAdult(ro.default); }   // a child is never the default slot
     await this.pick(pick, true);
     this.api = {
       version: VERSION, list: () => this.roster.map(c => ({id: c.id, name: c.name, gender: c.gender, role: c.role, canTravel: !!c.canTravel})),
@@ -65,11 +80,54 @@ class Companion {
       talk: text => text ? this.send(text) : this.listen(), listen: () => this.listen(), say: text => this.speak(text),
       setWorld: (w, d) => { this.world = w; this.worldDesc = d || WORLDS[w] || ''; }, moveTo: (x, y, z, yaw) => this.placeWorld(x, y, z, yaw),
       comeHere: () => this.comeHere(), forget: () => { this.hist = []; this.save(); }, setPassphrase: p => this.setPass(p),
-      update: dt => this.update(dt), unmount: () => unmount(), object3D: this.holder
+      update: dt => this.update(dt), unmount: () => unmount(), object3D: this.holder,
+      setHome: (id, pos) => this.setHome(id, pos), family: () => [...this.family.values()].map(r => ({id: r.ch.id, name: r.ch.name, role: r.ch.role, object3D: r.holder})),
+      talkTo: (id, text) => { const r = this.family.get(id); if (r) return text ? r.send(text) : r.listen(); if (this.ch && this.ch.id === id) return text ? this.send(text) : this.listen(); }
     };
+    if (this.o.family !== false) { this.syncFamily(); const onHome = () => this.placeFamily();
+      for (const t of [this.sceneEl, window]) if (t && t.addEventListener) { t.addEventListener('fp-home-ready', onHome); this.cleanup.push(() => t.removeEventListener('fp-home-ready', onHome)); } }
     this.emit('ready', {roster: this.api.list()});
     return this.api;
   }
+
+  inWorld(c) { return !Array.isArray(c.worlds) || !c.worlds.length || c.worlds.includes(this.world); }
+  firstAdult(def) { const ok = c => c && c.role !== 'child' && this.inWorld(c); const d = this.roster.find(c => c.id === def); return ok(d) ? d.id : (this.roster.find(ok) || this.roster[0]).id; }
+
+  // ---------- family residents (wife / children stand at home while another companion is active) ----------
+  async initResident() {
+    const c = this.o.character; this.roster = [c]; this.rosterBase = this.o.rosterBase || HERE;
+    this.holder = new this.T.Group(); this.holder.name = 'fp-resident-' + c.id; this.root3d.add(this.holder);
+    this.sub = this.makeSubtitle(); this.holder.add(this.sub.sprite); this.hookTick(); if (!this.o.noInput) this.hookInput();
+    await this.pick(c.id, true); return null;
+  }
+  syncFamily() {   // one resident per family member in this world, except the one that is the active companion
+    if (this.resident || this.dead) return;
+    for (const c of this.roster) { if (!FAMILY(c.role)) continue; const want = this.inWorld(c) && !(this.ch && this.ch.id === c.id), have = this.family.get(c.id);
+      if (want && !have) { const r = new Companion(this.sceneEl, this.rootEl, Object.assign({}, this.o, {resident: true, character: c, rosterBase: this.rosterBase, ui: false, follow: false, spawn: null}));
+        this.family.set(c.id, r); r.init().then(() => { if (r.dead) return; this.placeFamily(); }).catch(e => { console.warn('[fpc] resident', c.id, e); this.family.delete(c.id); r.destroy(); }); }
+      else if (!want && have) { this.family.delete(c.id); have.destroy(); } }
+  }
+  setHome(id, pos) { this.homes[id] = pos; this.placeFamily(); }
+  homeFor(c) {   // priority: api.setHome > roster home > window.FP_HOME.spawns > placeholder near the terrace
+    const P = (v, src) => { if (!v) return null; const a = Array.isArray(v) ? v : Array.isArray(v.position) ? v.position : null;
+      const o = a ? {x: a[0], y: a[1], z: a[2]} : {x: v.x, y: v.y, z: v.z}; const yaw = v.rotationY !== undefined ? v.rotationY : v.yaw; if (!isFinite(o.x) || !isFinite(o.z)) return null;
+      return {x: +o.x, y: o.y !== undefined && o.y !== null && isFinite(o.y) ? +o.y : null, z: +o.z, yaw: isFinite(yaw) ? +yaw : undefined, src}; };
+    const own = P(this.homes[c.id], 'setHome') || P(c.home, 'roster'); if (own) return own;
+    const kids = this.roster.filter(r => r.role === 'child' && this.inWorld(r)), ki = kids.indexOf(c), H = window.FP_HOME && window.FP_HOME.spawns;
+    if (H && this.world === 'earth') { if (c.role === 'wife') { const w = P(H.wife, 'FP_HOME'); if (w) return w; }
+      if (c.role === 'child') { const k = H.kids && P(H.kids[ki], 'FP_HOME'); if (k) return k; const y = P(H.yard, 'FP_HOME') || P(H.play, 'FP_HOME');
+        if (y) { const a = ki * 2.1; return {x: y.x + Math.cos(a) * 2.2, y: null, z: y.z + Math.sin(a) * 2.2, yaw: undefined, src: 'FP_HOME-yard'}; } } }
+    if (this.world !== 'earth') return null;   // no placeholder outside Fowling Pond: residents then stand near the player
+    const F = this.o.familyPlaceholder || FAMILY_PLACEHOLDER, K = F.kids || [], q = c.role === 'wife' ? F.wife : K[ki] || K[0];
+    return q ? {x: q.x + (c.role === 'child' && ki >= K.length ? (ki - K.length + 1) * 0.9 : 0), y: null, z: q.z, yaw: q.yaw, src: 'placeholder'} : null;
+  }
+  wanderArea(c) { const H = window.FP_HOME && window.FP_HOME.spawns, P = v => !v ? null : Array.isArray(v) ? {x: v[0], z: v[2]} : Array.isArray(v.position) ? {x: v.position[0], z: v.position[2], r: v.radius} : isFinite(v.x) ? {x: v.x, z: v.z, r: v.r || v.radius} : null;
+    if (c.role !== 'child' || c.wander === false || this.homes[c.id]) return null;
+    const a = P(c.wanderArea) || (H && this.world === 'earth' ? (P(H.play) || P(H.yard)) : null) || (this.world === 'earth' && !c.home && !H ? P((this.o.familyPlaceholder || FAMILY_PLACEHOLDER).play) : null);
+    return a ? {x: a.x, z: a.z, r: a.r || 4} : null; }
+  placeFamily() { for (const r of this.family.values()) { if (!r.model) continue; const h = this.homeFor(r.ch);
+      if (h) { r.placeWorld(h.x, h.y, h.z, h.yaw); r.homeSrc = h.src; } else if (!r.placed) r.comeHere();
+      r.placed = true; r.wander = this.wanderArea(r.ch); r.wTarget = null; r.wWait = 2 + Math.random() * 4; } }
 
   // ---------- characters ----------
   async pick(id, first) {
@@ -87,16 +145,16 @@ class Companion {
     await this.applyLook(m, c); if (this.dead) return;
     this.fit(m, c); this.holder.add(m); this.model = m; this.rig(c);
     this.hist = (await (this.store.get && this.store.get(this.key()))) || [];
-    if (this.store.set) this.store.set('fpc:v1:' + this.playerId + ':pick', c.id);
+    if (this.store.set && !this.resident && c.role !== 'child') this.store.set('fpc:v1:' + this.playerId + ':pick', c.id);
     if (prevPos) this.holder.position.copy(prevPos); else if (this.o.spawn) { const s = this.o.spawn; this.placeWorld(s.x, s.y, s.z, s.yaw); }
-    this.sub.sprite.position.set(0, (c.height || 1.7) + 0.32, 0);
+    this.sub.sprite.position.set(0, (this.modelH || c.height || 1.7) + 0.32, 0); this.fitHit();
     if (this.ui) this.ui.sel.value = c.id, this.ui.btn.textContent = 'Talk to ' + c.name;
-    this.emit('pick', {name: c.name});
+    if (!this.resident) { this.emit('pick', {name: c.name, role: c.role}); this.syncFamily(); }
     if (!first && !this.hist.length) this.subtitle(c.name);
   }
   // per-character look: roster `texture` (replaces the main body/clothing texture) and `tint` (recolours clothing, skin kept)
   async applyLook(m, c) {
-    if (!c.tint && !c.texture) return; const T = this.T, mats = [];
+    if (!c.tint && !c.texture && !c.hairTint && !c.eyeTint) return; const T = this.T, mats = [];
     m.traverse(o => { if (o.isMesh) for (const mt of [].concat(o.material)) if (!mats.includes(mt)) mats.push(mt); });
     const main = mats.find(mt => /body/i.test(mt.name || '')) || mats.filter(mt => mt.map && !(mt.alphaTest > 0) && mt.transparent !== true)[0] || mats[0]; if (!main) return;
     if (c.texture) { try { const old = main.map, tx = await new T.TextureLoader().loadAsync(new URL(c.texture, this.rosterBase).href);
@@ -111,6 +169,30 @@ class Companion {
           vec3 rc = clamp(fpcTint * (l * 1.8 + 0.04), 0.0, 1.0);
           diffuseColor.rgb = mix(c0, rc, fpcTintK * (1.0 - skin)); }`); };
       main.customProgramCacheKey = () => 'fpctint' + (sep ? 's' : '') + col.getHexString() + k; main.needsUpdate = true; }
+    // v1.2 hairTint: recolours the hair cards (the alpha-tested *_opacity material)
+    if (c.hairTint) { const col = new T.Color(c.hairTint), k = Math.max(0, Math.min(1, c.hairTintStrength === undefined ? 0.85 : +c.hairTintStrength));
+      const hair = mats.filter(mt => mt !== main && (/opacity|hair/i.test(mt.name || '') || mt.alphaTest > 0));
+      for (const mt of hair) { mt.onBeforeCompile = sh => { sh.uniforms.fpcHair = {value: col}; sh.uniforms.fpcHairK = {value: k};
+          sh.fragmentShader = 'uniform vec3 fpcHair; uniform float fpcHairK;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+          { vec3 c0 = diffuseColor.rgb; float l = dot(c0, vec3(0.299, 0.587, 0.114)); float lum = max(dot(fpcHair, vec3(0.299, 0.587, 0.114)), 0.05);
+            vec3 rc = clamp(fpcHair * (0.45 + 0.9 * l / lum * 0.45), 0.0, 1.0); diffuseColor.rgb = mix(c0, rc, fpcHairK); }`); };
+        mt.customProgramCacheKey = () => 'fpchair' + col.getHexString() + k; mt.needsUpdate = true; } }
+    // v1.2 eyeTint: recolours the iris on the head texture (Rocketbox layout: eyeball at uv 0.2645, 0.923; override with eyeUV [u, v, r]).
+    // hairTint also recolours hair painted on the head texture (golden/brown pixels outside the eye/mouth atlas); hairTintHead: false turns that off.
+    const head = mats.find(mt => mt !== main && /head/i.test(mt.name || '')), hh = c.hairTint && c.hairTintHead !== false;
+    if (head && head.map && (c.eyeTint || hh)) { const E = Array.isArray(c.eyeUV) ? c.eyeUV : [0.2645, 0.923, 0.034];
+      const eye = new T.Color(c.eyeTint || '#000'), hc = new T.Color(c.hairTint || '#000'), hk = hh ? Math.max(0, Math.min(1, c.hairTintStrength === undefined ? 0.85 : +c.hairTintStrength)) : 0, ek = c.eyeTint ? 0.92 : 0;
+      head.onBeforeCompile = sh => { Object.assign(sh.uniforms, {fpcEye: {value: eye}, fpcEyeK: {value: ek}, fpcEyeUV: {value: new T.Vector3(E[0], E[1], E[2])}, fpcHair: {value: hc}, fpcHairK: {value: hk}});
+        sh.fragmentShader = 'uniform vec3 fpcEye; uniform float fpcEyeK; uniform vec3 fpcEyeUV; uniform vec3 fpcHair; uniform float fpcHairK;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        { vec3 c0 = diffuseColor.rgb; float l = dot(c0, vec3(0.299, 0.587, 0.114));
+          vec3 sc = sqrt(max(c0, 0.0)); float zone = max(1.0 - smoothstep(0.26, 0.34, vMapUv.y), smoothstep(0.58, 0.64, vMapUv.y) * smoothstep(0.53, 0.57, vMapUv.x));
+          float hair = zone * smoothstep(-0.01, 0.03, (sc.g - sc.b) - (sc.r - sc.g) * 0.7) * smoothstep(0.02, 0.06, l);
+          float lum = max(dot(fpcHair, vec3(0.299, 0.587, 0.114)), 0.05);
+          diffuseColor.rgb = mix(c0, clamp(fpcHair * (0.45 + 0.9 * l / lum * 0.45), 0.0, 1.0), hair * fpcHairK);
+          float d = distance(vMapUv, fpcEyeUV.xy) / fpcEyeUV.z;
+          float iris = (1.0 - smoothstep(0.85, 1.05, d)) * smoothstep(0.03, 0.10, l) * (1.0 - smoothstep(0.42, 0.62, l));
+          diffuseColor.rgb = mix(diffuseColor.rgb, fpcEye * (0.45 + l * 1.6), iris * fpcEyeK); }`); };
+      head.customProgramCacheKey = () => 'fpchead' + eye.getHexString() + ek + hc.getHexString() + hk + E.join(','); head.needsUpdate = true; }
   }
   key() { return 'fpc:v1:' + this.playerId + ':' + this.ch.id; }
   save() { if (this.store.set) this.store.set(this.key(), this.hist.slice(-MAX_KEEP)); }
@@ -118,16 +200,18 @@ class Companion {
   fit(m, c) { // face +Z, feet on y = 0, height ~ c.height
     const T = this.T; m.updateMatrixWorld(true); const box = new T.Box3().setFromObject(m), h = box.max.y - box.min.y;
     if (h > 3 || h < 0.5) { const k = (c.height || 1.7) / h; m.scale.multiplyScalar(k); }
+    { m.updateMatrixWorld(true); const h0 = new T.Box3().setFromObject(m), hh = h0.max.y - h0.min.y; let k = 1; if (+c.targetHeight > 0.5 && +c.targetHeight < 2.6) k = +c.targetHeight / hh; if (+c.scale > 0.3 && +c.scale < 2) k *= +c.scale;   // v1.2: per-character size
+      if (k !== 1) { m.scale.multiplyScalar(k); m.updateMatrixWorld(true); } this.modelH = hh * k; }
     m.updateMatrixWorld(true); const b2 = new T.Box3().setFromObject(m); m.position.y -= b2.min.y;
     m.updateMatrixWorld(true);
-    const find = n => { let f = null; if (n) m.traverse(o => { if (!f && o.isBone && norm(o.name) === n) f = o; }); return f; };
+    const find = n => { let f = null; if (n) m.traverse(o => { if (!f && o.isBone && bone(n, o)) f = o; }); return f; };
     const R = RIGS[c.rig] || RIGS.rocketbox, head = find(R.head), le = find(R.lEye), re = find(R.rEye);
     if (head && le && re) { const hp = head.getWorldPosition(new T.Vector3()), ep = le.getWorldPosition(new T.Vector3()).add(re.getWorldPosition(new T.Vector3())).multiplyScalar(0.5);
       const f = ep.sub(hp); f.y = 0; if (f.lengthSq() > 1e-8) { m.rotation.y = -Math.atan2(f.x, f.z); m.updateMatrixWorld(true); } }
   }
   rig(c) {
     const T = this.T, m = this.model, R = RIGS[c.rig] || RIGS.rocketbox, B = this.bones = {};
-    const all = {}; m.traverse(o => { if (o.isBone) all[norm(o.name)] = o; });
+    const all = {}; m.traverse(o => { if (o.isBone) all[norm(o.name).replace(/^bip0\d/, 'bip01')] = o; });
     for (const k in R) B[k] = R[k] ? all[R[k]] || null : null;
     this.holder.updateMatrixWorld(true);
     const hq = this.holder.getWorldQuaternion(new T.Quaternion()), toW = v => v.applyQuaternion(hq).normalize();
@@ -164,8 +248,8 @@ class Companion {
   hookTick() {
     const A = window.AFRAME, s = this.sceneEl;
     if (A && s && s.isScene && this.rootEl && this.rootEl.appendChild) {
-      if (!A.components['fpc-tick']) A.registerComponent('fpc-tick', {tick(t, dt) { const i = inst; if (i && i.tickEl === this.el) i.update(Math.min(dt || 16, 100) / 1000); }});
-      const e = document.createElement('a-entity'); e.setAttribute('fpc-tick', ''); e.setAttribute('class', 'fpc-tickel'); this.rootEl.appendChild(e); this.tickEl = e;
+      if (!A.components['fpc-tick']) A.registerComponent('fpc-tick', {tick(t, dt) { const i = this.el.__fpc; if (i && !i.dead) i.update(Math.min(dt || 16, 100) / 1000); }});
+      const e = document.createElement('a-entity'); e.__fpc = this; e.setAttribute('fpc-tick', ''); e.setAttribute('class', 'fpc-tickel'); this.rootEl.appendChild(e); this.tickEl = e;
       this.cleanup.push(() => e.parentNode && e.parentNode.removeChild(e));
     } else if (this.o.autoTick !== false) { let last = performance.now(); const loop = () => { if (this.dead) return; const n = performance.now(); this.update(Math.min(n - last, 100) / 1000); last = n; this.raf = requestAnimationFrame(loop); }; this.raf = requestAnimationFrame(loop); }
   }
@@ -173,10 +257,11 @@ class Companion {
     if (this.dead || !this.model) return; const T = this.T; this.t += dt; const t = this.t, B = this.bones, base = this.base;
     const cam = this.camera, pp = cam ? cam.getWorldPosition(new T.Vector3()) : null, hp = this.holder.getWorldPosition(new T.Vector3());
     // follow: a travelling companion stays near the player (also after teleports, rooms, rocket rides)
-    if (pp && this.ch.canTravel !== false && this.o.follow !== false && this.state === 'idle') { const d = Math.hypot(pp.x - hp.x, pp.z - hp.z), dy = Math.abs(pp.y - 1.6 - hp.y);
+    if (this.resident && this.wander) this.doWander(dt, pp, hp);
+    if (pp && !this.resident && this.ch.canTravel !== false && this.o.follow !== false && this.state === 'idle') { const d = Math.hypot(pp.x - hp.x, pp.z - hp.z), dy = Math.abs(pp.y - 1.6 - hp.y);
       if (d > (this.o.followDist || 14) || dy > 6) this.comeHere(); }
     // turn the body toward the player when close or talking
-    if (pp) { const d = Math.hypot(pp.x - hp.x, pp.z - hp.z); if (d < 8 || this.state !== 'idle') { const want = Math.atan2(pp.x - hp.x, pp.z - hp.z) - this.parentYaw();
+    if (pp && !this.walking) { const d = Math.hypot(pp.x - hp.x, pp.z - hp.z); if (d < 8 || this.state !== 'idle') { const want = Math.atan2(pp.x - hp.x, pp.z - hp.z) - this.parentYaw();
       let dy = ((want - this.holder.rotation.y + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI; const thr = this.state !== 'idle' ? 0.05 : 0.7;
       if (Math.abs(dy) > thr || this.turning) { this.turning = Math.abs(dy) > 0.03; this.holder.rotation.y += Math.sign(dy) * Math.min(Math.abs(dy), 1.6 * dt); } } }
     this.holder.updateMatrixWorld(true);
@@ -205,6 +290,18 @@ class Companion {
     if (this.sub.until && performance.now() > this.sub.until && this.state === 'idle') { this.sub.sprite.material.opacity = Math.max(0, this.sub.sprite.material.opacity - dt * 1.5); if (this.sub.sprite.material.opacity <= 0) { this.sub.sprite.visible = false; this.sub.until = 0; } }
   }
 
+  doWander(dt, pp, hp) {   // kids drift around the yard / play area at an easy walk; they stop to chat
+    const W = this.wander, busy = this.state !== 'idle' || this.speaking || (pp && Math.hypot(pp.x - hp.x, pp.z - hp.z) < 2.5);
+    if (busy) { this.walking = false; return; }
+    if (!this.wTarget) { this.wWait -= dt; if (this.wWait > 0) { this.walking = false; return; } const a = Math.random() * 6.283, r = W.r * Math.sqrt(Math.random()); this.wTarget = {x: W.x + Math.cos(a) * r, z: W.z + Math.sin(a) * r}; }
+    const dx = this.wTarget.x - hp.x, dz = this.wTarget.z - hp.z, d = Math.hypot(dx, dz);
+    if (d < 0.15) { this.wTarget = null; this.wWait = 4 + Math.random() * 7; this.walking = false; return; }
+    const st = Math.min(d, 0.75 * dt), nx = hp.x + dx / d * st, nz = hp.z + dz / d * st; this.walking = true;
+    const want = Math.atan2(dx, dz) - this.parentYaw(); let dy = ((want - this.holder.rotation.y + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+    this.holder.rotation.y += Math.sign(dy) * Math.min(Math.abs(dy), 3 * dt); const T = this.T, p = new T.Vector3(nx, this.ground(nx, nz), nz); this.root3d.updateMatrixWorld(true); this.root3d.worldToLocal(p); this.holder.position.copy(p);
+  }
+  fitHit() { const o = this.hitEl && this.hitEl.object3D, h = this.modelH || 1.7; if (o) { o.scale.set(1, h / 1.8, 1); o.position.set(0, h / 2, 0); } }
+
   // ---------- subtitles (canvas sprite, works in VR) ----------
   makeSubtitle() {
     const T = this.T, cv = document.createElement('canvas'); cv.width = 1024; cv.height = 320; const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace;
@@ -228,7 +325,7 @@ class Companion {
     if (window.AFRAME && this.rootEl && this.rootEl.appendChild) {
       const hb = document.createElement('a-entity'); hb.setAttribute('class', 'btn fpc-hit'); hb.setAttribute('geometry', 'primitive: box; width: 0.7; height: 1.8; depth: 0.5');
       hb.setAttribute('material', 'transparent: true; opacity: 0; depthWrite: false'); this.rootEl.appendChild(hb); this.hitEl = hb;
-      hb.addEventListener('loaded', () => { this.holder.add(hb.object3D); hb.object3D.position.set(0, 0.9, 0); });
+      hb.addEventListener('loaded', () => { this.holder.add(hb.object3D); hb.object3D.position.set(0, 0.9, 0); this.fitHit(); });
       hb.addEventListener('click', () => this.tap()); this.cleanup.push(() => hb.parentNode && hb.parentNode.removeChild(hb));
     }
     // canvas click / tap on the avatar (any host)
@@ -237,6 +334,7 @@ class Companion {
       const v = new T.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), rc = new T.Raycaster(); rc.setFromCamera(v, this.camera);
       const box = new T.Box3().setFromObject(this.model); if (rc.ray.intersectsBox(box)) this.tap(); });
     // controller: hold B (right) near the companion to talk, release to send
+    if (this.resident) return;   // family residents: tap / click them to talk
     on(s, 'bbuttondown', () => { if (near()) this.listen(true); });
     on(s, 'bbuttonup', () => { if (this.rec && this.rec.hold) this.stopListen(); });
     // desktop: T = talk (hold, or tap to toggle); Enter in the text box
@@ -255,7 +353,11 @@ class Companion {
       '<div class="log"></div>';
     document.body.appendChild(d); const q = c => d.querySelector(c);
     const ui = this.ui = {el: d, btn: q('.main'), sel: q('.sel'), log: q('.log'), txt: q('.txt')};
-    for (const c of this.roster) { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name + (c.role === 'girlfriend' ? ' (girlfriend)' : ''); ui.sel.appendChild(o); }
+    { const G = {girlfriend: 'Girlfriends', companion: 'Companions', wife: 'Family', child: 'Family'}, groups = {};   // kids only ever in the Family group
+      for (const c of this.roster) { if (!this.inWorld(c)) continue; const gn = G[c.role] || 'Companions'; let g = groups[gn];
+        if (!g) { g = groups[gn] = document.createElement('optgroup'); g.label = gn; }
+        const o = document.createElement('option'); o.value = c.id; o.textContent = c.name + (c.role === 'wife' ? ' (wife)' : c.role === 'child' ? ' (' + (c.relation || 'kid') + ')' : ''); g.appendChild(o); }
+      for (const gn of ['Girlfriends', 'Companions', 'Family']) if (groups[gn]) ui.sel.appendChild(groups[gn]); }
     ui.btn.onclick = () => this.tap(); q('.tog').onclick = () => d.classList.toggle('open');
     const sendTxt = () => { const v = ui.txt.value.trim(); if (v) { ui.txt.value = ''; this.send(v); } };
     q('.snd').onclick = sendTxt; ui.txt.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') sendTxt(); };
@@ -315,7 +417,7 @@ class Companion {
     if (text) this.hist.push({role: 'user', content: String(text).slice(0, 800)});
     let res; try {
       const r = await fetch(this.proxy, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-FP-Pass': this.pass()}, body: JSON.stringify({
-        persona: c.persona + (c.name ? '\nYour name is ' + c.name + '.' : ''), world: this.world, worldDesc: this.worldDesc, playerName: this.playerName,
+        characterId: c.id, role: c.role || 'companion', persona: c.role === 'child' ? '' : (c.persona || '') + (c.name ? '\nYour name is ' + c.name + '.' : ''), world: this.world, worldDesc: this.worldDesc, playerName: this.playerName,
         messages: this.hist.slice(-SEND), audio: audio || undefined})});
       res = await r.json().catch(() => ({})); res.status = r.status;
     } catch (e) { res = {status: 0, reply: ''}; }
@@ -348,6 +450,7 @@ class Companion {
   stopSpeaking() { try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {} this.speaking = false; }
 
   destroy() {
+    for (const r of this.family.values()) { try { r.destroy(); } catch (e) {} } this.family.clear();
     this.dead = true; this.stopSpeaking(); if (this.rec) { try { this.rec.kind === 'sr' ? this.rec.r.abort() : this.rec.stop(); } catch (e) {} this.rec = null; }
     if (this.raf) cancelAnimationFrame(this.raf); for (const f of this.cleanup) { try { f(); } catch (e) {} } this.cleanup = [];
     if (this.holder) { if (this.holder.parent) this.holder.parent.remove(this.holder); dispose(this.holder); }

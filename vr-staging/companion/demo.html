@@ -17,6 +17,7 @@
     let roster; if (q.get('tint') || q.get('texture')) { roster = await fetch('./roster.json').then(r => r.json());
       const c = roster.characters.find(x => x.id === (q.get('pick') || roster.default)); if (c) { if (q.get('tint')) c.tint = q.get('tint'); if (q.get('texture')) c.texture = q.get('texture'); } }
     window.fpc = await mount(scene, root, {playerId: 'demo', world: 'earth', roster, pick: q.get('pick') || undefined, spawn: {x: 0, y: 0, z: 0, yaw: 0}, follow: false,
+      family: q.get('family') === '1', familyPlaceholder: {wife: {x: 1.4, z: -0.8, yaw: -30}, kids: [{x: -1.4, z: -0.8, yaw: 30}, {x: -2.2, z: 0.3, yaw: 60}, {x: 2.2, z: 0.3, yaw: -60}], play: {x: 0, z: -2.5, r: 2}},
       onEvent: e => console.log('[fpc]', JSON.stringify(e))});
   };
   scene.hasLoaded ? go() : scene.addEventListener('loaded', go);

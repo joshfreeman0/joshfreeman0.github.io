@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Companion line-up</title><meta name="robots" content="noindex">
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script></head><body>
+<!-- ?ids=lila,freya,maya,nina  (default: all women)  &spacing=0.9 -->
+<a-scene renderer="colorManagement: true; toneMapping: ACESFilmic" background="color: #a9c2dc" shadow="type: pcfsoft">
+  <a-entity light="type: hemisphere; color: #dfeaff; groundColor: #6b5a44; intensity: 0.9"></a-entity>
+  <a-entity light="type: directional; intensity: 2.2; castShadow: true" position="-3 6 4"></a-entity>
+  <a-plane rotation="-90 0 0" width="60" height="60" color="#7d8a5c" shadow="receive: true"></a-plane>
+  <a-entity id="rig" position="0 0 6"><a-camera look-controls wasd-controls position="0 1.1 0" fov="40"></a-camera></a-entity>
+  <a-entity id="companions"></a-entity>
+</a-scene>
+<script type="module">
+  import {preview} from './companion.js';
+  const scene = document.querySelector('a-scene'), root = document.querySelector('#companions'), q = new URLSearchParams(location.search);
+  const go = async () => { const R = await fetch('./roster.json').then(r => r.json()); const ids = (q.get('ids') || R.characters.filter(c => c.gender === 'female' && c.role !== 'child').map(c => c.id).join(',')).split(',');
+    const chars = ids.map(id => R.characters.find(c => c.id === id)).filter(Boolean);
+    window.lineup = await preview(scene, root, chars, {spacing: +q.get('spacing') || 0.95});
+    document.title = 'ready'; console.log('[fpc] lineup', JSON.stringify(window.lineup.map(l => [l.id, +l.height.toFixed(3)]))); };
+  scene.hasLoaded ? go() : scene.addEventListener('loaded', go);
+</script></body></html>
