@@ -226,6 +226,18 @@ const PLACES = {
 };
 function placesHere() { const c = W3D.cities && W3D.cities.current && W3D.cities.current(); return PLACES[c] || PLACES.home; }
 RE.places = () => placesHere().map(p => p[0]);
+/* Nov 27: fly to any lat/lon in the current frame (Boston & area spots, bostonarea.js). City frame when a saucer city is loaded, else home.
+   o.back = metres south of the target, o.up = height over the Google ground; returns the arrival point (camera faces north, at the target). */
+RE.goLatLon = (name, lat, lon, o) => { o = o || {}; if (!RE.on) setOn(true);
+  const c = W3D.cities && W3D.cities.current && W3D.cities.current(); if (c && ANCH[c] && RE.anchor !== c && RE.tiles) { setAnchor(c); calTries = 0; RE.calDone = null; }
+  const A = c && ANCH[c] ? ANCH[c] : ANCH.home; if (!A.kx) Object.assign(A, kxy(A.lat));
+  const qx = A.x + (lon - A.lon) * A.kx, qz = A.z - (lat - A.lat) * A.ky, back = o.back || 900, zz = qz + back, dt = Math.hypot(qx - A.x, zz - A.z);
+  const gy = o.ground || 0, y = gy - dt * dt / 12742000 + (o.up || 320);   // the Google ground drops with distance from the anchor (stays so after a 'free' re-anchor)
+  if (window.JFVR) JFVR.fly = true; W3D.teleportTo(qx, y, zz, 0); if (window.JFVR) JFVR.fly = true;
+  const fl = document.querySelector('#flylabel'); if (fl) fl.setAttribute('value', 'Fly: ON');
+  const sc = document.querySelector('a-scene'), lc = document.querySelector('[camera]') && document.querySelector('[camera]').components['look-controls'];
+  if (lc && sc && !sc.is('vr-mode')) { lc.pitchObject.rotation.x = -Math.atan2(o.up || 320, back); lc.yawObject.rotation.y = 0; }
+  toast(name); return {x: qx, y, z: zz, tx: qx, tz: qz}; };
 RE.goPlace = i => { const L = placesHere(), p = L[i]; if (!p || !RE.A) return false; if (!RE.on) setOn(true);
   const c = W3D.cities && W3D.cities.current && W3D.cities.current(); if (c && ANCH[c] && RE.anchor !== c && RE.anchor !== 'free' && RE.tiles) { setAnchor(c); calTries = 0; RE.calDone = null; }
   if (c && ANCH[c] && !ANCH[c].kx) Object.assign(ANCH[c], kxy(ANCH[c].lat));
