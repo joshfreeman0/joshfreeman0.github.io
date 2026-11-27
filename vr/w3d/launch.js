@@ -159,6 +159,10 @@ function rocketProxy(rocket, pad) {
    navigator.xr 'sessiongranted' and enters VR itself). Never session.end() / exitVR() first - that drops the headset to 2D. ---------- */
 let going = false;
 function goMars() { if (going) return; going = true; window.location.assign(MARS_URL); }
+// Same-page Mars (FP_ROOMS, vr/ROOMS.md): when a Mars room module exists, the rocket lands you in it with no page change at all.
+const marsRoom = () => !!(window.FP_ROOMS && FP_ROOMS.has('mars'));
+function goMarsRoom() { if (going) return; going = true;
+  FP_ROOMS.enter('mars', {via: 'rocket'}).then(ok => { if (ok) going = false; else window.location.assign(MARS_URL); }); }   // fallback: /vr/mars/ hand-off
 W3D.goMars = goMars;
 
 /* ---------- the flight: built on demand, disposed afterwards ---------- */
@@ -230,7 +234,7 @@ function startFlight(o) {
   }
   let ending = null;
   function stepEnd() { if (!ending || ending.fin) return; const k = Math.min(1, (performance.now() - ending.t) / 700); fade.material.opacity = Math.max(fade.material.opacity, k); if (k >= 1) endNow(); }
-  function endNow() { if (!ending || ending.fin) return; ending.fin = true; fade.material.opacity = 1; ending.toMars ? goMars() : restore(); }
+  function endNow() { if (!ending || ending.fin) return; ending.fin = true; fade.material.opacity = 1; if (!ending.toMars) restore(); else if (marsRoom()) { restore(); goMarsRoom(); } else goMars(); }
   function restore() {
     rig.removeAttribute('w3d-ride'); sc.removeEventListener('bbuttondown', onB); window.removeEventListener('keydown', onKey);
     [bSkip, bCancel].forEach(b => b.parentNode && b.parentNode.removeChild(b)); ov.remove();

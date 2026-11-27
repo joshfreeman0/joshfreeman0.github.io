@@ -57,6 +57,7 @@ function terrainH(x, z) {
 }
 W3D.terrainH = terrainH;
 function groundAt(x, z, y) {
+  if (W3D.roomPhys) return W3D.roomPhys.ground(x, z, y);   // inside an FP_ROOMS guest room (fprooms.js)
   let g = terrainH(x, z);
   const P = W3D.water && W3D.water.pond; if (P && g < WATER - 0.2 && x > P.x0 && x < P.x1 && z > P.z0 && z < P.z1) g = WATER - 0.2; // walk on the pond surface rather than its bed
   if (W3D.patchH) { const ph = W3D.patchH(x, z); if (ph !== null) g = ph; }   // Bridgewater detail patch (launch.js), when loaded
@@ -70,6 +71,7 @@ function groundAt(x, z, y) {
 }
 W3D.groundAt = groundAt;
 function blocked(x, z, y) {
+  if (W3D.roomPhys) return W3D.roomPhys.blocked(x, z, y);
   if (W3D.cityBlocked && W3D.cityBlocked(x, z, y)) return true;
   if (W3D.bHooks) for (const h of W3D.bHooks) if (h(x, z, y)) return true;
   for (const w of walls) if (x > w.x0 - 0.3 && x < w.x1 + 0.3 && z > w.z0 - 0.3 && z < w.z1 + 0.3 && w.y1 > y + 0.35 && w.y0 < y + 1.7) return true;

@@ -41,10 +41,13 @@
     G.add(new THREE.PointLight(0xcfe6ff, 0.6, 5)); return G; }
   W3D.transitTex = {earth: earthTex, moon: moonTex, starField};
   W3D.arrivalCover = FROM;   // index.html xrCover() leaves the screen to the arrival flight
-  if (!FROM) return;
-
   const T = {moon0: 0.6, moon1: 6.5, earth0: 2.5, entry: 9.5, descent: 12, land: 15.5};
-  let A = null;
+  let A = null, sysOn = false;
+  W3D.arrivalStart = () => { if (A) return; if (!sysOn) setup(); start(); };   // FP_ROOMS: rocket ride home from a guest room, same page
+  const black = new THREE.Color(0x000004), glowC = new THREE.Color(0xff8a3c), skyC = new THREE.Color(0xa9c6e2);
+  W3D.arrival = {get active() { return !!A; }, skip: () => { if (A) A.skip = true; }, T};
+  if (!FROM) return;
+  setup();
   function start() {
     const sc = document.querySelector('a-scene'), rig = document.querySelector('#rig');
     if (!sc || !sc.camera || !sc.renderer || !rig || !rig.object3D) return setTimeout(start, 50);
@@ -75,7 +78,7 @@
     if (W3D.spots && W3D.spots.padland) W3D.spots.padland(); else if (W3D.teleportTo) W3D.teleportTo(LAND.x, undefined, LAND.z, -45);
     const msg = 'Welcome back from Mars'; if (W3D.toast) W3D.toast(msg, 4000); else if (window.JFVR && JFVR.hud) JFVR.hud(msg);
     console.log('transit: arrival landed'); }
-  const black = new THREE.Color(0x000004), glowC = new THREE.Color(0xff8a3c), skyC = new THREE.Color(0xa9c6e2);
+  function setup() { if (sysOn) return; sysOn = true;
   AFRAME.registerSystem('w3d-arrival', { tick: function () {
     if (!A) return; const a = A, t = (performance.now() - a.t0) / 1000, cam = this.el.camera; if (!cam) return;
     const rig = a.rig.object3D, rp = rig.position, ph = a.rig.components && a.rig.components['w3d-physics'];
@@ -112,6 +115,6 @@
     cam.getWorldDirection(a.ld); a.ld.y = 0; if (a.ld.lengthSq() < 1e-6) a.ld.copy(a.fwd); a.ld.normalize();   // caption ahead of where you look
     a.lbl.position.copy(cw).addScaledVector(a.ld, 2.2).add(new THREE.Vector3(0, -0.35, 0)); a.lbl.lookAt(cw.x, cw.y - 0.35, cw.z);
   } });
-  W3D.arrival = {get active() { return !!A; }, skip: () => { if (A) A.skip = true; }, T};
+  }
   start();
 })();
