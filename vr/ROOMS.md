@@ -96,3 +96,65 @@ The Tesseract site, repo, branding and artwork stay exactly as they are. The roo
 ## Memory note (Quest 3S)
 
 While away, the home world is hidden but its meshes stay in GPU memory. Real Earth's tile cache is trimmed. If a big room (RPL) runs out of memory on Quest, the next step is to dispose the heaviest home layers (street-level houses, grass, cover-up planting) on `enter()` and rebuild them on `leave()`.
+
+## Shared exhibit modules (FPX, T-30): hangar, labs, Foresight, space + Musk campus
+
+These are world-agnostic. They don't have their own `a-scene`, renderer or XR session, and they load assets by relative path (`FPX.base`, the folder `kit.js` was loaded from). The same files run in Fowling Pond and can be mounted on Mars (bot Me) or in any other room.
+
+**Files** (load `kit.js` first, then any module; three r158 / A-Frame 1.5 globals):
+
+- `vr/w3d/exhibits/kit.js`: the shared `window.FPX` kit. It provides panels, merged parts, buttons, WebAudio tones, a VR-safe `FPX.link`, `FPX.drone` (the flyable camera drone), `FPX.ride` (scripted rides), `FPX.mount` and `FPX.setVisible`.
+- `vr/w3d/exhibits/hangar.js`: `hangar` (Drone Hangar, patrol quadcopters, the flyable camera drone and the H18 Defense panel).
+- `vr/w3d/exhibits/phreaklab.js`: `phreaklab` (Cap'n Crunch Phreaking Lab, with the 2600 Hz whistle, blue box, ham skywave corner, and Draper and Woz panels).
+- `vr/w3d/exhibits/foresight.js`: `foresight` (Foresight court, covering history, the Tech Tree, Nosek/Gigafund, Jurvetson with CC BY photos, and MIRI).
+- `vr/w3d/exhibits/spacecampus.js`: `planet`, `starmind`, `terafab`, `tesla`, `boring` (with the Loop tunnel ride) and `solarcity`.
+- `vr/w3d/exhibits/img/`: Jurvetson photos (CC BY 2.0, credited on the board), NASA public-domain Blue Marble and the ISS Dove photo.
+- `vr/w3d/t30site.js`: Fowling Pond only. It places all nine modules north of the launch pad, levels them on the ground, adds colliders and steps, and registers the spots.
+
+**API**
+
+```js
+const h = FPX.mount(name, sceneEl, rootEl, {position: {x, y, z}, rotationY: 0, lite: false, groundAt: (x, z) => y, radius: 320});
+FPX.setVisible(h, false);   // hide + disable its buttons
+h.unmount();                // dispose geometry, textures, buttons
+```
+
+- `rootEl` can be an A-Frame entity or a THREE.Object3D (the default is the scene).
+- Each module's origin is at ground level, with its open side facing +z.
+- `h.inst` exposes `footprint`, `walls` (local rects), `floorY`, `spawn {x, z, yawDeg}` and `update(t)`, which the kit ticks automatically. The hangar also has `fly()`, and boring has `ride()`.
+
+**The drone needs:**
+
+- the host rig to be `#rig`, with a camera child;
+- buttons raycast on `.btn`.
+
+**While the drone is active**, the kit pauses `thumbstick-move`, `wasd-controls`, `w3d-physics` and `w3d-keys` (where they exist), then restores the rig on exit.
+
+**Drone controls:**
+
+- **Quest:** left stick moves; right stick turns and climbs; B exits.
+- **Keyboard:** WASD, Q/E, Space/C, Esc.
+- **Touch:** on-screen buttons.
+
+**On Mars (Me):**
+
+```html
+<script src="https://joshfreeman.org/vr/w3d/exhibits/kit.js?v=1"></script>
+<script src="https://joshfreeman.org/vr/w3d/exhibits/hangar.js?v=1"></script>
+```
+
+Then call `FPX.mount('hangar', sceneEl, marsRoot, {position: {...}, groundAt: marsGround})`. Pass your own `groundAt` so the drone keeps above the Mars terrain.
+
+**Fowling Pond spots:**
+
+- `?spot=hangar` (also `drone`, `h18`)
+- `phreaklab` (also `lab`, `crunch`)
+- `foresight`
+- `planet`
+- `starmind`
+- `terafab`
+- `tesla` (also `campus`)
+- `boring` (also `loop`)
+- `solarcity`
+
+**Menu:** one entry, "Drone Hangar + labs".
