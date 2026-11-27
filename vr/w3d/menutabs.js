@@ -37,7 +37,7 @@
   const TABS = [['go', 'Go to'], ['worlds', 'Other worlds'], ['bank', 'Bank'], ['set', 'Settings']];
   const ORDER = {
     go: ['w:terrace', 'w:hall', 'w:vault', 'w:showcase', 'w:office', 'jfv-residence', 'jfv-guest', 'w:conservatory', 'w:propulsion', 'w:ufo',
-      'w:pond', 'w:pyramid', 'w:houseboat', 'pharosvr', 'w:launchpad', 'w:starfleet', 'w:founders', 'w:hangar', 'w:saucer', 'w:bridgewater', 'w:aldensquare', 'w:rockets', 'w:versailles', 'jfv-worldrooms', 'w:walker', 'placesvr', 'w:home'],
+      'w:pond', 'w:pyramid', 'w:houseboat', 'pharosvr', 'w:launchpad', 'w:starfleet', 'w:founders', 'w:hangar', 'w:saucer', 'w:bridgewater', 'w:aldensquare', 'w:rockets', 'w:versailles', 'jfv-ballroom', 'jfv-worldrooms', 'w:walker', 'placesvr', 'w:home'],
     worlds: ['jfv-rplpad', 'jfv-rplgo', 'tesseractvr'],
     bank: ['bankledgervr', 'jfv-bhall', 'jfv-bvault', 'jfv-bterrace'],
     set: ['speed', 'fly', 'reload', 'mpvrvoice', 'mpvrcount', 'invite', 'skylabel', 'nsndlabel', 'realearthvr', 'buildvrbtn']

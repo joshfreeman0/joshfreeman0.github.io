@@ -93,6 +93,10 @@ The Tesseract site, repo, branding and artwork stay exactly as they are. The roo
 4. **Later (Saturday or after):** the walk-in propulsion-science lab and multiverse plan (T-21) as further bays, built from the same live content.
 5. **Size:** about half a day for B. No change on the Tesseract side.
 
+## Grand Ballroom (built Nov 27 2026)
+
+`vr/rooms/ballroom.js`, a shared module: `export default ROOM`, and it also calls `FP_ROOMS.register(FP_ROOMS.pending || 'ballroom', ROOM)` when loaded by FP_ROOMS. `vr/w3d/ballroomgate.js` adds `CATALOG.ballroom` at runtime (fprooms.js unchanged), the "Grand Ballroom" Go to button (2D and VR), `W3D.spots.ballroom`, and `?room=ballroom` / `?spot=ballroom`. Inside: gilded balconies, crystal chandeliers, parquet dance floor, orchestra on a proscenium stage, a U.S. Coast Guard dress-blues honor guard with a sword arch at the entrance, waltzing couples, and one fact-checked history panel. Music is "On the Beautiful Blue Danube" (Johann Strauss II, 1866-67, public domain), synthesized with WebAudio from a note list in the file (no recording); Music ON/OFF button by the entrance. All procedural: ~20 draw calls, ~30k triangles, 4 small canvas textures; lite drops point/spot lights, the back orchestra row and half the dancers. To mount elsewhere (Mars): `import ROOM from '/vr/rooms/ballroom.js?v=1'`, then `ROOM.mount(sceneEl, rootEl, ctx)` with the ctx described above (`THREE`, `AFRAME`, `lite`, `leave`, `toast`, `teleport`), and `ROOM.unmount()`.
+
 ## Memory note (Quest 3S)
 
 While away, the home world is hidden but its meshes stay in GPU memory. Real Earth's tile cache is trimmed. If a big room (RPL) runs out of memory on Quest, the next step is to dispose the heaviest home layers (street-level houses, grass, cover-up planting) on `enter()` and rebuild them on `leave()`.
