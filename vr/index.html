@@ -9,6 +9,7 @@
 <link rel="icon" href="/vr/icon-192.png">
 <link rel="apple-touch-icon" href="/vr/icon-192.png">
 <meta name="theme-color" content="#c9a24a">
+<script src="/vr/xrhold.js?v=1" data-features='{"requiredFeatures":["local-floor"],"optionalFeatures":["bounded-floor"]}'></script>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script>
 /* Quest cross-site hand-off (Red Planet Lounge <-> Fowling Pond): a page reached by navigating from inside an immersive session gets
@@ -23,11 +24,12 @@
       const go = () => orig.call(sc, ar);
       const pr = (navigator.xr && !ar && !sc.checkHeadsetConnected() ? navigator.xr.isSessionSupported('immersive-vr').catch(() => false).then(go) : go());
       sc._jfEntering = Promise.resolve(pr).finally(() => { sc._jfEntering = null; }); return sc._jfEntering; }; }
-  window.JFVR_GRANTED = false;
+  window.JFVR_GRANTED = !!(window.JFXR && window.JFXR.granted);   /* xrhold.js (first script) may already hold the granted session */
   if (!navigator.xr || !navigator.xr.addEventListener) return;
+  if (window.JFVR_GRANTED) enter(0);
   navigator.xr.addEventListener('sessiongranted', () => { window.JFVR_GRANTED = true; console.log('xr: sessiongranted'); enter(0); });
   function enter(n) { const sc = document.querySelector('a-scene');
-    if (!sc || !sc.renderer || !sc.systems || !sc.systems.webxr) { if (n < 300) setTimeout(() => enter(n + 1), 50); return; }
+    if (!sc || !sc.renderer || !sc.systems || !sc.systems.webxr) { if (n < 600) setTimeout(() => enter(n + 1), 50); return; }
     if (sc.is('vr-mode')) return; sc.enterVR().catch(e => console.warn('xr: granted enterVR failed', e)); }
 })();
 </script>
