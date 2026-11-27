@@ -6,7 +6,7 @@ One ES module that puts a talking, realistic AI companion into any A-Frame (or p
 - Default roster: `https://joshfreeman.org/vr-staging/companion/roster.json`
 - Demo page: `https://joshfreeman.org/vr-staging/companion/demo.html` (`?family=1` also shows the wife and kids)
 - Line-up page: `https://joshfreeman.org/vr-staging/companion/lineup.html?ids=lila,freya,maya,nina` (static side-by-side comparison, no talking)
-- Version: `1.2.1` (`api.version`)
+- Version: `1.2.2` (`api.version`)
 - Proxy: `https://fp-companion.tesseractprogram.workers.dev/chat` (Cloudflare Worker `fp-companion`, source `/workspace/fp-upgrade/worker`)
 - GitHub Pages serves everything with `Access-Control-Allow-Origin: *`, so redplanetlounge.pages.dev can `import()` the module and load its GLBs.
 
@@ -43,6 +43,8 @@ opts | meaning
 `pick` | character id. Default: the player's last pick, else roster `default`. A `child` character, or one not allowed in this `world`, is never used as the starting pick (falls back to `default`, then the first adult).
 `family` | default `true` (v1.2.1: `false` is respected by later `pick()` calls too). Mounts the roster's `wife` and `child` characters that belong in this `world` as **residents** (they stand at their homes, do not follow, can be clicked/tapped to talk). `false` turns that off.
 `familyPlaceholder` | override for the built-in placeholder spots (see Family).
+`homeWaitMs` | v1.2.2, default `6000`. How long wife/kid residents stay hidden waiting for `setHome` / roster `home` / `FP_HOME` before falling back to the terrace placeholder.
+`houseAware` | v1.2.2, default `true`. `false` turns off the family-home follow rule below.
 `proxyUrl` | chat proxy. Default `DEFAULT_PROXY`.
 `onEvent` | callback; `e.type` is `ready`, `pick`, `listening`, `heard`, `reply` (`text`, `model`, `cost`), `speaking`, `moved`, `error`.
 `spawn` | `{x, y, z, yaw}` world position. `groundAt(x, z)` floor height. `follow` (default true) + `followDist` (14 m): a `canTravel` companion reappears beside you when you are far away (teleports, rooms, rocket).
@@ -131,8 +133,12 @@ Where they stand (first match wins):
 1. `api.setHome(id, pos)`
 2. roster `home`
 3. `window.FP_HOME.spawns` from B's family-home module: `{wife: {position: [x, y, z], rotationY}, kids: [{position, rotationY}, ...], yard, play, porch}`. Read on mount, and again whenever `fp-home-ready` fires on the scene element (or window). The wife goes to `spawns.wife`; kids go to `spawns.kids[i]` in roster order (Linnea -> `kids[0]`, Oskar -> `kids[1]`); extra slots stay empty; extra kids stand in a ring near `yard`. Kids wander in `play` (else `yard`). `rotationY` / `yaw` are degrees.
-4. Placeholder near the Fowling Pond terrace (Earth only, used only if `FP_HOME` never appears), `FAMILY_PLACEHOLDER`:
+4. Placeholder near the Fowling Pond terrace (Earth only, used only if nothing above has given a spot within `homeWaitMs`, default 6 s), `FAMILY_PLACEHOLDER`:
    wife (844.5, -381.5) yaw 200; kids: Linnea (840.5, -382.5) yaw 150, Oskar (841.5, -376.5) yaw 120; play area centre (842.0, -379.5), radius 2.5. y = ground height.
+
+**Visibility (v1.2.2).** Every companion and resident is created hidden and only becomes visible once it has been placed (`spawn`, `setHome`, roster `home`, `FP_HOME`, the placeholder after `homeWaitMs`, or beside the player). Nothing is ever drawn at the world origin while assets or the home load. A primary companion mounted without `spawn` appears beside the player as soon as there is a camera.
+
+**Following around the family home (v1.2.2).** While the player is inside the house, the active (travelling) companion does not follow indoors: she waits on the porch, 1.6 m beside `spawns.porch` on the side away from the wife, facing the player, and normal following resumes when the player leaves the house (followDist 14 m as before). "Come here" while indoors also sends her to the porch, and outdoors "Come here" / follow never puts her inside the walls (front, right, left, then behind the player, first spot clear of the house). House footprint: `FP_HOME.bounds` (or `.house`) `{x0, x1, z0, z1}` in world metres if B provides it, else `FP_HOME.site` centre +- 6.4 m (x) by +- 4.9 m (z), matching familyhome v1/v2's 12 x 9 m shell plus 0.4 m, else a 6 m circle round the porch. Other worlds and places are unaffected.
 
 B's `?spot=home` URL lands the player on the porch (`spawns.porch`); the module does not move the player.
 

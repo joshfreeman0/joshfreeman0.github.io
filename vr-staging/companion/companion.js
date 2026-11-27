@@ -3,7 +3,7 @@
    Replies come from an LLM through a server-side proxy (Cloudflare Worker; the OpenRouter key never reaches the browser).
    See README.md next to this file. */
 const HERE = new URL('./', import.meta.url).href;
-export const VERSION = '1.2.1';
+export const VERSION = '1.2.2';
 export const DEFAULT_PROXY = 'https://fp-companion.tesseractprogram.workers.dev/chat';
 export const WORLDS = {
   earth: 'Earth, Fowling Pond: a restored pond in Raynham, Massachusetts, on real terrain. Above it stands an Egyptian-style concept bank compound (terrace pavilion, banking hall, vault, Josh\'s office, conservatory, sphinxes and temple gate). Around it: a pyramid park at Route 24 and I-495, a houseboat, the Pharos lighthouse, King\'s Pond and the Forge River, Vesta\'s house, a zoo, and a launch pad in Bridgewater with a rocket to Mars. Flying saucers visit other cities.',
@@ -68,7 +68,7 @@ class Companion {
     this.rosterBase = typeof this.o.roster === 'string' ? new URL(this.o.roster, HERE).href : HERE;
     this.roster = (ro.characters || []).filter(c => c && c.id && c.avatar);
     if (!this.roster.length) throw new Error('companion: empty roster');
-    this.holder = new T.Group(); this.holder.name = 'fp-companion'; this.root3d.add(this.holder);
+    this.holder = new T.Group(); this.holder.name = 'fp-companion'; this.holder.visible = false; this.root3d.add(this.holder);   // v1.2.2: hidden until placed (never shown at the origin)
     this.sub = this.makeSubtitle(); this.holder.add(this.sub.sprite);
     this.hookTick(); this.hookInput(); if (this.o.ui !== false) this.makeUI();
     let pick = this.o.pick || this.store.get && (await this.store.get('fpc:v1:' + this.playerId + ':pick')) || ro.default || this.roster[0].id;
@@ -84,7 +84,8 @@ class Companion {
       setHome: (id, pos) => this.setHome(id, pos), family: () => [...this.family.values()].map(r => ({id: r.ch.id, name: r.ch.name, role: r.ch.role, object3D: r.holder})),
       talkTo: (id, text) => { const r = this.family.get(id); if (r) return text ? r.send(text) : r.listen(); if (this.ch && this.ch.id === id) return text ? this.send(text) : this.listen(); }
     };
-    if (this.o.family !== false) { this.syncFamily(); const onHome = () => this.placeFamily();
+    if (this.o.family !== false) { this.homeWaitOver = false; const hw = setTimeout(() => { this.homeWaitOver = true; if (!this.dead) this.placeFamily(); }, this.o.homeWaitMs === undefined ? 6000 : +this.o.homeWaitMs); this.cleanup.push(() => clearTimeout(hw));
+      this.syncFamily(); const onHome = () => this.placeFamily();
       for (const t of [this.sceneEl, window]) if (t && t.addEventListener) { t.addEventListener('fp-home-ready', onHome); this.cleanup.push(() => t.removeEventListener('fp-home-ready', onHome)); } }
     this.emit('ready', {roster: this.api.list()});
     return this.api;
@@ -96,7 +97,7 @@ class Companion {
   // ---------- family residents (wife / children stand at home while another companion is active) ----------
   async initResident() {
     const c = this.o.character; this.roster = [c]; this.rosterBase = this.o.rosterBase || HERE;
-    this.holder = new this.T.Group(); this.holder.name = 'fp-resident-' + c.id; this.root3d.add(this.holder);
+    this.holder = new this.T.Group(); this.holder.name = 'fp-resident-' + c.id; this.holder.visible = false; this.root3d.add(this.holder);
     this.sub = this.makeSubtitle(); this.holder.add(this.sub.sprite); this.hookTick(); if (!this.o.noInput) this.hookInput();
     await this.pick(c.id, true); return null;
   }
@@ -125,9 +126,10 @@ class Companion {
     if (c.role !== 'child' || c.wander === false || this.homes[c.id]) return null;
     const a = P(c.wanderArea) || (H && this.world === 'earth' ? (P(H.play) || P(H.yard)) : null) || (this.world === 'earth' && !c.home && !H ? P((this.o.familyPlaceholder || FAMILY_PLACEHOLDER).play) : null);
     return a ? {x: a.x, z: a.z, r: a.r || 4} : null; }
-  placeFamily() { for (const r of this.family.values()) { if (!r.model) continue; const h = this.homeFor(r.ch);
+  placeFamily() { if (this.dead) return; for (const r of this.family.values()) { if (!r.model) continue; const h = this.homeFor(r.ch);
+      if (h && h.src === 'placeholder' && !this.homeWaitOver) continue;   // v1.2.2: stay hidden while FP_HOME may still arrive (homeWaitMs)
       if (h) { r.placeWorld(h.x, h.y, h.z, h.yaw); r.homeSrc = h.src; } else if (!r.placed) r.comeHere();
-      r.placed = true; r.wander = this.wanderArea(r.ch); r.wTarget = null; r.wWait = 2 + Math.random() * 4; } }
+      r.wander = this.wanderArea(r.ch); r.wTarget = null; r.wWait = 2 + Math.random() * 4; } }
 
   // ---------- characters ----------
   async pick(id, first) {
@@ -146,7 +148,7 @@ class Companion {
     this.fit(m, c); this.holder.add(m); this.model = m; this.rig(c);
     this.hist = (await (this.store.get && this.store.get(this.key()))) || [];
     if (this.store.set && !this.resident && c.role !== 'child') this.store.set('fpc:v1:' + this.playerId + ':pick', c.id);
-    if (prevPos) this.holder.position.copy(prevPos); else if (this.o.spawn) { const s = this.o.spawn; this.placeWorld(s.x, s.y, s.z, s.yaw); }
+    if (prevPos) this.holder.position.copy(prevPos); else if (this.o.spawn) { const s = this.o.spawn; this.placeWorld(s.x, s.y, s.z, s.yaw); } else if (!this.resident) this.comeHere();
     this.sub.sprite.position.set(0, (this.modelH || c.height || 1.7) + 0.32, 0); this.fitHit();
     if (this.ui) this.ui.sel.value = c.id, this.ui.btn.textContent = 'Talk to ' + c.name;
     if (!this.resident) { this.emit('pick', {name: c.name, role: c.role}); if (this.o.family !== false) this.syncFamily(); }
@@ -234,12 +236,29 @@ class Companion {
 
   // ---------- placement ----------
   placeWorld(x, y, z, yaw) { const T = this.T, p = new T.Vector3(x, y === undefined || y === null ? this.ground(x, z) : y, z); this.root3d.updateMatrixWorld(true); this.root3d.worldToLocal(p);
-    this.holder.position.copy(p); if (yaw !== undefined) this.holder.rotation.y = yaw * Math.PI / 180; }
+    this.holder.position.copy(p); if (yaw !== undefined) this.holder.rotation.y = yaw * Math.PI / 180; this.holder.visible = true; this.placed = true; }
   ground(x, z) { try { if (this.o.groundAt) { const g = this.o.groundAt(x, z); if (isFinite(g)) return g; } } catch (e) {} const c = this.playerPos(); return c ? c.y - 1.6 : 0; }
   playerPos() { const c = this.camera; return c ? c.getWorldPosition(new this.T.Vector3()) : null; }
   comeHere() { const T = this.T, c = this.camera; if (!c) return; const p = c.getWorldPosition(new T.Vector3()), f = c.getWorldDirection(new T.Vector3()); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize();
-    const r = new T.Vector3(-f.z, 0, f.x), x = p.x + f.x * 1.7 + r.x * 0.5, z = p.z + f.z * 1.7 + r.z * 0.5; this.placeWorld(x, null, z);
-    this.faceW(p, true); this.emit('moved'); }
+    const hi = this.resident ? null : this.houseInfo();
+    if (hi && hi.inside(p.x, p.z)) { if (hi.spot) { this.placeWorld(hi.spot[0], hi.spot[1], hi.spot[2]); this.faceW(p, true); this.atPorch = true; this.emit('moved', {reason: 'porch'}); } return; }   // player indoors: wait on the porch
+    const r = new T.Vector3(-f.z, 0, f.x);
+    for (const [a, b] of [[1.7, 0.5], [0.4, 1.6], [0.4, -1.6], [-1.6, 0.4]]) { const x = p.x + f.x * a + r.x * b, z = p.z + f.z * a + r.z * b;   // front, right, left, behind: first spot outside the house walls
+      if (hi && hi.inside(x, z, 0.4)) continue; this.placeWorld(x, null, z); this.faceW(p, true); this.emit('moved'); return; }
+    if (hi && hi.spot) { this.placeWorld(hi.spot[0], hi.spot[1], hi.spot[2]); this.faceW(p, true); this.emit('moved', {reason: 'porch'}); } }
+  /* v1.2.2: B's family home (window.FP_HOME). House footprint from FP_HOME.bounds / .house {x0, x1, z0, z1} (world), else FP_HOME.site centre +- 6.4 x 4.9 m (familyhome v1/v2 shell),
+     else a 6 m circle round the porch. The waiting spot is 1.6 m beside spawns.porch, on the side away from the wife. */
+  houseInfo() { const H = window.FP_HOME; if (!H || !H.spawns || H.ready === false || this.world !== 'earth' || this.o.houseAware === false) return null;
+    const P = v => !v ? null : Array.isArray(v) ? v : Array.isArray(v.position) ? v.position : isFinite(v.x) ? [v.x, v.y, v.z] : null;
+    const porch = P(H.spawns.porch), wife = P(H.spawns.wife), b = H.bounds || H.house; let rect = null, circ = null;
+    if (b && isFinite(b.x0) && isFinite(b.z1)) rect = b; else if (H.site && isFinite(H.site.x) && isFinite(H.site.z)) rect = {x0: H.site.x - 6.4, x1: H.site.x + 6.4, z0: H.site.z - 4.9, z1: H.site.z + 4.9};
+    else if (porch || wife) { const c0 = porch || wife; circ = {x: c0[0], z: c0[2], r: 6}; }
+    if (!rect && !circ) return null;
+    const inside = (x, z, m) => { m = m || 0; return rect ? x > rect.x0 - m && x < rect.x1 + m && z > rect.z0 - m && z < rect.z1 + m : Math.hypot(x - circ.x, z - circ.z) < circ.r + m; };
+    let spot = null; if (porch) { const cx = rect ? (rect.x0 + rect.x1) / 2 : porch[0], cz = rect ? (rect.z0 + rect.z1) / 2 : porch[2] + 1; let dx = porch[0] - cx, dz = porch[2] - cz; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
+      let px = -dz, pz = dx; if (wife && Math.hypot(porch[0] + px - wife[0], porch[2] + pz - wife[2]) < Math.hypot(porch[0] - px - wife[0], porch[2] - pz - wife[2])) { px = -px; pz = -pz; }
+      spot = [porch[0] + px * 1.6, porch[1] === undefined ? null : porch[1], porch[2] + pz * 1.6]; }
+    return {inside, spot, rect, circ}; }
   faceW(p, snap) { const T = this.T, h = this.holder.getWorldPosition(new T.Vector3()), want = Math.atan2(p.x - h.x, p.z - h.z) - this.parentYaw();
     if (snap) this.holder.rotation.y = want; return want; }
   parentYaw() { const e = new this.T.Euler().setFromQuaternion(this.root3d.getWorldQuaternion(new this.T.Quaternion()), 'YXZ'); return e.y; }
@@ -258,8 +277,13 @@ class Companion {
     const cam = this.camera, pp = cam ? cam.getWorldPosition(new T.Vector3()) : null, hp = this.holder.getWorldPosition(new T.Vector3());
     // follow: a travelling companion stays near the player (also after teleports, rooms, rocket rides)
     if (this.resident && this.wander) this.doWander(dt, pp, hp);
+    if (pp && !this.resident && !this.placed) this.comeHere();   // no spawn given: appear beside the player once there is a camera
     if (pp && !this.resident && this.ch.canTravel !== false && this.o.follow !== false && this.state === 'idle') { const d = Math.hypot(pp.x - hp.x, pp.z - hp.z), dy = Math.abs(pp.y - 1.6 - hp.y);
-      if (d > (this.o.followDist || 14) || dy > 6) this.comeHere(); }
+      const hi = this.houseInfo();
+      if (hi && hi.inside(pp.x, pp.z)) {   // v1.2.2: player inside the family home: wait on the porch instead of following through the walls
+        if (hi.spot && !this.atPorch && Math.hypot(hp.x - hi.spot[0], hp.z - hi.spot[2]) > 1) { this.placeWorld(hi.spot[0], hi.spot[1], hi.spot[2]); this.faceW(pp, true); this.emit('moved', {reason: 'porch'}); }
+        this.atPorch = true; }
+      else { this.atPorch = false; if (d > (this.o.followDist || 14) || dy > 6) this.comeHere(); } }
     // turn the body toward the player when close or talking
     if (pp && !this.walking) { const d = Math.hypot(pp.x - hp.x, pp.z - hp.z); if (d < 8 || this.state !== 'idle') { const want = Math.atan2(pp.x - hp.x, pp.z - hp.z) - this.parentYaw();
       let dy = ((want - this.holder.rotation.y + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI; const thr = this.state !== 'idle' ? 0.05 : 0.7;
