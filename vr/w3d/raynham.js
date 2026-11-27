@@ -20,7 +20,7 @@ W3D.keepOut = (W3D.keepOut || []).concat([{x: 1224.5, z: -1174.5, r: 20, name: '
   {x: 1333.5, z: -1336.5, r: 24, name: "St. Ann's Church"}, {x: 1376, z: -1453, r: 28, name: "St. Ann's hall"}, {x: 1349, z: -751, r: 14, name: "Colletti's Market"}]);
 let D = null, center = null, boards = [], arrows = null, samples = [], kiosk = null, ride = null, acc = 0, last = {x: 1e9, z: 1e9};
 const R = W3D.raynham = {stats: () => ({loaded: !!D, center: !!center, centerTris: center ? center.userData.tris : 0, boards: boards.filter(b => b.mesh).length,
-  arrows: arrows ? arrows.count : 0, kiosk: !!kiosk, riding: ride ? {n: ride.r.n, s: Math.round(ride.s), L: Math.round(ride.L)} : null}), ride: n => startRide(n), stop: () => stopRide('Ride stopped'), speed: 25};
+  arrows: arrows ? arrows.count : 0, dunkin: dunkin ? {tris: dunkin.userData.tris, cleared: dunkin.userData.cleared} : null, kiosk: !!kiosk, riding: ride ? {n: ride.r.n, s: Math.round(ride.s), L: Math.round(ride.L)} : null}), ride: n => startRide(n), stop: () => stopRide('Ride stopped'), speed: 25};
 
 function gh(x, z) { let y = W3D.groundAt ? W3D.groundAt(x, z, 999) : NaN; if (!isFinite(y)) y = W3D.terrainH ? W3D.terrainH(x, z) : 0; return isFinite(y) ? y : 0; }
 function tH(x, z) { const y = W3D.terrainH ? W3D.terrainH(x, z) : gh(x, z); return isFinite(y) ? y : 0; }
@@ -162,10 +162,161 @@ function obb(P) {   // min-area rectangle over the footprint's edge directions
   const uc = (u0 + u1) / 2, vc = (v0 + v1) / 2; return {cx: cx0 + ux * uc - uz * vc, cz: cz0 + uz * uc + ux * vc, ux, uz, hl: (u1 - u0) / 2, hw: (v1 - v0) / 2};
 }
 
+/* ---------- Dunkin', Broadway (Josh, Nov 27): OSM building 215785307's north-west unit, lots, drive-thru, a barista ----------
+   frame: A = the unit's front corner, U along the Broadway-facing front (u 0..39), W into the building (w 0..21) */
+const DK = {x: -1080, z: -998, lat: 41.937661, lon: -71.080995, A: [-1083.0, -978.8], U: [0.5829, -0.8125], W: [-0.8125, -0.5829]};
+const dkAt = (u, w) => [DK.A[0] + DK.U[0] * u + DK.W[0] * w, DK.A[1] + DK.U[1] * u + DK.W[1] * w];
+W3D.keepOut = W3D.keepOut.concat([{x: -1080, z: -1001, r: 25, name: "Dunkin'"}, {x: -1059, z: -992, r: 22, name: "Dunkin' lot"}, {x: -1098, z: -1015, r: 18, name: "Dunkin' lot"}]);
+let dunkin = null, dkAnim = null;
+function inPoly(L, x, z) { let c = false; for (let i = 0, j = L.length - 1; i < L.length; j = i++) { const a = L[i], b = L[j]; if ((a[1] > z) !== (b[1] > z) && x < (b[0] - a[0]) * (z - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; }
+function segD(x, z, a, b) { const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1; let t = ((x - a[0]) * dx + (z - a[1]) * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t; return Math.hypot(a[0] + dx * t - x, a[1] + dz * t - z); }
+function nearPoly(L, x, z, m) { if (inPoly(L, x, z)) return true; for (let i = 0; i < L.length; i++) if (segD(x, z, L[i], L[(i + 1) % L.length]) < m) return true; return false; }
+function extrudeOpen(G, P, h, wall, roof) {   // extrude() minus the front edge (A..B), which buildDunkin() closes around the shop window
+  if (ccw(P) > 0) P = P.slice().reverse(); let lo = 1e9, hi = -1e9; for (const [x, z] of P) { const y = tH(x, z); lo = Math.min(lo, y); hi = Math.max(hi, y); }
+  const y0 = lo - 0.4, y1 = hi + h, isA = p => Math.hypot(p[0] - DK.A[0], p[1] - DK.A[1]) < 0.5, B = dkAt(39.1, 0), isB = p => Math.hypot(p[0] - B[0], p[1] - B[1]) < 1;
+  for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; if ((isA(a) && isB(b)) || (isB(a) && isA(b))) continue; G.quad([a[0], y0, a[1]], [b[0], y0, b[1]], [b[0], y1, b[1]], [a[0], y1, a[1]], wall); }
+  const tr = THREE.ShapeUtils.triangulateShape(P.map(p => new THREE.Vector2(p[0], p[1])), []);
+  for (const [i, j, k] of tr) { const A = P[i], Bq = P[j], K = P[k]; G.tri([A[0], y1, A[1]], [K[0], y1, K[1]], [Bq[0], y1, Bq[1]], roof); }
+  return {y0, y1, P};
+}
+function drape(G, L, col, lift) {   // a polygon of asphalt on a 2 m grid, following the ground
+  let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; L.forEach(([x, z]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); });
+  const st = 2, y = (x, z) => tH(x, z) + lift;
+  for (let x = x0; x < x1; x += st) for (let z = z0; z < z1; z += st) if (inPoly(L, x + st / 2, z + st / 2)) G.quad([x, y(x, z + st), z + st], [x + st, y(x + st, z + st), z + st], [x + st, y(x + st, z), z], [x, y(x, z), z], col);
+}
+function strip(G, P, hw, col, lift) {   // a polyline ribbon (drive-thru lane, service drives), 3 m steps
+  for (let i = 0; i < P.length - 1; i++) { const a = P[i], b = P[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 0.1) continue; const dx = (b[0] - a[0]) / L, dz = (b[1] - a[1]) / L, n = Math.ceil(L / 3);
+    for (let k = 0; k < n; k++) { const p = [a[0] + dx * L * k / n, a[1] + dz * L * k / n], q = [a[0] + dx * L * (k + 1) / n, a[1] + dz * L * (k + 1) / n], y = (x, z) => tH(x, z) + lift;
+      const c = [[p[0] - dz * hw, p[1] + dx * hw], [q[0] - dz * hw, q[1] + dx * hw], [q[0] + dz * hw, q[1] - dx * hw], [p[0] + dz * hw, p[1] - dx * hw]];
+      G.quad(...c.map(([x, z]) => [x, y(x, z), z]), col); } }
+}
+// an oriented box in any frame: centre (x, y, z), size, yaw
+function obox(G, x, y, z, sx, sy, sz, yaw, col) { const g = new THREE.BoxGeometry(sx, sy, sz).toNonIndexed(); g.rotateY(yaw); g.translate(x, y, z); pushGeo(G, g, col); }
+function dkTex(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
+function dkSign() { return dkTex(1024, 256, (g, w, h) => { g.fillStyle = '#fff7ef'; g.fillRect(0, 0, w, h); g.font = '900 170px "Arial Rounded MT Bold", Arial Black, Arial, sans-serif'; g.textBaseline = 'middle';
+  const a = 'DUNK', b = "IN'", wa = g.measureText(a).width, wb = g.measureText(b).width; let x = (w - wa - wb) / 2;
+  g.fillStyle = '#ff671f'; g.fillText(a, x, h / 2 + 8); g.fillStyle = '#da1884'; g.fillText(b, x + wa, h / 2 + 8); }); }
+function dkMenu(drive) { return dkTex(512, 256, (g, w, h) => { g.fillStyle = '#2b1d16'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#ff671f'; g.fillRect(0, 0, w, 44); g.fillStyle = '#fff'; g.font = 'bold 30px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(drive ? 'DRIVE THRU' : 'MENU', w / 2, 23);
+  const it = ['Hot coffee', 'Iced coffee', 'Lattes', 'Donuts', 'Munchkins', 'Breakfast'], col = ['#ff671f', '#da1884', '#f6c343'];
+  g.textAlign = 'left'; g.font = 'bold 24px Arial, sans-serif'; it.forEach((s, i) => { const x = 20 + (i % 2) * 250, y = 80 + Math.floor(i / 2) * 60; g.fillStyle = col[i % 3]; g.fillRect(x, y - 16, 30, 30); g.fillStyle = '#f4ece4'; g.fillText(s, x + 42, y); }); }); }
+
+// the barista: about 450 tris in three meshes (body, head that nods, right arm that waves); deliberately no name tag or text anywhere
+function barista(mat) {
+  const grp = new THREE.Group(); grp.name = 'houses-raynham-dunkin-barista';
+  const skin = C(0xf2c6a4), hair = C(0xf1cf73), shirt = C(0x3a2a22), apron = C(0xff671f), pink = C(0xda1884), pants = C(0x24211f), eye = C(0x2f7fe0), white = C(0xffffff);
+  const B = new Geo(), H = new Geo(), Ar = new Geo();
+  obox(B, -0.09, 0.45, 0, 0.15, 0.9, 0.18, 0, pants); obox(B, 0.09, 0.45, 0, 0.15, 0.9, 0.18, 0, pants);
+  obox(B, 0, 1.17, 0, 0.42, 0.56, 0.23, 0, shirt); obox(B, 0, 1.0, 0.125, 0.36, 0.62, 0.02, 0, apron); obox(B, 0, 1.28, 0.127, 0.2, 0.14, 0.02, 0, apron);
+  obox(B, 0, 0.98, 0.137, 0.22, 0.08, 0.01, 0, pink);                                     // apron pocket
+  obox(B, -0.26, 1.16, 0, 0.1, 0.5, 0.11, 0, shirt); obox(B, -0.26, 0.87, 0.02, 0.09, 0.1, 0.09, 0, skin);   // left arm + hand
+  { const g = new THREE.CylinderGeometry(0.05, 0.055, 0.1, 6).toNonIndexed(); g.translate(0, 1.49, 0); pushGeo(B, g, skin); }
+  // head: local origin at the neck so it can nod
+  { const g = new THREE.SphereGeometry(0.13, 8, 6).toNonIndexed(); g.scale(1, 1.12, 1); g.translate(0, 0.16, 0); pushGeo(H, g, skin);
+    const cap = new THREE.SphereGeometry(0.142, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.55).toNonIndexed(); cap.scale(1, 1.1, 1.04); cap.translate(0, 0.17, -0.012); pushGeo(H, cap, hair);
+    obox(H, 0, 0.07, -0.1, 0.25, 0.3, 0.07, 0, hair);                                        // hair down the back
+    obox(H, 0, 0.12, -0.15, 0.08, 0.22, 0.06, 0, hair);                                      // ponytail through the visor
+    obox(H, -0.115, 0.1, 0.0, 0.04, 0.2, 0.14, 0, hair); obox(H, 0.115, 0.1, 0.0, 0.04, 0.2, 0.14, 0, hair);
+    for (const s of [-1, 1]) { obox(H, s * 0.05, 0.175, 0.118, 0.05, 0.034, 0.012, 0, white); obox(H, s * 0.05, 0.175, 0.126, 0.03, 0.03, 0.01, 0, eye); obox(H, s * 0.05, 0.208, 0.12, 0.05, 0.01, 0.01, 0, C(0xb08a40)); }
+    obox(H, 0, 0.1, 0.128, 0.06, 0.014, 0.01, 0, C(0xc2475a));                               // smile
+    const band = new THREE.CylinderGeometry(0.15, 0.15, 0.055, 10, 1, true).toNonIndexed(); band.translate(0, 0.24, 0); pushGeo(H, band, pink);
+    obox(H, 0, 0.225, 0.19, 0.24, 0.022, 0.13, 0, apron); }                                  // visor brim
+  // right arm: origin at the shoulder
+  obox(Ar, 0, -0.25, 0, 0.1, 0.5, 0.11, 0, shirt); obox(Ar, 0, -0.54, 0.02, 0.09, 0.1, 0.09, 0, skin);
+  const mB = B.mesh(mat, 'houses-raynham-dunkin-barista-body'), mH = H.mesh(mat, 'houses-raynham-dunkin-barista-head'), mR = Ar.mesh(mat, 'houses-raynham-dunkin-barista-arm');
+  for (const m of [mB, mH, mR]) { const n = m.geometry.attributes.normal, c = m.geometry.attributes.color;   // baked soft light, so the unlit (MeshBasic) figure still has form and glows with the shop at night
+    for (let i = 0; i < c.count; i++) { const k = 0.72 + 0.28 * Math.max(0, n.getX(i) * 0.3 + n.getY(i) * 0.75 + n.getZ(i) * 0.6); c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k); } }
+  mH.position.set(0, 1.52, 0); mR.position.set(0.26, 1.42, 0); grp.add(mB, mH, mR);
+  grp.userData = {head: mH, arm: mR, tris: mB.userData.tris + mH.userData.tris + mR.userData.tris}; return grp;
+}
+function animBarista(t) {   // 9 s loop: wave twice, smile-nod, idle sway
+  const a = dkAnim; if (!a) return; const k = t % 9;
+  a.arm.rotation.z = k < 2.4 ? Math.min(1, k / 0.4, (2.4 - k) / 0.4) * (2.5 + 0.35 * Math.sin(k * 9)) : 0;
+  a.head.rotation.x = k > 3 && k < 4.2 ? 0.22 * Math.sin((k - 3) / 1.2 * Math.PI * 2) : 0.03 * Math.sin(t * 0.8);
+  a.head.rotation.y = 0.1 * Math.sin(t * 0.37);
+}
+function clearSite() {   // trees / bushes (the world's big instanced meshes) that poke into the building, the lots or the lane
+  const dk = D.dk, areas = [dk.b, ...dk.lots]; let n = 0;
+  const hit = (x, z) => areas.some(L => nearPoly(L, x, z, 3)) || dk.lane.some((p, i) => i && segD(x, z, dk.lane[i - 1], p) < 4);
+  for (const im of W3D.root.children) { if (!im.isInstancedMesh || im.count < 200) continue; const e = im.instanceMatrix.array; let ch = false;
+    for (let i = 0; i < im.count; i++) { const o = i * 16, x = e[o + 12], z = e[o + 14]; if (Math.abs(x - DK.x) > 80 || Math.abs(z - DK.z) > 80 || (e[o] === 0 && e[o + 5] === 0)) continue;
+      if (hit(x, z)) { e[o] = e[o + 1] = e[o + 2] = e[o + 4] = e[o + 5] = e[o + 6] = e[o + 8] = e[o + 9] = e[o + 10] = 0; ch = true; n++; } }
+    if (ch) im.instanceMatrix.needsUpdate = true; }
+  return n;
+}
+function buildDunkin() {
+  const dk = D.dk, G = new Geo(), I = new Geo(), S = new Geo();
+  // lots, lane and service drives
+  dk.lots.forEach(L => drape(G, L, C(0x2c2e31), 0.06)); strip(G, dk.lane, 1.8, C(0x34363a), 0.08); dk.svc.forEach(P => strip(G, P, 3, C(0x2f3134), 0.05));
+  for (const R of dk.rows) { const [p0, p1, p2, p3] = R, L = Math.hypot(p3[0] - p0[0], p3[1] - p0[1]), w = 0.07;   // stall lines across each row, 2.75 m apart
+    for (let s = 0; s <= L; s += 2.75) { const t = s / L, a = [p0[0] + (p3[0] - p0[0]) * t, p0[1] + (p3[1] - p0[1]) * t], b = [p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t];
+      const dx = (p3[0] - p0[0]) / L * w, dz = (p3[1] - p0[1]) / L * w, y = (x, z) => tH(x, z) + 0.1;
+      G.quad([a[0] - dx, y(a[0], a[1]), a[1] - dz], [b[0] - dx, y(b[0], b[1]), b[1] - dz], [b[0] + dx, y(b[0], b[1]), b[1] + dz], [a[0] + dx, y(a[0], a[1]), a[1] + dz], C(0xe9e9e2)); } }
+  // the building: tan block, the Dunkin' unit is the first 15 m of the front
+  const r = extrudeOpen(G, dk.b, 5.0, C(0xc9b596), C(0x4a4c50)), yb = r.y1 - 5.0 + 0.1, yaw = Math.atan2(DK.U[0], DK.U[1]) - Math.PI / 2;
+  const fq = (Q, u0, u1, v0, v1, off, col, uv) => { const a = dkAt(u0, -off), b = dkAt(u1, -off); Q.quad([a[0], yb + v0, a[1]], [b[0], yb + v0, b[1]], [b[0], yb + v1, b[1]], [a[0], yb + v1, a[1]], col, uv); };
+  const v0 = r.y0 - yb; fq(G, 0, 1, v0, r.y1 - yb, 0, C(0xc9b596)); fq(G, 14, 39.1, v0, r.y1 - yb, 0, C(0xc9b596)); fq(G, 1, 14, 2.95, r.y1 - yb, 0, C(0xc9b596)); fq(G, 1, 14, v0, 0.05, 0, C(0x9d8a70));
+  fq(G, 0, 15, 3.05, 4.9, 0.03, C(0xfff4ea)); fq(G, 0, 15, 2.95, 3.1, 0.4, C(0xff671f)); fq(G, 0, 15, 2.85, 2.95, 0.4, C(0xda1884));   // white fascia + orange/pink awning stripe
+  for (let u = 1; u <= 14.01; u += 2.6) fq(G, u - 0.06, u + 0.06, 0, 2.95, 0.07, C(0x2a2a2c));                            // mullions
+  fq(G, 6.0, 6.08, 0, 2.3, 0.09, C(0x2a2a2c)); fq(G, 7.92, 8.0, 0, 2.3, 0.09, C(0x2a2a2c)); fq(G, 6.0, 8.0, 2.22, 2.3, 0.09, C(0x2a2a2c)); fq(G, 7.6, 7.66, 0.9, 1.3, 0.11, C(0xc0c4c8));
+  for (let k = 0; k < 4; k++) { const u0 = 17 + k * 5.5; fq(G, u0, u0 + 4.6, 0.3, 2.8, 0.04, C(0x29323b)); fq(G, u0, u0 + 4.6, 3.2, 4.2, 0.04, C(0xe8e2d4)); }   // the other units: plain, unlabelled
+  fq(S, 2.0, 13.0, 3.25, 4.75, 0.1, C(0xffffff));                                                                          // DUNKIN' (textured)
+  // interior (MeshBasic: reads as a lit shop day and night)
+  const iq = (u0, w0, u1, w1, y0, y1, col) => { const a = dkAt(u0, w0), b = dkAt(u1, w1); I.quad([a[0], yb + y0, a[1]], [b[0], yb + y0, b[1]], [b[0], yb + y1, b[1]], [a[0], yb + y1, a[1]], col); };
+  const fl = (u0, w0, u1, w1, y, col) => { const p = [dkAt(u0, w0), dkAt(u1, w0), dkAt(u1, w1), dkAt(u0, w1)]; I.quad(...p.map(q => [q[0], yb + y, q[1]]), col); };
+  fl(0.2, 0.2, 14.8, 7.5, 0.03, C(0xb98d62)); fl(0.2, 0.2, 14.8, 7.5, 3.0, C(0xffe2b0));                                      // floor + glowing ceiling
+  iq(0.2, 7.5, 14.8, 7.5, 0, 3.0, C(0xf0d9bf)); iq(14.8, 0.2, 14.8, 7.5, 0, 3.0, C(0xe9cfb2)); iq(0.2, 0.2, 0.2, 7.5, 0, 3.0, C(0xe9cfb2));   // back / side walls
+  iq(5, 7.45, 10.5, 7.45, 1.9, 2.75, C(0x2b1d16)); iq(1.5, 7.45, 4.5, 7.45, 1.2, 1.6, C(0xff671f));                     // menu-board backing + an orange shelf band
+  const cb = (u0, u1, w0, w1, y0, y1, side, top) => { iq(u0, w0, u1, w0, y0, y1, side); iq(u0, w1, u1, w1, y0, y1, side); iq(u0, w0, u0, w1, y0, y1, side); iq(u1, w0, u1, w1, y0, y1, side); fl(u0, w0, u1, w1, y1, top); };
+  cb(2, 11.5, 3.0, 3.8, 0, 1.05, C(0xff7a2f), C(0xf4efe9)); iq(2, 2.98, 11.5, 2.98, 0.75, 0.85, C(0xda1884));              // the counter, pink trim line
+  cb(2.4, 4.6, 3.15, 3.65, 1.05, 1.5, C(0xdfeef5), C(0xdfeef5));                                                           // donut case
+  cb(8.5, 9.4, 6.8, 7.4, 0.9, 1.7, C(0x3b3c40), C(0x3b3c40)); cb(9.8, 10.6, 6.8, 7.4, 0.9, 1.6, C(0xc4c6c9), C(0xc4c6c9)); cb(7, 12, 6.7, 7.45, 0, 0.9, C(0x8a6a4c), C(0xd8d4ce));   // coffee machines on the back bench
+  for (const [u, w] of [[13.2, 1.4], [13.2, 4.6]]) { cb(u - 0.4, u + 0.4, w - 0.4, w + 0.4, 0.72, 0.76, C(0x5a3d2b), C(0x6b4a33)); cb(u - 0.05, u + 0.05, w - 0.05, w + 0.05, 0, 0.72, C(0x2a2a2c), C(0x2a2a2c)); }   // two-tops by the window
+  const donut = new THREE.TorusGeometry(0.075, 0.035, 4, 7); const dc = [0xd88a4a, 0xf3a6c8, 0x6b3b22, 0xf6e0b0, 0xd88a4a, 0xf3a6c8];
+  dc.forEach((c, i) => { const g = donut.clone().toNonIndexed(); g.rotateX(Math.PI / 2); const p = dkAt(2.7 + i * 0.33, 3.4); g.translate(p[0], yb + 1.12 + (i % 2) * 0.17, p[1]); pushGeo(I, g, C(c)); }); donut.dispose();
+  // drive-thru window on the back bump, its menu board by the lane
+  const bw = [[-1095.0, -1001.2], [-1091.8, -1005.6]], bn = [-0.809, -0.588];
+  { const q = (t0, t1, v0, v1, off, col, Q) => { const a = [bw[0][0] + (bw[1][0] - bw[0][0]) * t0 + bn[0] * off, bw[0][1] + (bw[1][1] - bw[0][1]) * t0 + bn[1] * off], b = [bw[0][0] + (bw[1][0] - bw[0][0]) * t1 + bn[0] * off, bw[0][1] + (bw[1][1] - bw[0][1]) * t1 + bn[1] * off];
+      (Q || G).quad([a[0], yb + v0, a[1]], [b[0], yb + v0, b[1]], [b[0], yb + v1, b[1]], [a[0], yb + v1, a[1]], col); };
+    q(0.2, 0.8, 0.9, 2.3, 0.05, C(0x2a2a2c)); q(0.26, 0.74, 1.0, 2.2, 0.07, C(0xffd49a), I); q(0.1, 0.9, 2.45, 2.8, 0.35, C(0xff671f)); }
+  const glassM = clip(new THREE.MeshBasicMaterial({color: 0x9fc3d6, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide}));
+  const gq = new Geo(); { const a = dkAt(1, -0.05), b = dkAt(14, -0.05); gq.quad([a[0], yb + 0.05, a[1]], [b[0], yb + 0.05, b[1]], [b[0], yb + 2.95, b[1]], [a[0], yb + 2.95, a[1]], C(0xffffff)); }
+  // menu board on two posts beside the lane, facing oncoming cars
+  const mp = [-1096.4, -983.2], my = tH(mp[0], mp[1]), mYaw = Math.atan2(DK.U[0], DK.U[1]) - 0.38;
+  obox(G, mp[0] - 0.9 * Math.cos(mYaw), my + 0.9, mp[1] + 0.9 * Math.sin(mYaw), 0.12, 1.8, 0.12, mYaw, C(0x2a2a2c)); obox(G, mp[0] + 0.9 * Math.cos(mYaw), my + 0.9, mp[1] - 0.9 * Math.sin(mYaw), 0.12, 1.8, 0.12, mYaw, C(0x2a2a2c));
+  obox(G, mp[0], my + 1.75, mp[1], 2.3, 1.25, 0.12, mYaw, C(0x2a2a2c));
+  // parked cars: four in the front row, one in the side lot, door bay left clear
+  const cars = [[1, 0.03, 0xb8bcc2], [1, 0.33, 0x1f3a66], [1, 0.62, 0xe8e8e6], [0, 0.3, 0x8c1c1c], [2, 0.4, 0x2f3236]];
+  for (const [ri, t, c] of cars) { const [p0, p1, p2, p3] = dk.rows[ri], a = [p0[0] + (p3[0] - p0[0]) * t, p0[1] + (p3[1] - p0[1]) * t], b = [p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t];
+    const cx = (a[0] + b[0]) / 2, cz = (a[1] + b[1]) / 2, yw = Math.atan2(b[0] - a[0], b[1] - a[1]), y0 = tH(cx, cz);
+    const at = (f, s) => [cx + Math.sin(yw) * f + Math.cos(yw) * s, cz + Math.cos(yw) * f - Math.sin(yw) * s];
+    obox(G, cx, y0 + 0.62, cz, 1.8, 0.62, 4.5, yw, C(c)); const cc = at(-0.25, 0); obox(G, cc[0], y0 + 1.18, cc[1], 1.6, 0.52, 2.3, yw, C(0x2a3440));
+    for (const f of [-1.45, 1.4]) for (const s of [-0.85, 0.85]) { const w = at(f, s); obox(G, w[0], y0 + 0.33, w[1], 0.24, 0.62, 0.62, yw, C(0x141414)); } }
+  // a lamp post at each lot, a bench by the door
+  for (const p of [dkAt(20, -12), [-1098, -1015]]) { const y = tH(p[0], p[1]); obox(G, p[0], y + 3.5, p[1], 0.16, 7, 0.16, 0, C(0x4a4d52)); obox(I, p[0], y + 7, p[1], 0.7, 0.18, 0.35, yaw, C(0xfff2d0)); }
+  { const p = dkAt(10.5, -1.4); obox(G, p[0], yb + 0.45, p[1], 1.6, 0.08, 0.45, yaw, C(0x6b4a33)); }
+  const grp = new THREE.Group(); grp.name = 'raynham-dunkin';
+  const mA = clip(new THREE.MeshLambertMaterial({vertexColors: true, side: THREE.DoubleSide})), mI = clip(new THREE.MeshBasicMaterial({vertexColors: true, side: THREE.DoubleSide, toneMapped: false}));
+  const signM = clip(new THREE.MeshBasicMaterial({map: dkSign(), toneMapped: false, side: THREE.DoubleSide}));
+  const m1 = G.mesh(mA, 'houses-raynham-dunkin'), m2 = I.mesh(mI, 'houses-raynham-dunkin-inside'), m3 = S.mesh(signM, 'houses-raynham-dunkin-sign'), m4 = gq.mesh(glassM, 'houses-raynham-dunkin-glass');
+  [m2, m3, m4].forEach(m => { m.castShadow = false; }); m4.receiveShadow = false; m4.renderOrder = 2; grp.add(m1, m2, m3, m4);
+  // menu panels (textured): the inside board over the bench, the drive-thru board
+  const pm = (tex, x, y, z, w, h, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), clip(new THREE.MeshBasicMaterial({map: tex, toneMapped: false, side: THREE.DoubleSide}))); m.position.set(x, y, z); m.rotation.y = ry; m.name = 'houses-raynham-dunkin-menu'; grp.add(m); return m; };
+  { const p = dkAt(7.75, 7.4); pm(dkMenu(false), p[0], yb + 2.32, p[1], 5.3, 0.8, yaw); }
+  { pm(dkMenu(true), mp[0] + 0.08 * Math.sin(mYaw), my + 1.75, mp[1] + 0.08 * Math.cos(mYaw), 2.15, 1.1, mYaw); }
+  // the barista behind the counter, facing the door
+  const bm = clip(new THREE.MeshBasicMaterial({vertexColors: true, toneMapped: false})), b = barista(bm), bp = dkAt(7.0, 4.5); b.position.set(bp[0], yb + 0.03, bp[1]); b.rotation.y = yaw; grp.add(b);
+  dkAnim = b.userData; grp.userData = {tris: m1.userData.tris + m2.userData.tris + m3.userData.tris + 2 + 4 + b.userData.tris, glass: glassM, inside: mI, barista: b};
+  grp.userData.cleared = clearSite(); return grp;
+}
+function dkNight() { if (!dunkin) return; const n = W3D.night ? W3D.night.n : 0, k = Math.max(0, Math.min(1, n || 0)), g = dunkin.userData.glass;
+  g.color.setRGB(0.62 + 0.38 * k, 0.76 + 0.06 * k, 0.84 - 0.34 * k); g.opacity = 0.32 - 0.14 * k; }
+
 /* ---------- place boards (lazy, billboarded) ---------- */
 function boardSpecs() {
   const out = [], cH = [7.0, 9.2, 11.4, 13.6, 7.6, 10.4]; let ci = 0;
   for (const p of D.pois) { const big = p.k === 'r', x = p.p[0], z = p.p[1];
+    if (p.k === 'd') { out.push({x, z, text: p.n, sub: null, bg: '#12306b', w: 9, h: 8.5, show: 900}); continue; }
     out.push({x, z, text: p.n, sub: p.s, bg: p.k === 'x' ? '#0b5d2e' : '#12306b', w: big ? 12 : p.k === 'x' ? 9 : 5.2, h: big ? 18 : p.k === 'x' ? 11.5 : cH[ci++ % cH.length], show: big ? 2600 : 650}); }
   for (const c of D.cross) out.push({x: c.p[0], z: c.p[1], text: c.n, sub: null, bg: '#1f6fa8', w: 7, h: 9, show: 1400});
   const starts = [];
@@ -252,6 +403,7 @@ const SP = {
   raynham: () => { W3D.teleportTo(SPOT.x, undefined, SPOT.z, SPOT.yaw); }, 'raynham-center': () => SP.raynham(), 'raynham-routes': () => SP.raynham(),
   'st-anns': () => { W3D.teleportTo(1296, undefined, -1352, -72); }, collettis: () => { W3D.teleportTo(1318, undefined, -748, -105); }
 };
+SP.dunkin = () => { const p = dkAt(6.8, -10); W3D.teleportTo(p[0], undefined, p[1], 54.4); }; SP['dunkin-raynham'] = SP.dunkin;
 for (let i = 1; i <= 13; i++) SP['raynham-route-' + i] = () => { const go = () => D ? startRide(i) : setTimeout(go, 400); go(); };
 (function reg() { if (!W3D.spots) return setTimeout(reg, 300); Object.assign(W3D.spots, SP); W3D.spots['st-ann'] = SP['st-anns']; })();
 function menus() {
@@ -262,6 +414,12 @@ function menus() {
   if (bar && !document.getElementById('raynhamvr')) { const p = document.createElement('a-plane'); p.id = 'raynhamvr'; p.className = 'btn'; p.dataset.w = 'raynham'; p.setAttribute('width', 1.3); p.setAttribute('height', 0.26); p.setAttribute('material', 'shader:flat;color:#FFD700');
     const t = document.createElement('a-text'); t.setAttribute('value', 'Raynham Center'); t.setAttribute('align', 'center'); t.setAttribute('color', '#111'); t.setAttribute('width', 2.0); t.setAttribute('position', '0 0 0.005'); p.appendChild(t);
     p.addEventListener('click', () => { if (typeof window.goWorld === 'function') window.goWorld('raynham'); }); bar.appendChild(p); }
+  const rb = document.querySelector('#ui button[data-w="raynham"]');
+  if (rb && !document.querySelector('#ui button[data-w="dunkin"]')) { const b = document.createElement('button'); b.dataset.w = 'dunkin'; b.textContent = "Dunkin' (Broadway, Raynham)"; rb.parentNode.insertBefore(b, rb.nextSibling);
+    b.addEventListener('click', () => { if (typeof window.goWorld === 'function') window.goWorld('dunkin'); }); }
+  if (bar && !document.getElementById('dunkinvr')) { const p = document.createElement('a-plane'); p.id = 'dunkinvr'; p.className = 'btn'; p.dataset.w = 'dunkin'; p.setAttribute('width', 1.3); p.setAttribute('height', 0.26); p.setAttribute('material', 'shader:flat;color:#FFD700');
+    const t = document.createElement('a-text'); t.setAttribute('value', "Dunkin'"); t.setAttribute('align', 'center'); t.setAttribute('color', '#111'); t.setAttribute('width', 2.0); t.setAttribute('position', '0 0 0.005'); p.appendChild(t);
+    p.addEventListener('click', () => { if (typeof window.goWorld === 'function') window.goWorld('dunkin'); }); bar.appendChild(p); }
 }
 function arrival() {   // index.html's ?spot= list doesn't know these names yet: hop there once the world is up
   const sp = (new URLSearchParams(location.search).get('spot') || '').toLowerCase(); if (!SP[sp] && sp !== 'st-ann') return;
@@ -274,16 +432,22 @@ AFRAME.registerSystem('w3d-raynham', {
     sc.addEventListener('enter-vr', () => { if (ride) ride.vr = true; }); sc.addEventListener('exit-vr', () => { if (ride) ride.vr = false; }); },
   tick(t, dt) {
     if (!window.W3D_READY || !W3D.root || !dt) return;
-    if (!D) { if (!this.loading) { this.loading = true; fetch('/vr/w3d/raynham.json?v=2').then(r => r.json()).then(j => { D = j; buildSamples(); }).catch(e => console.warn('raynham data unavailable', e)); } return; }
+    if (!D) { if (!this.loading) { this.loading = true; fetch('/vr/w3d/raynham.json?v=3').then(r => r.json()).then(j => { D = j; buildSamples(); }).catch(e => console.warn('raynham data unavailable', e)); } return; }
     const sec = Math.min(dt, 100) / 1000; if (ride) tickRide(sec);
     const sc = this.el, cam = sc.camera; if (!cam) return; cam.getWorldPosition(_v); const cx = _v.x, cz = _v.z;
     for (const b of boards) if (b.mesh && b.mesh.visible) b.mesh.rotation.y = Math.atan2(cx - b.x, cz - b.z);
+    if (dunkin && dunkin.visible && Math.hypot(cx - DK.x, cz - DK.z) < 90) animBarista(t / 1000);
     acc += dt; if (acc < 500) return; acc = 0;
-    if (!W3D.active) { if (center) center.visible = false; return; }
+    if (!W3D.active) { if (center) center.visible = false; if (dunkin) dunkin.visible = false; return; }
     const dC = Math.hypot(cx - CEN.x, cz - CEN.z);
     if (!center && dC < BUILD_D) { center = buildCenter(sc); W3D.root.add(center); console.log('raynham: center built, ' + center.userData.tris + ' tris'); }
     else if (center && dC > DROP_D) { W3D.root.remove(center); dispose(center); center = null; }
     if (center) center.visible = true;
+    const dD = Math.hypot(cx - DK.x, cz - DK.z);
+    if (!dunkin && dD < 700 && D.dk) { if (!R.cutAdded && W3D.realEarth && W3D.realEarth.addCut) { R.cutAdded = 1; W3D.realEarth.addCut({lat: DK.lat, lon: DK.lon, half: 46, need: /^raynham-dunkin$/}); }
+      dunkin = buildDunkin(); W3D.root.add(dunkin); console.log("raynham: Dunkin' built, " + dunkin.userData.tris + ' tris, ' + dunkin.userData.cleared + ' trees cleared'); }
+    else if (dunkin && dD > 1100) { W3D.root.remove(dunkin); dispose(dunkin); dunkin = null; dkAnim = null; }
+    if (dunkin) { dunkin.visible = true; dkNight(); }
     if (!kiosk && dC < 400 && sc.hasLoaded) kiosk = buildKiosk(sc);
     if (kiosk && kiosk.object3D) kiosk.object3D.visible = dC < 120;
     if (!arrows) { arrows = arrowMesh(); W3D.root.add(arrows); boards = boardSpecs(); }

@@ -32,7 +32,7 @@
     'w:guest': ['gs-bank', 6], 'w:conservatory': ['gs-bank', 7], 'w:propulsion': ['gs-bank', 8], 'w:ufo': ['gs-bank', 9],
     tessroomlink: ['gs-space', 5, 'Tesseract room'], ballroomlink: ['gs-rooms', 0], 'room:nz': ['gs-rooms', 1], 'room:australia': ['gs-rooms', 2], 'room:samoa': ['gs-rooms', 3],
     'room:hawaii': ['gs-rooms', 4], 'room:royal': ['gs-rooms', 5], 'wr-home2d': ['gs-rooms', 9, 'Leave room'],
-    'w:raynham': ['gs-earth', 0], 'w:bridgewater': ['gs-earth', 1], 'w:aldensquare': ['gs-earth', 2], 'w:walker': ['gs-earth', 3], placesbtn: ['gs-earth', 9, 'Places (Real Earth)'],
+    'w:raynham': ['gs-earth', 0], 'w:dunkin': ['gs-earth', 1], 'w:bridgewater': ['gs-earth', 2], 'w:aldensquare': ['gs-earth', 3], 'w:walker': ['gs-earth', 4], placesbtn: ['gs-earth', 9, 'Places (Real Earth)'],
     'w:versailles': ['gs-vers', 0, 'Château (front court)'],
     rplgo: ['gs-space', 0, 'Red Planet Lounge (Mars)'], 'w:launchpad': ['gs-space', 1, 'Launch pad'], 'w:rockets': ['gs-space', 2], 'w:starfleet': ['gs-space', 3], 'w:saucer': ['gs-space', 4],
     'w:founders': ['gs-exh', 0], 'w:hangar': ['gs-exh', 1, 'Drone Hangar (H18)'],
@@ -81,7 +81,7 @@
       d.addEventListener('toggle', () => { if (d.open) SECS.forEach(([s2]) => { const x = document.getElementById('gs-' + s2); if (x && x !== d && x.open) x.open = false; });   // one section open at a time: short list, little scrolling
         const o = SECS.map(s => s[0]).filter(s => { const x = document.getElementById('gs-' + s); return x && x.open; }); lsSet('jfvr_sec2d', o.join(',')); }); });
     const vs = el('details', {class: 'jf-sec jf-sub', id: 'gs-vers'}); vs.appendChild(el('summary', {}, 'Versailles<span class="n"></span>')); vs.appendChild(el('div', {class: 'jf-body'}));
-    vs.style.order = 5; body('gs-earth').appendChild(vs);
+    vs.style.order = 6; body('gs-earth').appendChild(vs);
     const grp = (pane, id, l) => { const g = el('div', {class: 'jf-grp', id}); g.appendChild(el('span', {class: 'sec'}, l)); g.appendChild(el('div', {class: 'jf-body'})); pane.appendChild(g); };
     grp(mkPane('people'), 'pp', 'People, voice and account');
     grp(mkPane('read'), 'rd', 'Read in the world');
@@ -141,8 +141,8 @@
     'w:terrace': ['bank', 0], 'w:hall': ['bank', 1], 'w:vault': ['bank', 2], 'w:showcase': ['bank', 3, 'Wampum showcase'], 'w:office': ['bank', 4], 'jfv-residence': ['bank', 5],
     'jfv-guest': ['bank', 6], 'w:conservatory': ['bank', 7], 'w:propulsion': ['bank', 8], 'w:ufo': ['bank', 9],
     'jfv-ballroom': ['rooms', 0], 'jfv-room-nz': ['rooms', 1], 'jfv-room-australia': ['rooms', 2], 'jfv-room-samoa': ['rooms', 3], 'jfv-room-hawaii': ['rooms', 4], 'jfv-room-royal': ['rooms', 5], 'jfv-room-back': ['rooms', 9],
-    raynhamvr: ['earth', 0, 'Raynham Center'], 'w:bridgewater': ['earth', 1, 'Corporate Base'], 'w:aldensquare': ['earth', 2, 'Alden Square'], 'w:walker': ['earth', 3, 'Walker Memorial'],
-    'jfv-vers-open': ['earth', 4], placesvr: ['earth', 9],
+    raynhamvr: ['earth', 0, 'Raynham Center'], dunkinvr: ['earth', 1, "Dunkin'"], 'w:bridgewater': ['earth', 2, 'Corporate Base'], 'w:aldensquare': ['earth', 3, 'Alden Square'], 'w:walker': ['earth', 4, 'Walker Memorial'],
+    'jfv-vers-open': ['earth', 5], placesvr: ['earth', 9],
     'jfv-vers-back': ['vers', 0], 'w:versailles': ['vers', 1, 'Château'], 'w:versailles-mirrors': ['vers', 6, 'Hall of Mirrors'],
     'jfv-rplgo': ['space', 0], 'w:launchpad': ['space', 1, 'Launch pad'], 'w:rockets': ['space', 2, 'Rocket yard'], 'w:starfleet': ['space', 3, 'Star Fleet base'], 'w:saucer': ['space', 4], 'jfv-tessroom': ['space', 5],
     'w:founders': ['exh', 0, 'Founders Hall'], 'w:hangar': ['exh', 1, 'Drone Hangar (H18)'],
