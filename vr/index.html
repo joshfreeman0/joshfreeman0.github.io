@@ -56,7 +56,7 @@ window.JFVR_LITE = (function () {
 <script src="hd.js?v=6"></script>
 <script src="w3d/seasons.js?v=1"></script>
 <script src="w3d/sphinx.js?v=2"></script>
-<script src="w3d/world.js?v=21o"></script>
+<script src="w3d/world.js?v=21p"></script>
 <script src="w3d/rooms.js?v=5"></script>
 <script src="w3d/cities.js?v=10"></script>
 <script src="w3d/saucer.js?v=9"></script>
@@ -73,10 +73,10 @@ window.JFVR_LITE = (function () {
 <script src="w3d/streets.js?v=11"></script>
 <script src="w3d/zoo.js?v=2"></script>
 <script src="w3d/transit.js?v=2"></script>
-<script src="w3d/fprooms.js?v=3"></script>
+<script src="w3d/fprooms.js?v=4"></script>
 <script src="w3d/launch.js?v=8"></script>
 <script src="w3d/starfleet.js?v=2"></script>
-<script src="w3d/exhibits/kit.js?v=1"></script>
+<script src="w3d/exhibits/kit.js?v=2"></script>
 <script src="w3d/exhibits/hangar.js?v=1"></script>
 <script src="w3d/exhibits/phreaklab.js?v=1"></script>
 <script src="w3d/exhibits/foresight.js?v=1"></script>
@@ -90,9 +90,9 @@ window.JFVR_LITE = (function () {
 <script src="w3d/clickfix.js?v=1"></script>
 <script src="w3d/softgpu.js?v=1"></script>
 <script src="w3d/friends.js?v=4"></script>
-<script src="fpacct.js?v=1"></script>
+<script src="fpacct.js?v=2"></script>
 <script src="fpacct-ui.js?v=1"></script>
-<script src="w3d/founders.js?v=1"></script>
+<script src="w3d/founders.js?v=2"></script>
 <script src="w3d/vrpointer.js?v=1"></script>
 <script src="w3d/tiles3d.min.js?v=1"></script>
 <script src="w3d/gk.js?v=1"></script>
@@ -299,7 +299,7 @@ scn.addEventListener('exit-vr', () => bar.setAttribute('visible', false));
 /* Clear failure message with Try again (and, on the full tier, a lighter version) instead of hanging on the loading text. */
 window.JFVR_fail = function (why) {
   if (window.JFVR_failed) return; window.JFVR_failed = true;
-  let d = document.querySelector('body > #load'); if (!d) { d = document.createElement('div'); d.id = 'load'; document.body.appendChild(d); }
+  let d = document.querySelector('#load'); if (!d) { d = document.createElement('div'); d.id = 'load'; document.body.appendChild(d); }
   d.dataset.failed = 1; d.className = 'fail';
   const u = new URL(location.href); u.searchParams.set('r', Date.now()); const again = u.toString(); u.searchParams.set('lite', '1'); u.searchParams.delete('full');
   d.innerHTML = '';
@@ -333,10 +333,10 @@ function xrCover(){ if (window.W3D_READY || window.JFVR_COVER || (window.W3D && 
   const iv = setInterval(() => { if (!window.W3D_READY) return; clearInterval(iv); camE.object3D.remove(g); m.geometry.dispose(); m.material.dispose(); t.geometry.dispose(); t.material.dispose(); tx.dispose(); window.JFVR_COVER = null; }, 200); }
 scn.addEventListener('enter-vr', xrCover); if (scn.is && scn.is('vr-mode')) xrCover();
 function start(){
-  W3D.onImagery = (done, total) => { const d = document.querySelector('body > #load'); if (!d || d.dataset.failed) return; if (done >= total) d.remove(); else d.textContent = 'Loading imagery ' + done + '/' + total + '...'; };
+  W3D.onImagery = (done, total) => { const d = document.querySelector('#load'); if (!d || d.dataset.failed) return; if (done >= total) d.remove(); else d.textContent = 'Loading imagery ' + done + '/' + total + '...'; };
   W3D.build(scn.object3D, scn).then(() => {
       if (window.JFVR_failed) return;
-      const d = document.querySelector('body > #load'); if (d) { if (window.W3D_LOADING) { d.className = 'bg'; d.textContent = 'Loading imagery...'; } else d.remove(); }
+      const d = document.querySelector('#load'); if (d) { if (window.W3D_LOADING) { d.className = 'bg'; d.textContent = 'Loading imagery...'; } else d.remove(); }
       goWorld(arrivalSpot()); window.W3D_READY = true; arrivalToast(); })
     .catch(e => { console.error(e); window.JFVR_fail('The 3D world did not load (' + (e && e.message || e) + ').'); });
 }

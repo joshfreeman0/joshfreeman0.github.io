@@ -20,7 +20,7 @@ Same login in both worlds: the token lives in localStorage per site; `FPA.handof
 | People | `people(q, role)`, `person(id)`, `block(id)`, `unblock(id)`, `blocks()`, `report(type, id, reason)` |
 | Friends | `friends()` -> `{friends:[{id,name,online,world,spot}], incoming, outgoing}`, `requestFriend`, `acceptFriend`, `declineFriend`, `removeFriend` |
 | Presence | `setPresence(world, spot)` (heartbeat every 60 s; online = seen in the last 150 s) |
-| Invites | `invite(friendId, {world, url, note})` (default url `https://joshfreeman.org/vr/?join=<my id>`), `acceptInvite(id)` -> `{url, world, from_id}`, `declineInvite(id)`, `inbox`, `pollInbox()` |
+| Invites | `invite(friendId, {world, url, note})` (default url per world: Earth `https://joshfreeman.org/vr/?join=<my id>`, Mars `https://joshfreeman.org/vr/?room=mars&join=<my id>`; `FPA.joinUrl(world)`, `FPA.WORLD_URL`), `acceptInvite(id)` -> `{url, world, from_id}`, `declineInvite(id)`, `inbox`, `pollInbox()` |
 | Founders Hall | `projects()`, `project(id)`, `createProject({title, description, link, poster, open_hours})`, `updateProject`, `deleteProject`, `posterUrl(p)`, `follow`, `unfollow`, `encourage(id, text)`, `offer(id, text)`, `openBooth(id, minutes, url)` (invites followers), `closeBooth(id)` |
 | Intros | `intros()`, `askIntro(to, note, projectId)`, `introYes(id)`, `introNo(id)`; admin: `FPA.admin.intros()`, `.approve(id)`, `.decline(id)`, `.reports()`, `.resolve(id)`, `.ban(id, unban)`, `.stats()` |
 
@@ -29,3 +29,8 @@ Intro flow: A asks -> B says yes -> Josh approves (wrist panel or Account > Intr
 
 Joining: in Fowling Pond, `?join=<account id>` (or Join on an invite) finds that person in the shared multiplayer room (mp.js sends the
 account id as `a`) and puts you beside them, on the same page, so a Quest stays in VR. Mars can handle `?join=` the same way with its own peers.
+`window.FPJOIN(id)` (founders.js) is the host's in-place join; if the in-page Mars room is open it leaves it first (FP_ROOMS.leave), so Red
+Planet Lounge can call it in host mode. A `?room=mars&join=` link opens Mars and leaves the join to RPL.
+
+Note: the exhibit kit (`vr/w3d/exhibits/kit.js`, FPX) assumes A-Frame (`AFRAME.registerComponent`, `<a-plane>` buttons, `a-scene`);
+fpacct.js / fpacct-ui.js do not. A non-A-Frame host has to shim those (RPL standalone does).

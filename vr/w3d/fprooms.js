@@ -11,7 +11,7 @@
   const ROOM_ORIGIN = {x: 0, y: 0, z: 400000};
   const okUrl = u => typeof u === 'string' && /^\/vr\/rooms\/[\w-]+\.js$/.test(u);
   const CATALOG = {
-    mars: {title: 'Red Planet Lounge', module: '/vr/rooms/mars.js?v=1', fallbackUrl: '/vr/mars/?spot=pad&from=joshfreeman-vr'},   // adapter around Me's mountRPL (T-2); /vr/mars/ stays the fallback
+    mars: {title: 'Red Planet Lounge', module: '/vr/rooms/mars.js?v=2', fallbackUrl: '/vr/mars/?spot=pad&from=joshfreeman-vr'},   // adapter around Me's mountRPL (T-2); /vr/mars/ stays the fallback
     tesseract: {title: 'Tesseract room', module: '/vr/rooms/tesseract.js?v=1', fallbackUrl: null},                     // T-21, entered via tesseractgate.js
     stub: {title: 'Test room', module: '/vr/rooms/stub.js?v=1', fallbackUrl: null}
   };

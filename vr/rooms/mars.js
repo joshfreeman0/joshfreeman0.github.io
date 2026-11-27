@@ -12,12 +12,9 @@
    If the module can't load (offline, RPL down), mount throws, FP_ROOMS rolls back and the rocket uses the old /vr/mars/ page. */
 const RPL_URL = 'https://redplanetlounge.pages.dev/rpl-module.js';
 const MOUNT_TIMEOUT = 60000;
-let mod = null, host = null, exitH = null, btn2d = null, lm = null;
-// RPL's texture loader uses three's shared DefaultLoadingManager and sets its onLoad/onProgress/onError; after unmount those would
-// still fire on Fowling Pond's own loads ("Cannot set properties of undefined (setting 'ready')"), so keep and put back the host's handlers.
-const LM_KEYS = ['onStart', 'onLoad', 'onProgress', 'onError'];
-function saveLM(T) { const M = T && T.DefaultLoadingManager; if (!M) return null; const o = {M}; LM_KEYS.forEach(k => { o[k] = M[k]; }); return o; }
-function restoreLM(o) { if (o) LM_KEYS.forEach(k => { o.M[k] = o[k]; }); }
+let mod = null, host = null, exitH = null, btn2d = null;
+// RPL (deploy cb078b33) uses its own LoadingManager and rpl- prefixed DOM ids, and shows its own touch controls when mounted on
+// touch devices (hidden in XR), so no loader / id / touch workarounds are needed here.
 
 function pauseHost(sceneEl) {
   const rig = document.querySelector('#rig'), S = {rig, comps: [], els: [], bar: null, rigP: null, rigQ: null};
@@ -30,6 +27,8 @@ function pauseHost(sceneEl) {
   // FP's controller entities (lasers, teleport, snap turn, stick walking, menu toggle) and the desktop mouse cursor: paused + hidden
   document.querySelectorAll('[laser-controls], #rig [cursor]').forEach(el => { S.els.push([el, el.object3D.visible, el.isPlaying]); if (el.isPlaying) el.pause(); el.object3D.visible = false; });
   if (window.JFVR) { S.fly = JFVR.fly; JFVR.fly = false; }
+  // FP's phone joystick / fly buttons (locomotion.js) would sit on top of RPL's own touch controls: hide them while on Mars
+  S.dom = [...document.querySelectorAll('#tjoy, #tfly')].map(el => [el, el.style.display]); S.dom.forEach(([el]) => { el.style.display = 'none'; });
   return S;
 }
 function restoreHost(S) {
@@ -37,12 +36,16 @@ function restoreHost(S) {
   if (S.rig && S.rigP) { S.rig.object3D.position.copy(S.rigP); S.rig.object3D.quaternion.copy(S.rigQ); const ph = S.rig.components['w3d-physics']; if (ph && ph.prev) ph.prev.copy(S.rigP); }
   S.comps.forEach(k => { try { k.play(); } catch (e) {} });
   S.els.forEach(([el, vis, playing]) => { el.object3D.visible = vis; if (playing && !el.isPlaying) try { el.play(); } catch (e) {} });
+  (S.dom || []).forEach(([el, d]) => { el.style.display = d; });
   const bar = document.getElementById('vrbar'); if (bar && S.bar != null) bar.object3D.visible = false;   // menu comes back closed
 }
 function addBackButton(ctx) {   // 2D (desktop / phone): RPL's own 2D menus are not shown when mounted, so offer a plain way home
   btn2d = document.createElement('button'); btn2d.id = 'mars-back2d'; btn2d.type = 'button'; btn2d.textContent = 'Return to Earth';
   btn2d.style.cssText = 'position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:30;padding:10px 16px;border:0;border-radius:10px;background:#ff9a6b;color:#111;font:600 15px system-ui,sans-serif';
   btn2d.addEventListener('click', () => ctx.leave({arrive: true})); document.body.appendChild(btn2d);
+  // phones: RPL's touch stick / Fly / Jump sit along the bottom (body.rpl-touch), so FP's bottom bar (#ui) steps aside and the button goes up top
+  if (document.body.classList.contains('rpl-touch')) { btn2d.style.bottom = 'auto'; btn2d.style.top = '12px';
+    const tb = document.getElementById('ui'); if (tb && host) { host.dom.push([tb, tb.style.display]); tb.style.display = 'none'; } }
 }
 
 const ROOM = {
@@ -51,7 +54,7 @@ const ROOM = {
   async mount(sceneEl, rootEl, ctx) {
     if (!mod) mod = await import(RPL_URL);
     if (mod.isMounted && mod.isMounted()) mod.unmountRPL();
-    host = pauseHost(sceneEl); lm = saveLM(ctx.THREE || window.THREE);
+    host = pauseHost(sceneEl);
     exitH = () => setTimeout(() => { if (window.FP_ROOMS && FP_ROOMS.current === 'mars' && !FP_ROOMS.busy) ctx.leave({arrive: true}); }, 0);
     rootEl.addEventListener('rpl-exit-request', exitH);
     const spot = (ctx.opts && ctx.opts.spot) || 'pad';
@@ -65,7 +68,7 @@ const ROOM = {
       h.ready.then(() => console.log('rooms: mars ready')).catch(() => {});
     } catch (e) {
       clearTimeout(to); try { mod.unmountRPL(); } catch (e2) {}
-      rootEl.removeEventListener('rpl-exit-request', exitH); exitH = null; restoreLM(lm); lm = null; restoreHost(host); host = null; throw e;
+      rootEl.removeEventListener('rpl-exit-request', exitH); exitH = null; restoreHost(host); host = null; throw e;
     }
     addBackButton(ctx);
   },
@@ -73,7 +76,7 @@ const ROOM = {
     let stats = null; try { stats = mod && mod.unmountRPL(); } catch (e) { console.warn('rooms: unmountRPL', e); }
     const root = document.getElementById('fproom-mars'); if (root && exitH) root.removeEventListener('rpl-exit-request', exitH); exitH = null;
     if (btn2d) { btn2d.remove(); btn2d = null; }
-    restoreLM(lm); lm = null; restoreHost(host); host = null; delete window.FP_MARS;
+    restoreHost(host); host = null; delete window.FP_MARS;
     if (stats) console.log('rooms: mars unmounted ' + JSON.stringify(stats));
   }
 };

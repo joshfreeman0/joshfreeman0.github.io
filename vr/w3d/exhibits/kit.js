@@ -117,6 +117,8 @@
     if (on && !camHud) { const c = document.createElement('canvas'); c.width = 512; c.height = 64; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
       camHud = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.0625), new THREE.MeshBasicMaterial({map: t, transparent: true, depthTest: false, toneMapped: false})); camHud.renderOrder = 999; camHud.position.set(0, -0.2, -0.7); camHud.userData.c = c; }
     if (camHud) { if (on) cam.object3D.add(camHud); else if (camHud.parent) camHud.parent.remove(camHud); } }
+  // the drone-cam HUD (1 plane + 1 canvas texture) is shared by every exhibit; freed when the last exhibit unmounts (refcount = MOUNTS)
+  D.freeHud = function () { if (!camHud || D.active) return; if (camHud.parent) camHud.parent.remove(camHud); camHud.geometry.dispose(); camHud.material.map.dispose(); camHud.material.dispose(); camHud = null; };
   function drawHud(alt) { if (!camHud) return; const c = camHud.userData.c, g = c.getContext('2d'); g.clearRect(0, 0, 512, 64); g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(0, 0, 512, 64);
     g.fillStyle = (performance.now() % 1000) < 500 ? '#ff3030' : '#601010'; g.beginPath(); g.arc(24, 32, 9, 0, 7); g.fill(); g.fillStyle = '#ffe9a8'; g.font = 'bold 22px Arial'; g.textBaseline = 'middle';
     g.fillText('DRONE CAM  ' + Math.round(alt) + ' m   ' + (inXR() ? 'B = return' : 'Esc = return'), 44, 32); camHud.material.map.needsUpdate = true; }
@@ -132,7 +134,7 @@
     if (rig && saved) { rig.object3D.position.copy(saved.p); rig.object3D.rotation.y = saved.ry; }
     paused.forEach(c => { try { c.play(); } catch (e) {} }); paused = [];
     const ph = rig && rig.components['w3d-physics']; if (ph && ph.prev) { ph.prev.copy(rig.object3D.position); ph.vy = 0; }
-    overlay(false); camOverlay(false); for (const k in keys) keys[k] = false; hud('Back on the ground'); const cb = opt && opt.onExit; opt = null; if (cb) cb(); };
+    overlay(false); camOverlay(false); for (const k in keys) keys[k] = false; hud('Back on the ground'); const cb = opt && opt.onExit; opt = null; if (cb) cb(); if (!MOUNTS.size) D.freeHud(); };
   const _cw = new THREE.Vector3();
   function step(dt) { const rig = document.querySelector('#rig'), cam = document.querySelector('[camera]'); if (!rig || !cam || !st) return;
     const P = pads(), L = P.left, R = P.right; const ta = (window.JFVR && JFVR.touchAxes) || {x: 0, y: 0};
@@ -174,7 +176,7 @@
   FPX.mount = function (name, sceneEl, rootEl, opts) { opts = opts || {}; const M = FPX[name]; if (!M || !M.build) throw new Error('FPX: unknown exhibit ' + name);
     const inst = M.build(opts), root = rootEl && rootEl.object3D ? rootEl.object3D : (rootEl && rootEl.isObject3D ? rootEl : (sceneEl || scene()).object3D);
     const p = opts.position || {x: 0, y: 0, z: 0}; inst.group.position.set(p.x, p.y, p.z); inst.group.rotation.y = opts.rotationY || 0; root.add(inst.group);
-    if (inst.mountButtons) inst.mountButtons(); const h = {name, inst, group: inst.group, t0: performance.now(), unmount() { MOUNTS.delete(h); inst.dispose(); }}; MOUNTS.add(h);
+    if (inst.mountButtons) inst.mountButtons(); const h = {name, inst, group: inst.group, t0: performance.now(), unmount() { if (!MOUNTS.delete(h)) return; inst.dispose(); if (!MOUNTS.size) D.freeHud(); }}; MOUNTS.add(h);
     const s = sceneEl || scene(); if (!AFRAME.components['fpx-exhibits-tick']) AFRAME.registerComponent('fpx-exhibits-tick', {tick() { const t = performance.now(); MOUNTS.forEach(m => { if (m.inst.update && m.group.visible) m.inst.update((t - m.t0) / 1000); }); }});
     if (!s.hasAttribute('fpx-exhibits-tick')) s.setAttribute('fpx-exhibits-tick', '');
     return h; };

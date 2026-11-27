@@ -20,13 +20,17 @@
 
   /* ---------- join a friend (invites) ---------- */
   let joinT = null;
-  window.FPJOIN = acct => { clearInterval(joinT); const t0 = Date.now(); let told = false;
+  // also called by Red Planet Lounge in host mode (a Fowling Pond invite accepted on Mars): leave the Mars room first, cleanly via
+  // FP_ROOMS (deferred a tick so RPL is not unmounted inside its own handler), then find the friend on Earth
+  window.FPJOIN = async acct => { clearInterval(joinT);
+    if (window.FP_ROOMS && FP_ROOMS.current) { await new Promise(r => setTimeout(r, 0)); if (FP_ROOMS.current) await FP_ROOMS.leave({arrive: false}); }
+    const t0 = Date.now(); let told = false;
     joinT = setInterval(() => { const MP = window.JFMP, FR = W3D.friends; if (!window.W3D_READY || !MP || !FR) return;
       const id = Object.keys(MP.peers || {}).find(k => MP.peers[k].acct === acct);
       if (id && MP.peers[id].tp) { clearInterval(joinT); FR.go(id); return; }
       if (!told) { told = true; hud('Finding your friend...'); }
       if (Date.now() - t0 > 45000) { clearInterval(joinT); hud('Your friend is not in Fowling Pond right now'); } }, 700); };
-  const jq = new URLSearchParams(location.search).get('join'); if (jq && /^u[a-z0-9]{6,20}$/.test(jq)) window.FPJOIN(jq);
+  const QJ = new URLSearchParams(location.search), jq = QJ.get('join'); if (jq && /^u[a-z0-9]{6,20}$/.test(jq) && !/^(mars|rpl|red-planet)/i.test(QJ.get('room') || QJ.get('spot') || '')) window.FPJOIN(jq);   // ?room=mars&join=: a Mars invite, not an Earth join
   async function acceptAndJoin(inv) { const r = await FPA.acceptInvite(inv.id); UI.join(r); FPA.pollInbox(); }
 
   /* ---------- left-wrist People panel ---------- */

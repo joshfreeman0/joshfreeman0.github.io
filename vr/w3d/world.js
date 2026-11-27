@@ -306,7 +306,7 @@ function column(x, y, z, h, r, parent) { // papyrus column with open bell capita
 }
 
 /* ---------- build ---------- */
-W3D.status = msg => { const d = document.querySelector('body > #load'); if (d && !d.dataset.failed) d.firstChild ? (d.firstChild.textContent = msg) : (d.textContent = msg); };
+W3D.status = msg => { const d = document.querySelector('#load'); if (d && !d.dataset.failed) d.firstChild ? (d.firstChild.textContent = msg) : (d.textContent = msg); };
 /* Image loading progress ("Loading imagery 3/7...") and failures, for every TextureLoader image (THREE.DefaultLoadingManager). */
 window.W3D_LOADING = true;
 THREE.DefaultLoadingManager.onProgress = (url, done, total) => { window.W3D_LOADING = done < total; if (!window.W3D_READY) W3D.status('Loading imagery ' + done + '/' + total + '...'); else if (W3D.onImagery) W3D.onImagery(done, total); };

@@ -50,8 +50,10 @@
   FPA.friends = () => api('GET', '/friends');            // {friends:[{id,name,online,world,spot,...}], incoming, outgoing}
   FPA.requestFriend = id => api('POST', '/friends/request/' + id); FPA.acceptFriend = id => api('POST', '/friends/accept/' + id);
   FPA.declineFriend = id => api('POST', '/friends/decline/' + id); FPA.removeFriend = id => api('POST', '/friends/remove/' + id);
-  FPA.invite = (to, o) => api('POST', '/invites', {to, world: (o && o.world) || FPA.world, url: (o && o.url) || FPA.joinUrl(), note: o && o.note});
-  FPA.joinUrl = () => FPA.me ? (FPA.world === 'mars' && !/joshfreeman\.org/.test(location.host) ? location.origin + location.pathname + '?join=' + FPA.me.id : 'https://joshfreeman.org/vr/?join=' + FPA.me.id) : null;
+  // default join link per world when the caller passes none: Earth -> /vr/, Mars -> /vr/?room=mars (the in-page Mars room)
+  FPA.WORLD_URL = {fowling: 'https://joshfreeman.org/vr/', mars: 'https://joshfreeman.org/vr/?room=mars'};
+  FPA.invite = (to, o) => { const w = (o && o.world) || FPA.world; return api('POST', '/invites', {to, world: w, url: (o && o.url) || FPA.joinUrl(w), note: o && o.note}); };
+  FPA.joinUrl = w => { if (!FPA.me) return null; const b = FPA.WORLD_URL[w || FPA.world] || FPA.WORLD_URL.fowling; return b + (b.includes('?') ? '&' : '?') + 'join=' + FPA.me.id; };
   FPA.acceptInvite = id => api('POST', '/invites/' + id + '/accept'); FPA.declineInvite = id => api('POST', '/invites/' + id + '/decline');
   FPA.setPresence = (world, spot) => { if (world) FPA.world = world; if (spot !== undefined) FPA.spot = spot; beat(true); };
   async function beat(now) { clearTimeout(hbT); if (!token) return; if (now !== false) try { await api('POST', '/presence', {world: FPA.world, spot: FPA.spot}); } catch (e) {}
