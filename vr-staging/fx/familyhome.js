@@ -263,7 +263,7 @@
       P.nature.ball(0.3, 1, x - 0.1, g0 + 0.18, z + 0.15, C.leaf[2], 0.6); for (let k = 0; k < 5; k++) P.nature.ball(0.05, 0, x - 0.3 + k * 0.1, g0 + 0.32, z - 0.1 + (k % 2) * 0.1, '#b08ad8'); }
     // flower beds: along the porch front and both sides of the front walk inside the fence
     const bed = (x0, x1, z, depth) => { const n = Math.round((x1 - x0) / 0.35); for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n, zz = z + (rnd() - 0.5) * depth, g0 = gl(x, zz);
-        P.nature.ball(0.24 + rnd() * 0.1, 1, x, g0 + 0.2, zz, C.leaf[i % 4], 0.75); for (let k = 0; k < 3; k++) P.nature.ball(0.085, 0, x + (k - 1) * 0.12, g0 + 0.4 + (k % 2) * 0.05, zz - 0.1 + (k % 2) * 0.12, ['#ff5d73', '#ffd84a', '#ffffff', '#ff9ec4', '#c39bf0'][(i + k) % 5]); }
+        P.nature.ball(0.26 + rnd() * 0.1, 0, x, g0 + 0.2, zz, C.leaf[i % 4], 0.75); for (let k = 0; k < 2; k++) P.nature.ball(0.085, 0, x + (k - 0.5) * 0.16, g0 + 0.42 + (k % 2) * 0.05, zz - 0.1 + (k % 2) * 0.12, ['#ff5d73', '#ffd84a', '#ffffff', '#ff9ec4', '#c39bf0'][(i + k) % 5]); }
       P.stone.box(x1 - x0 + 0.6, 0.1, depth + 0.4, (x0 + x1) / 2, gl((x0 + x1) / 2, z) + 0.03, z, '#6a4c36'); };
     bed(-4.2, -1.6, PZ0 - 0.55, 0.5); bed(1.6, 4.2, PZ0 - 0.55, 0.5); bed(-6.5, -2.2, LOT.z0 + 1.0, 0.6); bed(2.2, 6.5, LOT.z0 + 1.0, 0.6);
     // trees: trunk + clustered round crowns, darker underneath
@@ -329,7 +329,7 @@
     /* ---------- meshes (one per material) ---------- */
     const mk = (set, map, name, o, cast, ao) => { if (!set.count()) return null; const m = keep(new THREE.Mesh(set.geometry(ao), lam(map, o))); m.name = name; m.castShadow = !!cast; m.receiveShadow = false; group.add(m); return m; };
     mk(P.clap, X.clap, 'home-siding', {}, true, aoExt); mk(P.shingle, X.shingle, 'home-roof', {}, true); mk(P.brick, X.brick, 'home-brick', {}, false, aoExt); mk(P.stone, X.stone, 'home-stone', {}, false);
-    mk(P.plank, X.plank, 'home-wood', {}, false); mk(P.plain, X.plain, 'home-paint', {side: THREE.DoubleSide}, false);   // double-sided: the slide's half-pipe is seen from inside mk(P.nature, X.plain, 'home-plants', {}, false, aoNat);
+    mk(P.plank, X.plank, 'home-wood', {}, false); mk(P.plain, X.plain, 'home-paint', {side: THREE.DoubleSide}, false); mk(P.nature, X.plain, 'home-plants', {}, false, aoNat);   // paint is double-sided: the slide's half-pipe is seen from inside
     mk(P.inPlain, X.plain, 'home-interior', {emissive: 0x2a1d12}, false); mk(P.inPlank, X.plank, 'home-interior-wood', {emissive: 0x2a1d12}, false);
     if (P.glow.count()) { const m = keep(new THREE.Mesh(P.glow.geometry(), new THREE.MeshBasicMaterial({vertexColors: true, toneMapped: false}))); m.name = 'home-glow'; group.add(m); }
 
