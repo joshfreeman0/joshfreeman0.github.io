@@ -4,8 +4,8 @@
    - window.FP_HOME = {ready, site, spawns: {porch, wife, kids: [3], yard, play, kitchen, living}, go(), mount(), unmount()}
      each spawn = {position: [x, y, z], rotationY} in world metres, rotationY in DEGREES (0 = facing -z / north, toward the pond;
      the same convention as W3D.teleportTo yaw). 'fp-home-ready' fires on the a-scene (detail = FP_HOME) when it is set.
-   - If C's companion module is up (window.FP_COMPANION / window.FPC) with api.setHome(id, {x, y, z}), the wife goes to the porch
-     and the kids to the play area. Read-only otherwise; skipped quietly when not there.
+   - FP_HOME.bounds = house shell footprint {x0, x1, z0, z1}, FP_HOME.porchBounds = porch + steps (world metres). If C's companion module is up with api.setHome, only the
+     wife is pinned (porch); the kids are left to the module (spawns.kids[i], roaming inside `play`). Read-only otherwise; skipped quietly when not there.
    - Go to: ?spot=home (also family-home / familyhome / house), W3D.spots.familyhome, 2D menu Go to > "Home", VR menu Go to > "Home",
      left-wrist panel "Home" button. Lands on the porch facing the pond. The old "Home: Fowling Pond" button (fly over the pond) is unchanged. */
 (function () {
@@ -14,7 +14,7 @@
   const QS = new URLSearchParams(location.search), SP = (QS.get('spot') || QS.get('room') || '').toLowerCase();
   const WANT = /^(home|family-?home|house)$/.test(SP) && QS.get('home') !== '0';
   const H = window.FP_HOME = window.FP_HOME || {ready: false};
-  let handle = null, origin = null, added = {floors: [], walls: []}, hiddenTrees = [], maskHook = null, wired = false;
+  let keepOut = null, handle = null, origin = null, added = {floors: [], walls: []}, hiddenTrees = [], maskHook = null, wired = false;
   const hud = m => { if (window.JFVR && JFVR.hud) JFVR.hud(m); };
 
   function clearTrees(L) {   // the woodland trees inside the lot (world rect) are scaled to zero; restored on unmount
@@ -38,15 +38,18 @@
     const wx = r => Object.assign({}, r, {x0: r.x0 + origin.x, x1: r.x1 + origin.x, z0: r.z0 + origin.z, z1: r.z1 + origin.z});
     for (const f of inst.floors) { const w = wx(f); w.y = f.y + origin.y; W3D.floors.push(w); added.floors.push(w); }
     for (const f of inst.walls) { const w = wx(f); w.y0 = f.y0 + origin.y; w.y1 = f.y1 + origin.y; W3D.walls.push(w); added.walls.push(w); }
-    const L = inst.lot; clearTrees({x0: origin.x + L.x0 - LOT_PAD, x1: origin.x + L.x1 + LOT_PAD, z0: origin.z + L.z0 - LOT_PAD, z1: origin.z + L.z1 + LOT_PAD});
+    const L = inst.lot; W3D.keepOut = W3D.keepOut || []; keepOut = {x: origin.x + (L.x0 + L.x1) / 2, z: origin.z + (L.z0 + L.z1) / 2, r: 27, name: 'the family home'}; W3D.keepOut.push(keepOut);   // no grass tufts through the lawn; build mode leaves it alone
+    clearTrees({x0: origin.x + L.x0 - LOT_PAD, x1: origin.x + L.x1 + LOT_PAD, z0: origin.z + L.z0 - LOT_PAD, z1: origin.z + L.z1 + LOT_PAD});
     maskHook = ({rect}) => rect(origin.x + L.x0, origin.z + L.z0, origin.x + L.x1, origin.z + L.z1, 15);   // Real Earth: keep our ground here (already inside the pond cutout; belt and braces)
     W3D.maskHooks = W3D.maskHooks || []; W3D.maskHooks.push(maskHook); if (W3D.realEarth && W3D.realEarth.rebuildMask) W3D.realEarth.rebuildMask();
     // world spawns
     const S = inst.spawns, w = s => ({position: [+(s.x + origin.x).toFixed(2), +(s.y + origin.y).toFixed(2), +(s.z + origin.z).toFixed(2)], rotationY: s.rotationY});
     H.spawns = {porch: w(S.porch), wife: w(S.wife), kids: S.kids.map(w), yard: w(S.yard), play: w(S.play), kitchen: w(S.kitchen), living: w(S.living)};
-    H.site = {x: origin.x, y: +origin.y.toFixed(2), z: origin.z, floorY: +(origin.y + inst.FY).toFixed(2), side: 'south shore of the pond (west arm), porch facing north over the water', tris: inst.tris};
-    H.ready = true; H.version = 1; H.mount = mount; H.unmount = unmount; H.go = go;
-    console.log('fp-home: built at', origin.x, origin.y.toFixed(2), origin.z, inst.tris + ' tris');
+    H.site = {x: origin.x, y: +origin.y.toFixed(2), z: origin.z, floorY: +(origin.y + inst.FY).toFixed(2), side: 'south shore of the pond (west arm), porch facing north over the water', tris: inst.tris, meshes: inst.calls};
+    const wb = B => ({x0: +(origin.x + B.x0).toFixed(2), x1: +(origin.x + B.x1).toFixed(2), z0: +(origin.z + B.z0).toFixed(2), z1: +(origin.z + B.z1).toFixed(2)});
+    H.bounds = wb(inst.bounds); H.porchBounds = wb(inst.porchBounds);   // house shell footprint (walls) and the porch + steps, world metres
+    H.ready = true; H.version = 2; H.mount = mount; H.unmount = unmount; H.go = go;
+    console.log('fp-home: built at', origin.x, origin.y.toFixed(2), origin.z, inst.tris + ' tris', inst.calls + ' meshes');
     sc.emit('fp-home-ready', H, false); try { window.dispatchEvent(new CustomEvent('fp-home-ready', {detail: H})); } catch (e) {}
     placeFamily();
     return handle;
@@ -54,7 +57,7 @@
   function unmount() {
     if (!handle) return; handle.inst.dispose(); handle = null;
     const rm = (arr, list) => list.forEach(x => { const i = arr.indexOf(x); if (i >= 0) arr.splice(i, 1); }); rm(W3D.floors, added.floors); rm(W3D.walls, added.walls); added = {floors: [], walls: []};
-    restoreTrees(); if (maskHook && W3D.maskHooks) { const i = W3D.maskHooks.indexOf(maskHook); if (i >= 0) W3D.maskHooks.splice(i, 1); maskHook = null; if (W3D.realEarth && W3D.realEarth.rebuildMask) W3D.realEarth.rebuildMask(); }
+    restoreTrees(); if (keepOut && W3D.keepOut) { const i = W3D.keepOut.indexOf(keepOut); if (i >= 0) W3D.keepOut.splice(i, 1); keepOut = null; } if (maskHook && W3D.maskHooks) { const i = W3D.maskHooks.indexOf(maskHook); if (i >= 0) W3D.maskHooks.splice(i, 1); maskHook = null; if (W3D.realEarth && W3D.realEarth.rebuildMask) W3D.realEarth.rebuildMask(); }
     H.ready = false; const sc = document.querySelector('a-scene'); if (sc) sc.removeAttribute('fp-home-tick');
   }
   function go() {
@@ -70,9 +73,9 @@
     let list = []; try { list = (typeof api.list === 'function' ? api.list() : []) || []; } catch (e) {}
     const role = c => ((c.role || '') + ' ' + (c.id || '')).toLowerCase();
     const wife = list.filter(c => /wife|spouse/.test(role(c))), kids = list.filter(c => /kid|child|son|daughter/.test(role(c)));   // roster order = spawns.kids[0..2]
-    const sig = wife.map(c => c.id).concat(kids.map(c => c.id)).join(','); if (!sig || sig === famDone) return !!sig;
+    const sig = wife.map(c => c.id).join(','); if (!sig || sig === famDone) return !!sig;
     const P = s => ({x: s.position[0], y: s.position[1], z: s.position[2], rotationY: s.rotationY});   // rotationY in degrees, as the companion module reads it
-    try { wife.forEach(c => api.setHome(c.id, P(H.spawns.wife))); kids.forEach((c, i) => api.setHome(c.id, P(H.spawns.kids[i % H.spawns.kids.length]))); famDone = sig; } catch (e) {}
+    try { wife.forEach(c => api.setHome(c.id, P(H.spawns.wife))); famDone = sig; } catch (e) {}   // kids: not pinned - the companion module places them at spawns.kids[i] and lets them roam inside `play`
     return true; }
   let famTries = 0; const famIv = setInterval(() => { if (++famTries > 120) return clearInterval(famIv); if (H.ready) placeFamily(); }, 2000);   // picks up the roster once C's module mounts (2 s x 4 min)
 
