@@ -271,7 +271,7 @@ AFRAME.registerSystem('w3d-streets', {
   tick(time, dt) {
     if (!window.W3D || !W3D.root || !window.W3D_READY) return;
     if (!data) { if (!loading) { loading = true;
-      Promise.all([fetch('/vr/w3d/streets.json?v=8').then(r => r.json()), fetch('/vr/w3d/geo.json?v=1').then(r => r.json())])
+      Promise.all([fetch('/vr/w3d/streets.json?v=9').then(r => r.json()), fetch('/vr/w3d/geo.json?v=1').then(r => r.json())])
         .then(([j, g]) => { geo = g; data = j; }).catch(e => console.warn('street labels unavailable', e)); } return; }
     const cam = this.el.camera; if (!cam) return;
     if (!ready) { try { init(); } catch (e) { console.warn('street labels failed', e); data = null; loading = true; } return; }

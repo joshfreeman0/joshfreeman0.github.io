@@ -109,7 +109,7 @@
     if (!(W3D.home3d && W3D.home3d.ready) && (this._w = (this._w || 0) + 1) < 1200) return;   // houses first, so plants keep clear of them
     started = true;
     soil();
-    Promise.all([fetch('/vr/w3d/streets.json?v=8').then(r => r.json()), fetch('/vr/w3d/geo.json?v=1').then(r => r.json())]).then(([S, G]) => build(roadTest(S, G))).catch(e => { console.warn('coverup', e); build(() => false); });
+    Promise.all([fetch('/vr/w3d/streets.json?v=9').then(r => r.json()), fetch('/vr/w3d/geo.json?v=1').then(r => r.json())]).then(([S, G]) => build(roadTest(S, G))).catch(e => { console.warn('coverup', e); build(() => false); });
   } });
   const attach = () => { const sc = document.querySelector('a-scene'); if (sc) sc.setAttribute('w3d-coverup', ''); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', attach); else attach();
