@@ -238,8 +238,9 @@ RE.goLatLon = (name, lat, lon, o) => { o = o || {}; if (!RE.on) setOn(true);
   const gy = o.ground || 0, y = gy - dt * dt / 12742000 + (o.up || 320);   // the Google ground drops with distance from the anchor (stays so after a 'free' re-anchor)
   if (window.JFVR) JFVR.fly = true; W3D.teleportTo(qx, y, zz, 0); if (window.JFVR) JFVR.fly = true;
   const fl = document.querySelector('#flylabel'); if (fl) fl.setAttribute('value', 'Fly: ON');
-  const sc = document.querySelector('a-scene'), lc = document.querySelector('[camera]') && document.querySelector('[camera]').components['look-controls'];
-  if (lc && sc && !sc.is('vr-mode')) { lc.pitchObject.rotation.x = -Math.atan2(o.up || 320, back); lc.yawObject.rotation.y = 0; }
+  const sc = document.querySelector('a-scene'), pitch = -Math.atan2(o.up || 320, back), aim = () => { const lc = document.querySelector('[camera]') && document.querySelector('[camera]').components['look-controls'];
+    if (lc && sc && !sc.is('vr-mode')) { lc.pitchObject.rotation.x = pitch; lc.yawObject.rotation.y = 0; } };
+  aim(); if (!window.W3D_READY || o.tries) { setTimeout(aim, 800); setTimeout(aim, 2500); }   // ?spot= arrivals: the page's own start-up look resets the view after us
   toast(name); return {x: qx, y, z: zz, tx: qx, tz: qz}; };
 RE.goPlace = i => { const L = placesHere(), p = L[i]; if (!p || !RE.A) return false; if (!RE.on) setOn(true);
   const c = W3D.cities && W3D.cities.current && W3D.cities.current(); if (c && ANCH[c] && RE.anchor !== c && RE.anchor !== 'free' && RE.tiles) { setAnchor(c); calTries = 0; RE.calDone = null; }
