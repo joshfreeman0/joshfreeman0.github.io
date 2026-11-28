@@ -3,7 +3,7 @@
    leaves the wife and kids at FP_HOME (terrace placeholder if the house is not ready).
    One "Tap to talk with Lila" overlay unlocks audio and the mic. ?companion=0 turns it off; ?pick= chooses a character. */
 const QS = new URLSearchParams(location.search);
-const MOD = new URL('./companion.js?v=1.2.7', import.meta.url).href;
+const MOD = new URL('./companion.js?v=1.2.8', import.meta.url).href;
 function playerId() { try { let id = localStorage.getItem('fpc.player'); if (!id) { id = 'p-' + Math.random().toString(36).slice(2, 10); localStorage.setItem('fpc.player', id); } return id; } catch (e) { return 'guest'; } }
 async function go() {
   if (QS.get('companion') === '0') return;

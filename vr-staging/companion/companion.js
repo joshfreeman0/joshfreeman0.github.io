@@ -3,7 +3,7 @@
    Replies come from an LLM through a server-side proxy (Cloudflare Worker; the OpenRouter key never reaches the browser).
    See README.md next to this file. */
 const HERE = new URL('./', import.meta.url).href;
-export const VERSION = '1.2.7';
+export const VERSION = '1.2.8';
 export const DEFAULT_PROXY = 'https://fp-companion.tesseractprogram.workers.dev/chat';
 export const WORLDS = {
   earth: 'Earth, Fowling Pond: a restored pond in Raynham, Massachusetts, on real terrain. Above it stands an Egyptian-style concept bank compound (terrace pavilion, banking hall, vault, Josh\'s office, conservatory, sphinxes and temple gate). Around it: a pyramid park at Route 24 and I-495, a houseboat, the Pharos lighthouse, King\'s Pond and the Forge River, Vesta\'s house, a zoo, and a launch pad in Bridgewater with a rocket to Mars. Flying saucers visit other cities.',
@@ -480,6 +480,7 @@ class Companion {
 
   async listen(hold, auto) {
     this.unlockAudio();
+    if (!auto) this.handsFree = true;   // a click or Talk tap starts continuous turn-taking (needed for family residents, whose handsFree starts off)
     if (this.dead || this.rec || this.state === 'thinking' || this.speaking) return; if (!this.pass()) { this._afterPass = () => this.listen(); return this.needPass(); }
     if (!auto) this.stopSpeaking();
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -507,21 +508,24 @@ class Companion {
     return this.listenWav(hold);
   }
   async listenWav(hold) {
-    // no browser speech recognition (Quest Browser, Firefox): record a short clip, the proxy transcribes it
+    // no browser speech recognition (Quest Browser, Firefox): VAD clip, then the proxy transcribes it; keep the mic stream for the next turn
     try {
-      const mic = navigator.mediaDevices.getUserMedia({audio: {channelCount: 1, echoCancellation: true, noiseSuppression: true}});
-      const stream = await Promise.race([mic, new Promise((_, rej) => setTimeout(() => rej(new Error('mic-timeout')), 4000))]);
-      const ac = new (window.AudioContext || window.webkitAudioContext)(), src = ac.createMediaStreamSource(stream), pr = ac.createScriptProcessor(4096, 1, 1), bufs = [];
-      let voiced = 0, quiet = 0; const t0 = performance.now();
-      pr.onaudioprocess = e => { const d = e.inputBuffer.getChannelData(0); bufs.push(new Float32Array(d)); let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] * d[i]; const rms = Math.sqrt(s / (d.length / 4));
-        const dt = d.length / ac.sampleRate; if (rms > 0.02) { voiced += dt; quiet = 0; } else quiet += dt;
-        const el = (performance.now() - t0) / 1000; if (el > 9 || (!hold && voiced > 0.3 && quiet > 1.1) || (!hold && el > 6 && voiced < 0.1)) this.stopListen(); };
-      src.connect(pr); pr.connect(ac.destination);
-      this.rec = {kind: 'wav', hold, t0, stop: () => { pr.disconnect(); src.disconnect(); stream.getTracks().forEach(t => t.stop()); const rate = ac.sampleRate; ac.close(); return voiced > 0.15 ? wav16k(bufs, rate) : null; }};
-    } catch (e) { this.state = 'idle'; this.rec = null; this._micFailed = true; this.showTalkStrip(); this.subtitle('I can\'t hear the microphone. Type to me in the box at the bottom of the screen.', ' ', 8000); this.emit('error', {error: 'mic'}); }
+      let stream; try { stream = await this.micStream(); } catch (e) { if (Companion._micStream && Companion._micStream.getTracks().some(t => t.readyState === 'live')) stream = Companion._micStream; else throw e; }
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const ac = (this._micAc && this._micAc.state !== 'closed') ? this._micAc : new AC(); this._micAc = ac;
+      if (ac.state === 'suspended') await ac.resume();
+      const src = ac.createMediaStreamSource(stream), pr = ac.createScriptProcessor(4096, 1, 1), mute = ac.createGain(), bufs = [];
+      mute.gain.value = 0;
+      let voiced = 0, quiet = 0, started = false; const t0 = performance.now(), SIL = 0.9, MAX = 12, MINV = 0.2;
+      pr.onaudioprocess = e => { if (this.speaking || this.dead) return; const d = e.inputBuffer.getChannelData(0); let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] * d[i]; const rms = Math.sqrt(s / (d.length / 4));
+        const dt = d.length / ac.sampleRate; if (rms > 0.015) { if (!started) started = true; voiced += dt; quiet = 0; bufs.push(new Float32Array(d)); } else if (started) { quiet += dt; bufs.push(new Float32Array(d)); }
+        const el = (performance.now() - t0) / 1000; if ((started && voiced > MINV && quiet > SIL) || el > MAX) this.stopListen(); };
+      src.connect(pr); pr.connect(mute); mute.connect(ac.destination);
+      this.rec = {kind: 'wav', hold, t0, stop: () => { try { pr.disconnect(); src.disconnect(); mute.disconnect(); } catch (e) {} return voiced > 0.15 ? wav16k(bufs, ac.sampleRate) : null; }};
+    } catch (e) { this.state = 'idle'; this.rec = null; this._micFailed = true; this.showTalkStrip(); this.subtitle('I can\'t hear the microphone. Type to me in the box at the bottom of the screen.', ' ', 8000); this.emit('error', {error: 'mic'}); if (this.handsFree && !this.dead) this.armListen(2000); }
   }
   stopListen() { const r = this.rec; if (!r) return; if (r.kind === 'sr') { try { r.r.stop(); } catch (e) {} return; }
-    this.rec = null; const b64 = r.stop(); if (!b64) { this.state = 'idle'; this._emptyListen = (this._emptyListen || 0) + 1; if (this._emptyListen >= 2 || this.needsTypeFallback()) { this.showTalkStrip(); this.subtitle('I didn\'t catch that. Type to me in the box at the bottom of the screen.', ' ', 8000); return; } if (this.handsFree && !this.dead) { this.armListen(400); return; } this.subtitle('I didn\'t catch that.', ' ', 2500); return; } this._emptyListen = 0; this.send(null, b64); }
+    this.rec = null; const b64 = r.stop(); if (!b64) { this.state = 'idle'; this._emptyListen = (this._emptyListen || 0) + 1; if (this._emptyListen >= 2) this.showTalkStrip(); if (this.handsFree && !this.dead && !this.speaking) { this.armListen(400); return; } this.showTalkStrip(); this.subtitle('I didn\'t catch that. Type to me in the box at the bottom of the screen.', ' ', 8000); return; } this._emptyListen = 0; this.send(null, b64); }
 
   // ---------- talking to the proxy ----------
   async send(text, audio) { this.unlockAudio();
@@ -569,12 +573,42 @@ class Companion {
       const v = pool.find(v => v.name.toLowerCase().includes(p.toLowerCase()) && (v.lang || '').toLowerCase().replace('_', '-').startsWith(lang)) || pool.find(v => v.name.toLowerCase().includes(p.toLowerCase())); if (v) return v; }
     const nat = pool.filter(v => /natural|neural|online|premium|enhanced/i.test(v.name)); const g2 = (nat.length ? nat : pool).find(v => new RegExp(gender === 'male' ? '\\bmale\\b|guy|david|mark|daniel|alex|fred' : 'female|samantha|zira|aria|jenny|ava|victoria|karen|moira|serena|samantha|karen', 'i').test(v.name));
     return g2 || nat[0] || pool[0]; }
+  firstUtterance(text) { const t = String(text || '').trim(); if (!t) return ['', ''];
+    const m = t.match(/^([\s\S]{1,180}?[.!?])(?:\s+|$)/); if (m && m[1].length < t.length - 4) return [m[1].trim(), t.slice(m[0].length).trim()];
+    if (t.length > 160) { const i = t.lastIndexOf(' ', 140); if (i > 40) return [t.slice(0, i).trim(), t.slice(i).trim()]; }
+    return [t, '']; }
+  async micStream() {
+    const live = s => !!(s && s.getTracks && s.getTracks().some(t => t.kind === 'audio' && t.readyState === 'live'));
+    if (live(Companion._micStream)) return Companion._micStream;
+    if (this._micWait) return this._micWait;
+    this._micWait = Promise.race([
+      navigator.mediaDevices.getUserMedia({audio: {channelCount: 1, echoCancellation: true, noiseSuppression: true}}),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('mic-timeout')), 4000))
+    ]).then(s => { Companion._micStream = s; this._micWait = null; this._micFailed = false; return s; })
+      .catch(e => { this._micWait = null; throw e; });
+    return this._micWait;
+  }
+
   speak(text) {
-    this.subtitle(text); if (!text) return; this._lastSpoken = String(text);
+    if (this.o.residentsOnly && !this.resident) { const r = this.talkTarget(); return r ? r.speak(text) : undefined; }
+    if (!text) return; this._lastSpoken = String(text);
     if (!this.pass()) { this._afterPass = () => this.speak(text); return this.needPass(); }
-    if (!this.voiceOn()) { this.speaking = true; this._speakGen = (this._speakGen || 0) + 1; const gen = this._speakGen; clearTimeout(this.spT); this.spT = setTimeout(() => this.afterSpeak(gen), 600 + text.length * 55); return; }
+    if (!this.voiceOn()) { this.subtitle(text); this.speaking = true; this._speakGen = (this._speakGen || 0) + 1; const gen = this._speakGen; clearTimeout(this.spT); this.spT = setTimeout(() => this.afterSpeak(gen), 600 + text.length * 55); return; }
     this.stopSpeaking(true); this.speaking = true; this.emit('speaking'); this._speakGen = (this._speakGen || 0) + 1; const gen = this._speakGen;
-    this.fetchTts(text).then(blob => { if (this.dead || gen !== this._speakGen) return; if (blob && blob._noauth) { this.speaking = false; return; } if (blob) return this.playAudio(blob, gen); this.speakBrowser(text, gen); }).catch(e => { console.warn('[fpc] tts', e); if (!this.dead && gen === this._speakGen) this.speakBrowser(text, gen); });
+    const [head, rest] = this.firstUtterance(text), t0 = performance.now();
+    const headP = this.fetchTts(head), restP = rest ? this.fetchTts(rest) : null;
+    const finish = () => { if (gen === this._speakGen && this.speaking) this.afterSpeak(gen); };
+    headP.then(async blob => {
+      if (this.dead || gen !== this._speakGen) return;
+      if (blob && blob._noauth) { this.speaking = false; return; }
+      if (!blob) { this.subtitle(text); return this.speakBrowser(text, gen); }
+      this._ttsWaitMs = Math.round(performance.now() - t0);
+      await this.playAudio(blob, gen, {subtitle: text, last: !rest, t0});
+      if (rest && restP && gen === this._speakGen && !this.dead) {
+        const b2 = await restP; if (this.dead || gen !== this._speakGen) return;
+        if (b2 && !b2._noauth) await this.playAudio(b2, gen, {subtitle: text, last: true}); else finish();
+      }
+    }).catch(e => { console.warn('[fpc] tts', e); if (!this.dead && gen === this._speakGen) { this.subtitle(text); this.speakBrowser(text, gen); } });
     clearTimeout(this.spT); this.spT = setTimeout(() => { if (gen !== this._speakGen) return; const a = this.player; if (a && !a.paused && !a.ended) return; if (this.speaking) this.afterSpeak(gen); }, 8000 + text.length * 80);
   }
   ttsEndpoint() { return this.ttsUrl || (this.proxy || DEFAULT_PROXY).replace(/\/chat\/?$/, '/tts'); }
@@ -584,16 +618,18 @@ class Companion {
     if (res.status === 401) { try { localStorage.removeItem('fpc.pass'); } catch (e) {} this.needPass('wrong'); return {_noauth: true}; } if (!res.ok) throw new Error('tts ' + res.status);
     const blob = await res.blob(); if (!blob || blob.size < 200) return null; this.lastTts = { model: res.headers.get('X-FP-Tts-Model'), voice: res.headers.get('X-FP-Tts-Voice'), cost: res.headers.get('X-FP-Tts-Cost-Est'), bytes: blob.size }; return blob;
   }
-  playAudio(blob, gen) {
+  playAudio(blob, gen, opts) {
+    opts = opts || {};
     return new Promise(resolve => {
       try {
         const a = this.player = this.player || new Audio(); if (this._ttsUrl) { try { URL.revokeObjectURL(this._ttsUrl); } catch (e) {} }
         const url = this._ttsUrl = URL.createObjectURL(blob); a.muted = false; a.volume = 1; a.src = url;
-        const done = () => { a.onended = a.onerror = null; if (this._ttsUrl === url) { try { URL.revokeObjectURL(url); } catch (e) {} this._ttsUrl = null; } this.afterSpeak(gen); resolve(); };
-        a.onended = done; a.onerror = () => { if (this.ac) this.playViaContext(blob, gen, done); else done(); };
+        const show = () => { if (opts.subtitle && gen === this._speakGen) this.subtitle(opts.subtitle); };
+        const done = () => { a.onended = a.onerror = a.onplay = null; if (this._ttsUrl === url) { try { URL.revokeObjectURL(url); } catch (e) {} this._ttsUrl = null; } if (opts.last !== false) this.afterSpeak(gen); resolve(); };
+        a.onplay = show; a.onended = done; a.onerror = () => { if (this.ac) this.playViaContext(blob, gen, done); else done(); };
         a.ontimeupdate = () => { this.pulse = 0.08; };
-        const p = a.play(); if (p && p.catch) p.catch(() => { if (this.ac) this.playViaContext(blob, gen, done); else { this.speakBrowser(this.sub && this.sub.text || '', gen); resolve(); } });
-      } catch (e) { this.speakBrowser(this.sub && this.sub.text || '', gen); resolve(); }
+        const p = a.play(); if (p && p.then) p.then(show); if (p && p.catch) p.catch(() => { if (this.ac) this.playViaContext(blob, gen, done); else { show(); this.speakBrowser(opts.subtitle || (this.sub && this.sub.text) || '', gen); resolve(); } });
+      } catch (e) { if (opts.subtitle) this.subtitle(opts.subtitle); this.speakBrowser(opts.subtitle || (this.sub && this.sub.text) || '', gen); resolve(); }
     });
   }
   playViaContext(blob, gen, done) {
