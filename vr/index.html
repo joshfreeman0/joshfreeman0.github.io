@@ -96,7 +96,7 @@ window.JFVR_LITE = (function () {
 <script src="w3d/vrpointer.js?v=1"></script>
 <script src="w3d/tiles3d.min.js?v=1"></script>
 <script src="w3d/gk.js?v=1"></script>
-<script src="w3d/realearth.js?v=16"></script>
+<script src="w3d/realearth.js?v=17"></script>
 <script src="w3d/bostonarea.js?v=2"></script>
 <script src="w3d/londonarea.js?v=1"></script>
 <script src="w3d/davol.js?v=1"></script>
@@ -276,6 +276,7 @@ function goWorld(spot){
   const s3 = scn.object3D; s3.fog = W3D.fog; s3.environment = W3D.env || null; s3.background = W3D.bg || null;
   document.querySelector('#sky').setAttribute('visible', false);
   if (spot !== 'pond' && spot !== 'home' && JFVR.fly) { JFVR.fly = false; const l = document.querySelector('#flylabel'); if (l) l.setAttribute('value', 'Fly: OFF'); }
+  { const lc = document.querySelector('[camera]') && document.querySelector('[camera]').components['look-controls']; if (lc && !scn.is('vr-mode')) lc.pitchObject.rotation.x = 0; }   // level the view (a Real Earth spot leaves it tilted down); spots that aim set their own
   (W3D.spots[spot] || W3D.spots.terrace)(); mark('[data-w]', spot); bringMenu();
 }
 function show(t){ // 360 concept panorama, in this same page

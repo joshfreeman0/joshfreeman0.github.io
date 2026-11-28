@@ -233,6 +233,7 @@ RE.goLatLon = (name, lat, lon, o) => { o = o || {}; if (!RE.on) setOn(true);
   let A = c && ANCH[c] ? ANCH[c] : ANCH.home; if (!A.kx) Object.assign(A, kxy(A.lat));
   if (o.pin && !RE.tiles && RE.on) start();   // ?spot=ldn-* arrives before the w3d-ready start
   if (o.pin && !RE.tiles) { if (!RE.failed && (o.tries = (o.tries || 0) + 1) < 60) setTimeout(() => { const p = RE.goLatLon(name, lat, lon, o); if (p && o.done) o.done(p); }, 500); return null; }
+  if (!o.pin && RE.pin && RE.tiles) { RE.pin = false; setAnchor(c && ANCH[c] ? c : 'home'); calTries = 0; RE.calDone = null; }   // leaving a pinned far spot: back to a real frame first (Quincy / Plymouth after London)
   if (o.pin) { A = {lat, lon, x: 200000, z: -200000 - (o.back || 900), yOff: o.pin.yOff || 0, cal: 0}; setAnchor('free', A); RE.pin = true; }   // far city with no scene of ours (London): pin a free anchor out at 200 km
   const qx = A.x + (lon - A.lon) * A.kx, qz = A.z - (lat - A.lat) * A.ky, back = o.back || 900, zz = qz + back, dt = Math.hypot(qx - A.x, zz - A.z);
   const gy = o.ground || 0, y = gy - dt * dt / 12742000 + (o.up || 320);   // the Google ground drops with distance from the anchor (stays so after a 'free' re-anchor)
@@ -359,8 +360,8 @@ AFRAME.registerSystem('w3d-realearth', {
     const cityA = city && ANCH[city] ? city : nearCity && ANCH[nearCity] ? nearCity : null;
     if (cityA) {   // every saucer city sits on its real place: fly anywhere from it (anchor = the city within ~12 km, then a floating origin)
       const dc = Math.hypot(_c.x - D[cityA].x, _c.z - D[cityA].z); want = dc < (RE.anchor === cityA ? 13000 : 11000) ? cityA : 'free'; }
-    else if (Math.hypot(_c.x, _c.z) > 30000 || RE.anchor === 'free' && RE.pin) want = 'free';
-    if (RE.pin && !cityA && Math.hypot(_c.x, _c.z) < 30000) RE.pin = false;
+    else { if (RE.pin && Math.hypot(_c.x, _c.z) < 30000) RE.pin = false;   // back home from a pinned far spot (London): drop the pin first, so home re-anchors 'home' (not 'free' from the London frame)
+      if (Math.hypot(_c.x, _c.z) > 30000 || RE.anchor === 'free' && RE.pin) want = 'free'; }
     if (want !== 'free' && RE.anchor !== want) { setAnchor(want); calTries = 0; RE.calDone = null; }
     else if (want === 'free') { const A = RE.A, dA = Math.hypot(_c.x - A.x, _c.z - A.z);
       // re-base under the camera; the new tangent frame is lowered by the Earth's curvature drop at that distance so the ground doesn't jump
