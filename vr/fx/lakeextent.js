@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   const W3D = window.W3D = window.W3D || {};
-  const SRC = '/vr/fx/lakeextent.json?v=6';
+  const SRC = '/vr/fx/lakeextent.json?v=7';
   const WATER = 16.5, ROAD_W = 16, BUFFER = 45;
   let J = null, mask = null, lakeTex = null, mw = 0, mh = 0, inLake = () => false;
 
