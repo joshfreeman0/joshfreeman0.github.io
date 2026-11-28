@@ -3,7 +3,7 @@
    Replies come from an LLM through a server-side proxy (Cloudflare Worker; the OpenRouter key never reaches the browser).
    See README.md next to this file. */
 const HERE = new URL('./', import.meta.url).href;
-export const VERSION = '1.2.3';
+export const VERSION = '1.2.4';
 export const DEFAULT_PROXY = 'https://fp-companion.tesseractprogram.workers.dev/chat';
 export const WORLDS = {
   earth: 'Earth, Fowling Pond: a restored pond in Raynham, Massachusetts, on real terrain. Above it stands an Egyptian-style concept bank compound (terrace pavilion, banking hall, vault, Josh\'s office, conservatory, sphinxes and temple gate). Around it: a pyramid park at Route 24 and I-495, a houseboat, the Pharos lighthouse, King\'s Pond and the Forge River, Vesta\'s house, a zoo, and a launch pad in Bridgewater with a rocket to Mars. Flying saucers visit other cities.',
@@ -52,7 +52,7 @@ class Companion {
     if (!this.T) throw new Error('companion: THREE not found (pass opts.THREE)');
     this.store = o.storage || localStore; this.world = o.world || 'earth'; this.worldDesc = o.worldDesc || WORLDS[this.world] || '';
     this.playerId = String(o.playerId || 'guest'); this.playerName = o.playerName || '';
-    this.proxy = o.proxyUrl || DEFAULT_PROXY; this.emit = (type, d) => { try { o.onEvent && o.onEvent(Object.assign({type, character: this.ch && this.ch.id}, d || {})); } catch (e) {} };
+    this.proxy = o.proxyUrl || DEFAULT_PROXY; this.ttsUrl = o.ttsUrl || this.proxy.replace(/\/chat\/?$/, '/tts'); this.emit = (type, d) => { try { o.onEvent && o.onEvent(Object.assign({type, character: this.ch && this.ch.id}, d || {})); } catch (e) {} };
     this.resident = !!o.resident; this.homes = o.homes || {}; this.family = new Map(); this.state = 'idle'; this.t = 0; this.hist = []; this.cleanup = []; this.dead = false; this.jaw = 0; this.look = {yaw: 0, pitch: 0}; this.talkUntil = 0; this.lastTap = 0;
   }
   get root3d() { const r = this.rootEl; return r && r.object3D ? r.object3D : r; }
@@ -78,6 +78,7 @@ class Companion {
       version: VERSION, list: () => this.roster.map(c => ({id: c.id, name: c.name, gender: c.gender, role: c.role, canTravel: !!c.canTravel})),
       current: () => this.ch && {id: this.ch.id, name: this.ch.name}, pick: id => this.pick(id),
       talk: text => text ? this.send(text) : this.listen(), listen: () => this.listen(), say: text => this.speak(text),
+      voiceOn: () => this.voiceOn(), setVoiceOn: on => this.setVoiceOn(on), unlockAudio: () => this.unlockAudio(),
       setWorld: (w, d) => { this.world = w; this.worldDesc = d || WORLDS[w] || ''; }, moveTo: (x, y, z, yaw) => this.placeWorld(x, y, z, yaw),
       comeHere: () => this.comeHere(), forget: () => { this.hist = []; this.save(); }, setPassphrase: p => this.setPass(p),
       update: dt => this.update(dt), unmount: () => unmount(), object3D: this.holder,
@@ -359,18 +360,18 @@ class Companion {
       const box = new T.Box3().setFromObject(this.model); if (rc.ray.intersectsBox(box)) this.tap(); });
     // controller: hold B (right) near the companion to talk, release to send
     if (this.resident) return;   // family residents: tap / click them to talk
-    on(s, 'bbuttondown', () => { if (near()) this.listen(true); });
+    on(s, 'bbuttondown', () => { this.unlockAudio(); if (near()) this.listen(true); });
     on(s, 'bbuttonup', () => { if (this.rec && this.rec.hold) this.stopListen(); });
     // desktop: T = talk (hold, or tap to toggle); Enter in the text box
-    on(window, 'keydown', e => { if (e.repeat || /input|textarea/i.test((e.target && e.target.tagName) || '')) return; if (e.code === 'KeyT') { if (this.rec) this.stopListen(); else this.listen(true); } });
+    on(window, 'keydown', e => { if (e.repeat || /input|textarea/i.test((e.target && e.target.tagName) || '')) return; if (e.code === 'KeyT') { this.unlockAudio(); if (this.rec) this.stopListen(); else this.listen(true); } });
     on(window, 'keyup', e => { if (e.code === 'KeyT' && this.rec && this.rec.hold && performance.now() - this.rec.t0 > 600) this.stopListen(); });
   }
-  tap() { const n = performance.now(); if (n - this.lastTap < 500) return; this.lastTap = n; if (this.rec) this.stopListen(); else if (this.speaking) this.stopSpeaking(); else this.listen(false); }
+  tap() { this.unlockAudio(); const n = performance.now(); if (n - this.lastTap < 500) return; this.lastTap = n; if (this.rec) this.stopListen(); else if (this.speaking) this.stopSpeaking(); else this.listen(false); }
 
   makeUI() {
     const d = document.createElement('div'); d.className = 'fpc-ui';
-    d.innerHTML = '<style>.fpc-ui{position:fixed;left:12px;bottom:12px;z-index:30;font:14px system-ui,sans-serif;color:#fff;max-width:min(420px,92vw);transition:opacity .2s ease,bottom .2s ease}.fpc-ui.fpc-raised{bottom:calc(var(--fpc-menu-h, 56px) + env(safe-area-inset-bottom, 0px))}.fpc-ui.fpc-menu-open{opacity:0;pointer-events:none}.fpc-ui .row{display:flex;gap:6px;margin-top:6px}.fpc-ui button,.fpc-ui select,.fpc-ui input{font:inherit;border-radius:8px;border:1px solid #c9a24a;background:rgba(20,20,26,.85);color:#fff;padding:7px 10px}.fpc-ui button.main{background:#c9a24a;color:#1a1408;font-weight:600}.fpc-ui input{flex:1;min-width:0}.fpc-ui .log{background:rgba(10,12,18,.72);border-radius:8px;padding:7px 10px;margin-top:6px;display:none}.fpc-ui.open .log{display:block}.fpc-ui .more{display:none}.fpc-ui.open .more{display:flex}</style>' +
-      '<div class="row"><button class="main" type="button"></button><button class="tog" type="button" title="Type, choose a companion">...</button></div>' +
+    d.innerHTML = '<style>.fpc-ui{position:fixed;left:12px;bottom:12px;z-index:30;font:14px system-ui,sans-serif;color:#fff;max-width:min(420px,92vw);transition:opacity .2s ease,bottom .2s ease}.fpc-ui.fpc-raised{bottom:calc(var(--fpc-menu-h, 56px) + env(safe-area-inset-bottom, 0px))}.fpc-ui.fpc-menu-open{opacity:0;pointer-events:none}.fpc-ui .row{display:flex;gap:6px;margin-top:6px}.fpc-ui button,.fpc-ui select,.fpc-ui input{font:inherit;border-radius:8px;border:1px solid #c9a24a;background:rgba(20,20,26,.85);color:#fff;padding:7px 10px}.fpc-ui button.main{background:#c9a24a;color:#1a1408;font-weight:600}.fpc-ui button.mute{min-width:3.6em}.fpc-ui input{flex:1;min-width:0}.fpc-ui .log{background:rgba(10,12,18,.72);border-radius:8px;padding:7px 10px;margin-top:6px;display:none}.fpc-ui.open .log{display:block}.fpc-ui .more{display:none}.fpc-ui.open .more{display:flex}</style>' +
+      '<div class="row"><button class="main" type="button"></button><button class="mute" type="button" title="Voice on"></button><button class="tog" type="button" title="Type, choose a companion">...</button></div>' +
       '<div class="row more"><input class="txt" placeholder="Type to talk" maxlength="400"><button class="snd" type="button">Send</button></div>' +
       '<div class="row more"><select class="sel"></select><button class="come" type="button">Come here</button><button class="fgt" type="button" title="Forget this conversation">Forget</button></div>' +
       '<div class="row more"><input class="pw" type="password" placeholder="Passphrase" autocomplete="off"><button class="pws" type="button">Save</button></div>' +
@@ -382,7 +383,8 @@ class Companion {
         if (!g) { g = groups[gn] = document.createElement('optgroup'); g.label = gn; }
         const o = document.createElement('option'); o.value = c.id; o.textContent = c.name + (c.role === 'wife' ? ' (wife)' : c.role === 'child' ? ' (' + (c.relation || 'kid') + ')' : ''); g.appendChild(o); }
       for (const gn of ['Girlfriends', 'Companions', 'Family']) if (groups[gn]) ui.sel.appendChild(groups[gn]); }
-    ui.btn.onclick = () => this.tap(); q('.tog').onclick = () => d.classList.toggle('open');
+    ui.btn.onclick = () => this.tap(); ui.mute = q('.mute'); this.syncMuteBtn(); ui.mute.onclick = () => { this.setVoiceOn(!this.voiceOn()); };
+    q('.tog').onclick = () => d.classList.toggle('open'); d.addEventListener('pointerdown', () => this.unlockAudio(), {passive: true});
     const sendTxt = () => { const v = ui.txt.value.trim(); if (v) { ui.txt.value = ''; this.send(v); } };
     q('.snd').onclick = sendTxt; ui.txt.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') sendTxt(); };
     ui.sel.onchange = () => this.pick(ui.sel.value); q('.come').onclick = () => this.comeHere(); q('.fgt').onclick = () => { this.hist = []; this.save(); this.subtitle('(conversation cleared)'); };
@@ -422,6 +424,7 @@ class Companion {
 
   // ---------- listening ----------
   async listen(hold) {
+    this.unlockAudio();
     if (this.rec || this.state === 'thinking') return; if (!this.pass()) return this.needPass();
     this.stopSpeaking(); const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     this.state = 'listening'; this.subtitle('Listening...', ' ', 15000); this.emit('listening');
@@ -450,7 +453,7 @@ class Companion {
     this.rec = null; const b64 = r.stop(); if (!b64) { this.state = 'idle'; this.subtitle('I didn\'t catch that.', ' ', 2500); return; } this.send(null, b64); }
 
   // ---------- talking to the proxy ----------
-  async send(text, audio) {
+  async send(text, audio) { this.unlockAudio();
     if (!this.pass()) return this.needPass(); const c = this.ch; this.state = 'thinking'; this.subtitle(text ? text : '...', text ? 'You' : ' ', 20000);
     if (text) this.hist.push({role: 'user', content: String(text).slice(0, 800)});
     let res; try {
@@ -469,23 +472,79 @@ class Companion {
     this.emit('reply', {text: res.reply, model: res.model, cost: res.cost}); this.speak(res.reply);
   }
 
-  // ---------- voice ----------
+  // ---------- voice (v1.2.4) ----------
+  // iPhone Safari and Quest Browser often swallow speechSynthesis unless audio has been unlocked by a user gesture,
+  // and they may have no usable voices at all. Unlock on the first tap, play Worker TTS (Aura) through an HTML audio
+  // element, and fall back to speechSynthesis if the Worker request fails.
+  voiceOn() { if (this.o.voice === false) return false; try { const v = localStorage.getItem('fpc.voiceOn'); if (v === '0') return false; } catch (e) {} return this.o.voiceOn !== false; }
+  setVoiceOn(on) { try { localStorage.setItem('fpc.voiceOn', on ? '1' : '0'); } catch (e) {} if (!on) this.stopSpeaking(); this.syncMuteBtn(); this.emit('voice', {on: !!on}); }
+  syncMuteBtn() { const b = this.ui && this.ui.mute; if (!b) return; const on = this.voiceOn(); b.textContent = on ? 'Voice' : 'Muted'; b.title = on ? 'Voice on — tap to mute' : 'Muted — tap to turn voice on'; b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+  unlockAudio() {
+    if (this.audioUnlocked) { try { this.ac && this.ac.state === 'suspended' && this.ac.resume(); } catch (e) {} return; }
+    this.audioUnlocked = true;
+    try { const AC = window.AudioContext || window.webkitAudioContext; if (AC) { this.ac = this.ac || new AC(); this.ac.resume(); const buf = this.ac.createBuffer(1, 1, 22050), src = this.ac.createBufferSource(); src.buffer = buf; src.connect(this.ac.destination); src.start(0); } } catch (e) {}
+    try {
+      const a = this.player = this.player || new Audio(); a.preload = 'auto';
+      a.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      a.muted = true; const p = a.play(); if (p && p.then) p.then(() => { a.pause(); a.muted = false; a.removeAttribute('src'); a.load && a.load(); }).catch(() => { a.muted = false; });
+      else { a.muted = false; }
+    } catch (e) {}
+    try { const ss = window.speechSynthesis; if (ss) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; ss.speak(u); ss.cancel(); ss.getVoices(); ss.addEventListener && ss.addEventListener('voiceschanged', () => ss.getVoices()); } } catch (e) {}
+  }
   voice() { const ss = window.speechSynthesis; if (!ss) return null; const vs = ss.getVoices(); if (!vs.length) return null; const V = this.ch.voice || {}, lang = (V.lang || 'en-US').toLowerCase();
     const sameLang = vs.filter(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(lang.slice(0, 2)));
-    const pool = sameLang.length ? sameLang : vs, gender = this.ch.gender === 'male' ? 'male' : 'female';
+    const pool = sameLang.length ? sameLang : vs, gender = this.ch.gender === 'male' ? 'male' : (this.ch.role === 'child' && this.ch.gender === 'male' ? 'male' : 'female');
     for (const p of V.prefer || []) { if (p === 'female' || p === 'male') { const g = pool.find(v => new RegExp('\\b' + p + '\\b', 'i').test(v.name)); if (g) return g; continue; }
       const v = pool.find(v => v.name.toLowerCase().includes(p.toLowerCase()) && (v.lang || '').toLowerCase().replace('_', '-').startsWith(lang)) || pool.find(v => v.name.toLowerCase().includes(p.toLowerCase())); if (v) return v; }
-    const nat = pool.filter(v => /natural|neural|online|premium|enhanced/i.test(v.name)); const g2 = (nat.length ? nat : pool).find(v => new RegExp(gender === 'male' ? '\\bmale\\b|guy|david|mark|daniel|alex|fred' : 'female|samantha|zira|aria|jenny|ava|victoria|karen|moira|serena', 'i').test(v.name));
+    const nat = pool.filter(v => /natural|neural|online|premium|enhanced/i.test(v.name)); const g2 = (nat.length ? nat : pool).find(v => new RegExp(gender === 'male' ? '\\bmale\\b|guy|david|mark|daniel|alex|fred' : 'female|samantha|zira|aria|jenny|ava|victoria|karen|moira|serena|samantha|karen', 'i').test(v.name));
     return g2 || nat[0] || pool[0]; }
   speak(text) {
-    this.subtitle(text); const ss = window.speechSynthesis; if (!ss || this.o.voice === false) { this.speaking = true; clearTimeout(this.spT); this.spT = setTimeout(() => { this.speaking = false; }, 600 + text.length * 55); return; }
-    ss.cancel(); const u = new SpeechSynthesisUtterance(text), V = this.ch.voice || {}; const v = this.voice(); if (v) u.voice = v; u.lang = (v && v.lang) || V.lang || 'en-US';
-    u.pitch = V.pitch || 1; u.rate = V.rate || 1; u.volume = 1;
-    u.onstart = () => { this.speaking = true; this.emit('speaking'); }; u.onboundary = () => { this.pulse = 0.08; };
-    u.onend = u.onerror = () => { this.speaking = false; if (this.sub) this.sub.until = performance.now() + 2500; };
-    this.speaking = true; clearTimeout(this.spT); this.spT = setTimeout(() => { if (!ss.speaking) this.speaking = false; }, 1500 + text.length * 90); ss.speak(u);
+    this.subtitle(text); if (!text) return;
+    if (!this.voiceOn()) { this.speaking = true; clearTimeout(this.spT); this.spT = setTimeout(() => { this.speaking = false; }, 600 + text.length * 55); return; }
+    this.stopSpeaking(true); this.speaking = true; this.emit('speaking'); this._speakGen = (this._speakGen || 0) + 1; const gen = this._speakGen;
+    this.fetchTts(text).then(blob => { if (this.dead || gen !== this._speakGen) return; if (blob) return this.playAudio(blob, gen); this.speakBrowser(text, gen); }).catch(e => { console.warn('[fpc] tts', e); if (!this.dead && gen === this._speakGen) this.speakBrowser(text, gen); });
+    clearTimeout(this.spT); this.spT = setTimeout(() => { if (this.speaking && gen === this._speakGen) this.speaking = false; }, 8000 + text.length * 80);
   }
-  stopSpeaking() { try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {} this.speaking = false; }
+  ttsEndpoint() { return this.ttsUrl || (this.proxy || DEFAULT_PROXY).replace(/\/chat\/?$/, '/tts'); }
+  async fetchTts(text) {
+    const pass = this.pass(); if (!pass) return null;
+    const res = await fetch(this.ttsEndpoint(), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-FP-Pass': pass }, body: JSON.stringify({ text, characterId: this.ch && this.ch.id, role: this.ch && this.ch.role, gender: this.ch && this.ch.gender }) });
+    if (res.status === 401) return null; if (!res.ok) throw new Error('tts ' + res.status);
+    const blob = await res.blob(); if (!blob || blob.size < 200) return null; this.lastTts = { model: res.headers.get('X-FP-Tts-Model'), voice: res.headers.get('X-FP-Tts-Voice'), cost: res.headers.get('X-FP-Tts-Cost-Est'), bytes: blob.size }; return blob;
+  }
+  playAudio(blob, gen) {
+    return new Promise(resolve => {
+      try {
+        const a = this.player = this.player || new Audio(); if (this._ttsUrl) { try { URL.revokeObjectURL(this._ttsUrl); } catch (e) {} }
+        const url = this._ttsUrl = URL.createObjectURL(blob); a.muted = false; a.volume = 1; a.src = url;
+        const done = () => { a.onended = a.onerror = null; if (this._ttsUrl === url) { try { URL.revokeObjectURL(url); } catch (e) {} this._ttsUrl = null; } if (gen === this._speakGen) { this.speaking = false; if (this.sub) this.sub.until = performance.now() + 2500; } resolve(); };
+        a.onended = done; a.onerror = () => { if (this.ac) this.playViaContext(blob, gen, done); else done(); };
+        a.ontimeupdate = () => { this.pulse = 0.08; };
+        const p = a.play(); if (p && p.catch) p.catch(() => { if (this.ac) this.playViaContext(blob, gen, done); else { this.speakBrowser(this.sub && this.sub.text || '', gen); done(); } });
+      } catch (e) { this.speakBrowser(this.sub && this.sub.text || '', gen); resolve(); }
+    });
+  }
+  playViaContext(blob, gen, done) {
+    const ac = this.ac; if (!ac) return done(); ac.resume(); blob.arrayBuffer().then(b => ac.decodeAudioData(b)).then(buf => {
+      if (gen !== this._speakGen) return done(); const src = ac.createBufferSource(); src.buffer = buf; src.connect(ac.destination); src.onended = done; src.start(0); this._ttsSrc = src;
+    }).catch(done);
+  }
+  speakBrowser(text, gen) {
+    const ss = window.speechSynthesis; if (!ss || !text) { if (gen === this._speakGen) { this.speaking = true; clearTimeout(this.spT); this.spT = setTimeout(() => { if (gen === this._speakGen) this.speaking = false; }, 600 + text.length * 55); } return; }
+    const go = () => { if (this.dead || gen !== this._speakGen) return; try { ss.cancel(); ss.resume && ss.resume(); } catch (e) {}
+      const u = new SpeechSynthesisUtterance(text), V = (this.ch && this.ch.voice) || {}; const v = this.voice(); if (v) u.voice = v; u.lang = (v && v.lang) || V.lang || 'en-US';
+      u.pitch = V.pitch || 1; u.rate = V.rate || 1; u.volume = 1;
+      u.onstart = () => { if (gen === this._speakGen) { this.speaking = true; this.emit('speaking'); } }; u.onboundary = () => { this.pulse = 0.08; };
+      u.onend = u.onerror = () => { if (gen === this._speakGen) { this.speaking = false; if (this.sub) this.sub.until = performance.now() + 2500; } };
+      this._utt = u; ss.speak(u); setTimeout(() => { try { if (ss.paused) ss.resume(); } catch (e) {} }, 250);
+      if (!this._voicesTried && !v) { this._voicesTried = true; ss.addEventListener && ss.addEventListener('voiceschanged', () => { if (this._utt === u && gen === this._speakGen) { const v2 = this.voice(); if (v2) { try { ss.cancel(); u.voice = v2; ss.speak(u); } catch (e) {} } } }); }
+    };
+    if (ss.getVoices && !ss.getVoices().length) { ss.getVoices(); setTimeout(go, 250); } else go();
+  }
+  stopSpeaking(keepGen) { if (!keepGen) this._speakGen = (this._speakGen || 0) + 1; try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
+    try { if (this.player) { this.player.onended = this.player.onerror = this.player.ontimeupdate = null; this.player.pause(); this.player.removeAttribute('src'); } } catch (e) {}
+    try { if (this._ttsSrc) { this._ttsSrc.stop(); this._ttsSrc = null; } } catch (e) {}
+    this.speaking = false; }
 
   destroy() {
     for (const r of this.family.values()) { try { r.destroy(); } catch (e) {} } this.family.clear();

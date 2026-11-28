@@ -6,7 +6,7 @@ One ES module that puts a talking, realistic AI companion into any A-Frame (or p
 - Default roster: `https://joshfreeman.org/vr-staging/companion/roster.json`
 - Demo page: `https://joshfreeman.org/vr-staging/companion/demo.html` (`?family=1` also shows the wife and kids)
 - Line-up page: `https://joshfreeman.org/vr-staging/companion/lineup.html?ids=lila,freya,maya,nina` (static side-by-side comparison, no talking)
-- Version: `1.2.3` (`api.version`)
+- Version: `1.2.4` (`api.version`)
 - Proxy: `https://fp-companion.tesseractprogram.workers.dev/chat` (Cloudflare Worker `fp-companion`, source `/workspace/fp-upgrade/worker`)
 - GitHub Pages serves everything with `Access-Control-Allow-Origin: *`, so redplanetlounge.pages.dev can `import()` the module and load its GLBs.
 
@@ -58,10 +58,11 @@ opts | meaning
 On mount the api is also published as `window.FP_COMPANION` (v1.1); `unmount()` removes it if it still points at that instance.
 
 api: `version`, `list()`, `current()`, `pick(id)`, `talk(text?)` (no text = listen), `listen()`, `say(text)`, `setWorld(world, desc)`, `moveTo(x, y, z, yaw)`, `comeHere()`, `forget()`, `setPassphrase(p)`, `update(dt)`, `unmount()`, `object3D`.
+v1.2.4: `voiceOn()`, `setVoiceOn(on)`, `unlockAudio()`.
 v1.2: `setHome(id, {x, y?, z, yaw?})` (pins a wife/kid resident there; overrides roster `home` and `FP_HOME`), `family()` -> `[{id, name, role, object3D}]` (residents currently mounted), `talkTo(id, text?)`.
 Also exported: `preview(sceneEl, rootEl, characters, {spacing, z})` / `clearPreview()` for static line-ups (used by `lineup.html`), `FAMILY_PLACEHOLDER`, `VERSION`.
 
-Talking: click/tap her, or the "Talk to ..." button, or hold **B** (right controller) within 6 m, or hold/tap **T** on a keyboard; type in the panel as a fallback. Speech in: the browser's SpeechRecognition where it exists; otherwise (Quest Browser) a short 16 kHz WAV clip goes to the proxy, which transcribes it. Speech out: `speechSynthesis` with the character's voice hints; subtitles float above her head (also in VR).
+Talking: click/tap her, or the "Talk to ..." button, or hold **B** (right controller) within 6 m, or hold/tap **T** on a keyboard; type in the panel as a fallback. Speech in: the browser's SpeechRecognition where it exists; otherwise (Quest Browser) a short 16 kHz WAV clip goes to the proxy, which transcribes it. Speech out (v1.2.4): the first tap/Talk/T/B unlocks audio (needed on iPhone Safari and Quest Browser). Replies are spoken with a natural voice from the proxy `POST /tts` (Cloudflare Workers AI Deepgram Aura-1: female voices for the women, male for Daniel and Marcus, gentle voices for Linnea and Oskar). If that fails, the browser's `speechSynthesis` is used, with a female or male English voice to match the character. A **Voice** / **Muted** button in the companion bar turns speech off (default on, stored as `fpc.voiceOn`). Subtitles still float above her head. On an iPhone, turn off the silent switch and raise the volume to hear her.
 
 ## Roster schema
 
@@ -153,4 +154,5 @@ Add a character per person to a roster (yours or a copy of `roster.json`): `role
 ## Proxy
 
 `POST /chat` with header `X-FP-Pass: <passphrase>` and JSON `{characterId, role, persona, world, worldDesc, playerName, messages: [{role, content}], audio?: base64 WAV}` -> `{reply, heard, model, cost}`. `?check=1` only checks the passphrase.
+`POST /tts` (v1.2.4) with the same passphrase and JSON `{text, characterId, role, gender?}` -> an `audio/mpeg` clip (Aura-1). Kid lines are run through the same server-side kid filter before any audio is produced. Length is capped at 500 characters; replies are cached; TTS has its own rate limits (12/min and 250/day per IP, 2,000/day globally) so it does not eat the chat cap. About $0.015 per 1,000 characters on Aura-1 (a short reply is typically well under a tenth of a cent). The OpenRouter key stays on the Worker; if Aura is down the Worker may fall back to OpenRouter speech, then MeloTTS, and the client always falls back to `speechSynthesis`.
 Model `anthropic/claude-haiku-5.5` (fallback `deepseek/deepseek-v4.1-flash`, speech-to-text `google/gemini-3.5-flash-lite`), 220 max tokens, last 16 messages, 8 requests/min and 200/day per IP, 1,500/day in total, kids: last 6 messages, 120 max tokens. CORS only for joshfreeman.org, www.joshfreeman.org, redplanetlounge.pages.dev and *.redplanetlounge.pages.dev. The OpenRouter key and the passphrase hash are Worker secrets.
