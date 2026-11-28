@@ -6,7 +6,7 @@ One ES module that puts a talking, realistic AI companion into any A-Frame (or p
 - Default roster: `https://joshfreeman.org/vr-staging/companion/roster.json`
 - Demo page: `https://joshfreeman.org/vr-staging/companion/demo.html` (`?family=1` also shows the wife and kids)
 - Line-up page: `https://joshfreeman.org/vr-staging/companion/lineup.html?ids=lila,freya,maya,nina` (static side-by-side comparison, no talking)
-- Version: `1.2.8` (`api.version`)
+- Version: `1.2.9` (`api.version`)
 - Proxy: `https://fp-companion.tesseractprogram.workers.dev/chat` (Cloudflare Worker `fp-companion`, source `/workspace/fp-upgrade/worker`)
 - GitHub Pages serves everything with `Access-Control-Allow-Origin: *`, so redplanetlounge.pages.dev can `import()` the module and load its GLBs.
 
@@ -162,5 +162,8 @@ Model `anthropic/claude-haiku-5.5` (fallback `deepseek/deepseek-v4.1-flash`, spe
 
 If a passphrase is needed (v1.2.7), a centered on-screen box appears (not the hidden bottom-left field), so it is visible on Quest. Once saved it is kept in the browser (`fpc.pass`); `?fppass=` still works.
 On Quest (v1.2.7), after the passphrase she greets immediately (the mic is no longer waited on, which could hang and leave her silent). A Type-to-Lila box stays on screen in VR so you can type if the headset mic is already in use.
-On Quest (v1.2.8), clicking a companion (including Astrid at the house) starts a continuous talk loop: after her voice finishes she listens again, using voice-activity detection and the Worker to transcribe (Quest has no SpeechRecognition). Her reply text is shown when her voice starts, and the first sentence is spoken first so the delay is shorter. The microphone stream is kept for the next turn if another feature is already using it.
+On Quest (v1.2.9), clicking a companion (including Astrid at the house) starts a continuous talk loop: after her voice finishes she listens again, using voice-activity detection and the Worker to transcribe (Quest has no SpeechRecognition). Her reply text is shown when her voice starts, and the first sentence is spoken first so the delay is shorter. The microphone stream is kept for the next turn if another feature is already using it.
+
+On v1.2.9, only one companion talks at a time. Lila may come to the house with you; she and Astrid can trade a short line or two, then if you say "Lila, leave" (or "leave us" / "go away") she says one goodbye and walks away, and stays gone until you pick Talk to Lila or Come here. After she leaves she stays quiet, and you can talk to Astrid, Linnea, or Oskar (click them, or pick them in the Talk list). The kids stay G-rated.
+
 

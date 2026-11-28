@@ -3,7 +3,7 @@
    Replies come from an LLM through a server-side proxy (Cloudflare Worker; the OpenRouter key never reaches the browser).
    See README.md next to this file. */
 const HERE = new URL('./', import.meta.url).href;
-export const VERSION = '1.2.8';
+export const VERSION = '1.2.9';
 export const DEFAULT_PROXY = 'https://fp-companion.tesseractprogram.workers.dev/chat';
 export const WORLDS = {
   earth: 'Earth, Fowling Pond: a restored pond in Raynham, Massachusetts, on real terrain. Above it stands an Egyptian-style concept bank compound (terrace pavilion, banking hall, vault, Josh\'s office, conservatory, sphinxes and temple gate). Around it: a pyramid park at Route 24 and I-495, a houseboat, the Pharos lighthouse, King\'s Pond and the Forge River, Vesta\'s house, a zoo, and a launch pad in Bridgewater with a rocket to Mars. Flying saucers visit other cities.',
@@ -54,6 +54,7 @@ class Companion {
     this.playerId = String(o.playerId || 'guest'); this.playerName = o.playerName || '';
     this.proxy = o.proxyUrl || DEFAULT_PROXY; this.ttsUrl = o.ttsUrl || this.proxy.replace(/\/chat\/?$/, '/tts'); this.emit = (type, d) => { try { o.onEvent && o.onEvent(Object.assign({type, character: this.ch && this.ch.id}, d || {})); } catch (e) {} };
     this.resident = !!o.resident; this.homes = o.homes || {}; this.family = new Map(); this.state = 'idle'; this.t = 0; this.hist = []; this.cleanup = []; this.dead = false; this.jaw = 0; this.look = {yaw: 0, pitch: 0}; this.talkUntil = 0; this.lastTap = 0;
+    Companion.alls = Companion.alls || new Set(); Companion.alls.add(this); if (!this.resident) Companion.host = this;
   }
   get root3d() { const r = this.rootEl; return r && r.object3D ? r.object3D : r; }
   get camera() { const s = this.sceneEl; return this.o.camera || (s && s.camera) || null; }
@@ -86,7 +87,7 @@ class Companion {
       comeHere: () => this.comeHere(), forget: () => { this.hist = []; this.save(); }, setPassphrase: p => this.setPass(p),
       update: dt => this.update(dt), unmount: () => unmount(), object3D: this.holder,
       setHome: (id, pos) => this.setHome(id, pos), family: () => [...this.family.values()].map(r => ({id: r.ch.id, name: r.ch.name, role: r.ch.role, object3D: r.holder})),
-      talkTo: (id, text) => { const r = this.family.get(id); if (r) return text ? r.send(text) : r.listen(); if (this.ch && this.ch.id === id) return text ? this.send(text) : this.listen(); }
+      talkTo: (id, text) => { const r = this.family.get(id); if (r) { this.setTalkTarget(id); r.claimTalk(); return text ? r.send(text) : r.listen(); } if (this.ch && this.ch.id === id) { this._talkId = id; this.claimTalk(); return text ? this.send(text) : this.listen(); } }
     };
     if (this.o.family !== false) { this.homeWaitOver = false; const hw = setTimeout(() => { this.homeWaitOver = true; if (!this.dead) this.placeFamily(); }, this.o.homeWaitMs === undefined ? 6000 : +this.o.homeWaitMs); this.cleanup.push(() => clearTimeout(hw));
       this.syncFamily(); const onHome = () => this.placeFamily();
@@ -99,9 +100,140 @@ class Companion {
 
   inWorld(c) { return !Array.isArray(c.worlds) || !c.worlds.length || c.worlds.includes(this.world); }
   firstAdult(def) { const ok = c => c && c.role !== 'child' && this.inWorld(c); const d = this.roster.find(c => c.id === def); return ok(d) ? d.id : (this.roster.find(ok) || this.roster[0]).id; }
-  talkTarget() { if (this.resident) return this; const id = this._talkId || 'astrid'; return this.family.get(id) || [...this.family.values()].find(r => r.ch && r.ch.role === 'wife') || [...this.family.values()][0] || null; }
+  talkTarget() { if (this.resident) return this; if (this._talkId && this.family.get(this._talkId)) return this.family.get(this._talkId); if (this.o.residentsOnly) return this.family.get('astrid') || [...this.family.values()].find(r => r.ch && r.ch.role === 'wife') || [...this.family.values()][0] || null; return this; }
   setTalkTarget(id) { if (this.roster.some(c => c.id === id)) this._talkId = id; this.relabelTalk(); }
-  relabelTalk() { const r = this.talkTarget(), n = (r && r.ch && r.ch.name) || 'Astrid'; if (this.ui && this.ui.btn) this.ui.btn.textContent = 'Talk to ' + n; if (this.ui && this.ui.sel && r && r.ch) try { this.ui.sel.value = r.ch.id; } catch (e) {} }
+  relabelTalk() {
+    const t = (Companion.talker && !Companion.talker.dead && Companion.talker.ch) || (this.talkTarget() && this.talkTarget().ch) || this.ch;
+    const n = (t && t.name) || 'Lila';
+    if (this.ui && this.ui.btn) this.ui.btn.textContent = 'Talk to ' + n;
+    if (this.ui && this.ui.sel && t) try { this.ui.sel.value = t.id; } catch (e) {}
+    this.relabelStrip(n);
+  }
+  relabelStrip(n) { n = n || ((Companion.talker && Companion.talker.ch && Companion.talker.ch.name) || (this.ch && this.ch.name) || 'Lila'); if (this._talkUi && this._talkUi.inp) this._talkUi.inp.placeholder = 'Type to ' + n; }
+  hostOf() { return this.resident ? (Companion.host || this) : this; }
+  isFamily() { return !!(this.ch && FAMILY(this.ch.role)); }
+  isGuest() { return !!(this.ch && !FAMILY(this.ch.role)); }
+  claimTalk() {
+    if (Companion.talker && Companion.talker !== this && !Companion.talker.dead) Companion.talker.yieldTalk();
+    Companion.talker = this; const h = this.hostOf(); if (h) { if (this.ch) h._talkId = this.ch.id; h.relabelTalk(); }
+  }
+  yieldTalk() {
+    clearTimeout(this._listenArm); this.abortListen(); this.stopSpeaking(); this.state = 'idle';
+    if (Companion.talker === this) Companion.talker = null;
+  }
+  abortListen() {
+    const r = this.rec; if (!r) return;
+    if (r.kind === 'sr') { try { r.r.onresult = r.r.onend = r.r.onerror = null; r.r.abort ? r.r.abort() : r.r.stop(); } catch (e) {} this.rec = null; this.state = 'idle'; return; }
+    this.rec = null; try { r.stop(); } catch (e) {} this.state = 'idle';
+  }
+  homeZone() {
+    const H = window.FP_HOME; if (!H || this.world !== 'earth' || this.o.houseAware === false) return null;
+    const pad = 25, rects = [], circs = [];
+    const addR = r => { if (r && isFinite(r.x0) && isFinite(r.z1)) rects.push({x0: r.x0 - pad, x1: r.x1 + pad, z0: r.z0 - pad, z1: r.z1 + pad}); };
+    addR(H.bounds || H.house); addR(H.porchBounds);
+    const P = v => !v ? null : Array.isArray(v) ? v : Array.isArray(v.position) ? v.position : isFinite(v.x) ? [v.x, v.y, v.z] : null;
+    const addC = (v, r) => { const p = P(v); if (p) circs.push({x: p[0], z: p[2], r: r + pad}); };
+    if (H.spawns) { addC(H.spawns.yard, 12); addC(H.spawns.play, 12); addC(H.spawns.porch, 8); addC(H.spawns.wife, 8); (H.spawns.kids || []).forEach(k => addC(k, 8)); }
+    if (!rects.length && !circs.length && H.site && isFinite(H.site.x) && isFinite(H.site.z)) addR({x0: H.site.x - 22, x1: H.site.x + 22, z0: H.site.z - 20, z1: H.site.z + 20});
+    if (!rects.length && !circs.length) return null;
+    const contains = (x, z) => rects.some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) || circs.some(c => Math.hypot(x - c.x, z - c.z) < c.r);
+    const cx = (H.site && isFinite(H.site.x)) ? H.site.x : (rects[0] ? (rects[0].x0 + rects[0].x1) / 2 : circs[0].x);
+    const cz = (H.site && isFinite(H.site.z)) ? H.site.z : (rects[0] ? (rects[0].z0 + rects[0].z1) / 2 : circs[0].z);
+    const away = (dist) => {
+      dist = dist == null ? 30 : dist; let dx = 0, dz = 1, x = cx, z = cz;
+      for (let i = 0; i < 80; i++) { x += dx * 2; z += dz * 2; if (!contains(x, z)) break; }
+      x += dx * dist; z += dz * dist;
+      return [x, null, z, Math.atan2(dx, dz) * 180 / Math.PI];
+    };
+    return {contains, center: [cx, cz], away};
+  }
+  namedGuest(t) {
+    const host = this.hostOf(), roster = (host && host.roster) || this.roster || [], insts = [...(Companion.alls || [])];
+    if (/\blaila\b/.test(t)) t = t.replace(/\blaila\b/g, 'lila');
+    for (const c of roster) {
+      if (!c || FAMILY(c.role)) continue;
+      const names = [c.id, c.name].filter(Boolean).map(n => String(n).toLowerCase().replace(/[^a-z0-9]+/g, ''));
+      if (names.some(n => n && new RegExp('\\b' + n + '\\b').test(t))) return insts.find(i => !i.dead && i.ch && i.ch.id === c.id) || null;
+    }
+    return null;
+  }
+  guestHere() {
+    const insts = [...(Companion.alls || [])].filter(i => !i.dead && i.isGuest() && !i._dismissed);
+    if (!insts.length) return null;
+    const z = this.homeZone();
+    if (z) { const hit = insts.filter(i => { const p = i.holder && i.holder.getWorldPosition(new this.T.Vector3()); return p && z.contains(p.x, p.z); }); if (hit.length) return hit[0]; }
+    return insts[0];
+  }
+  leaveIntent(text) {
+    const t = String(text || '').toLowerCase().replace(/['\u2018\u2019]/g, "'").replace(/[^a-z0-9\s']/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!t) return null;
+    if (/\b(don'?t|do not|never|not)\b.{0,24}\b(leave|go away)\b/.test(t)) return null;
+    const strong = /\b(leave us|go away|you can go|please leave|get out|head out|wait outside|you should go|would you leave|can you leave|leave me|leave now|just leave|go on then|give us (some )?space|take a walk)\b/;
+    const named = this.namedGuest(t);
+    if (named && (strong.test(t) || /\b(leave|go|away|out)\b/.test(t))) return named;
+    if (!strong.test(t)) return null;
+    if (this.isGuest() && !this._dismissed) return this;
+    return this.guestHere();
+  }
+  recall() { this._dismissed = false; this._stayOut = null; this._leaving = false; Companion._banterLeft = 2; Companion._banterStarted = false; this.comeHere(); }
+  dismiss() {
+    if (this.dead || this.isFamily() || this._leaving || this._dismissed) return;
+    this._leaving = true; Companion._banterBusy = false; Companion._banterLeft = 0; clearTimeout(this._banterT);
+    this.claimTalk(); this._afterGoodbye = () => {
+      this._dismissed = true; this._leaving = false; this.handsFree = false;
+      const z = this.homeZone(); this._stayOut = z ? z.away(30) : null;
+      if (this._stayOut) this.placeWorld(this._stayOut[0], this._stayOut[1], this._stayOut[2], this._stayOut[3]);
+      this.yieldTalk();
+      const h = this.hostOf();
+      if (h && h !== this) {
+        const prefer = (h._talkId && h._talkId !== (this.ch && this.ch.id)) ? h._talkId : 'astrid';
+        const r = h.family.get(prefer) || [...h.family.values()].find(x => x.ch && x.ch.role === 'wife') || [...h.family.values()][0];
+        if (r) { h.setTalkTarget(r.ch.id); r.claimTalk(); r.handsFree = true; r.armListen(400); }
+      }
+      this.emit('left', {reason: 'dismissed'});
+    };
+    this.speak("Of course. I'll leave you with your family.");
+  }
+  maybeBanter() {
+    if (this._dismissed || this._leaving || this._fromBanter || (this.ch && this.ch.role === 'child')) return;
+    if (Companion._banterBusy || Companion._banterStarted || this._afterGoodbye) return;
+    const z = this.homeZone(); if (!z) return;
+    const insts = [...(Companion.alls || [])].filter(i => !i.dead);
+    const wife = insts.find(i => i.ch && i.ch.role === 'wife'), guest = insts.find(i => i.isGuest() && !i._dismissed && !i._leaving);
+    if (!wife || !guest) return;
+    const pos = i => i.holder && i.holder.getWorldPosition(new this.T.Vector3()), wp = pos(wife), gp = pos(guest);
+    if (!wp || !gp || !z.contains(wp.x, wp.z) || !z.contains(gp.x, gp.z)) return;
+    const other = this === wife ? guest : this === guest ? wife : null; if (!other) return;
+    Companion._banterStarted = true; Companion._banterBusy = true; Companion._banterLeft = 1;
+    this.runBanter(other, this);
+  }
+  async runBanter(speaker, back) {
+    const stop = () => { Companion._banterBusy = false; if (back && !back.dead && !back._dismissed) { back.claimTalk(); if (back.handsFree) back.armListen(400); } };
+    if (this._dismissed || speaker._dismissed || speaker._leaving || back._leaving) return stop();
+    const line = await this.requestBanter(speaker, back.ch && back.ch.name, back._lastSpoken);
+    if (!line || speaker._dismissed || speaker._leaving || back._dismissed) return stop();
+    speaker._fromBanter = true; speaker.claimTalk();
+    await new Promise(res => { speaker._afterBanter = res; speaker.speak(line); });
+    speaker._fromBanter = false;
+    if (speaker._dismissed || back._dismissed || back._leaving || !Companion._banterLeft) return stop();
+    Companion._banterLeft = 0;
+    const line2 = await this.requestBanter(back, speaker.ch && speaker.ch.name, speaker._lastSpoken);
+    if (!line2 || speaker._dismissed || back._dismissed || back._leaving) return stop();
+    back._fromBanter = true; back.claimTalk();
+    await new Promise(res => { back._afterBanter = res; back.speak(line2); });
+    back._fromBanter = false; stop();
+  }
+  async requestBanter(speaker, otherName, lastLine) {
+    if (!this.pass() || !speaker || !speaker.ch) return '';
+    try {
+      const c = speaker.ch;
+      const r = await fetch(this.proxy, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-FP-Pass': this.pass()}, body: JSON.stringify({
+        characterId: c.id, role: c.role || 'companion', persona: (c.persona || '') + (c.name ? '\nYour name is ' + c.name + '.' : ''), world: this.world, worldDesc: this.worldDesc, playerName: this.playerName,
+        messages: [{role: 'user', content: 'You are at the family home with ' + (otherName || 'someone') + ' and Josh. ' + (otherName || 'They') + ' just said: "' + String(lastLine || '').slice(0, 240) + '". Reply with ONE short, polite spoken sentence to ' + (otherName || 'them') + '. Do not involve the children. Do not ask Josh a question.'}]})});
+      const res = await r.json().catch(() => ({})); return String(res.reply || '').trim().slice(0, 220);
+    } catch (e) { return ''; }
+  }
+
 
   // ---------- family residents (wife / children stand at home while another companion is active) ----------
   async initResident() {
@@ -248,7 +380,7 @@ class Companion {
     this.holder.position.copy(p); if (yaw !== undefined) this.holder.rotation.y = yaw * Math.PI / 180; this.holder.visible = true; this.placed = true; }
   ground(x, z) { try { if (this.o.groundAt) { const g = this.o.groundAt(x, z); if (isFinite(g)) return g; } } catch (e) {} const c = this.playerPos(); return c ? c.y - 1.6 : 0; }
   playerPos() { const c = this.camera; return c ? c.getWorldPosition(new this.T.Vector3()) : null; }
-  comeHere() { if (this.o.residentsOnly && !this.resident) { this.subtitle("They're at home.", ' ', 2500); return; } const T = this.T, c = this.camera; if (!c) return; const p = c.getWorldPosition(new T.Vector3()), f = c.getWorldDirection(new T.Vector3()); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize();
+  comeHere() { if (this.o.residentsOnly && !this.resident) { this.subtitle("They're at home.", ' ', 2500); return; } if (this._dismissed) { this._dismissed = false; this._stayOut = null; this._leaving = false; Companion._banterLeft = 2; Companion._banterStarted = false; } const T = this.T, c = this.camera; if (!c) return; const p = c.getWorldPosition(new T.Vector3()), f = c.getWorldDirection(new T.Vector3()); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize();
     const hi = this.resident ? null : this.houseInfo();
     if (hi && hi.inside(p.x, p.z)) { if (hi.spot) { this.placeWorld(hi.spot[0], hi.spot[1], hi.spot[2]); this.faceW(p, true); this.atPorch = true; this.emit('moved', {reason: 'porch'}); } return; }   // player indoors: wait on the porch
     const r = new T.Vector3(-f.z, 0, f.x);
@@ -287,7 +419,9 @@ class Companion {
     // follow: a travelling companion stays near the player (also after teleports, rooms, rocket rides)
     if (this.resident && this.wander) this.doWander(dt, pp, hp);
     if (pp && !this.resident && !this.placed) this.comeHere();   // no spawn given: appear beside the player once there is a camera
-    if (pp && !this.resident && this.ch.canTravel !== false && this.o.follow !== false && this.state === 'idle') { const d = Math.hypot(pp.x - hp.x, pp.z - hp.z), dy = Math.abs(pp.y - 1.6 - hp.y);
+    if (pp && !this.resident && this._dismissed) {
+      const dest = this._stayOut; if (dest && Math.hypot(hp.x - dest[0], hp.z - dest[2]) > 1.5) { this.placeWorld(dest[0], dest[1], dest[2], dest[3]); }
+    } else if (pp && !this.resident && this.ch.canTravel !== false && this.o.follow !== false && this.state === 'idle') { const d = Math.hypot(pp.x - hp.x, pp.z - hp.z), dy = Math.abs(pp.y - 1.6 - hp.y);
       const hi = this.houseInfo();
       if (hi && hi.inside(pp.x, pp.z)) {   // v1.2.2: player inside the family home: wait on the porch instead of following through the walls
         if (hi.spot && !this.atPorch && Math.hypot(hp.x - hi.spot[0], hp.z - hi.spot[2]) > 1) { this.placeWorld(hi.spot[0], hi.spot[1], hi.spot[2]); this.faceW(pp, true); this.emit('moved', {reason: 'porch'}); }
@@ -391,12 +525,16 @@ class Companion {
         if (!g) { g = groups[gn] = document.createElement('optgroup'); g.label = gn; }
         const o = document.createElement('option'); o.value = c.id; o.textContent = c.name + (c.role === 'wife' ? ' (wife)' : c.role === 'child' ? ' (' + (c.relation || 'kid') + ')' : ''); g.appendChild(o); }
       for (const gn of ['Girlfriends', 'Companions', 'Family']) if (groups[gn]) ui.sel.appendChild(groups[gn]); }
-    ui.btn.onclick = () => this.tap(); ui.mute = q('.mute'); this.syncMuteBtn(); ui.mute.onclick = () => { this.setVoiceOn(!this.voiceOn()); };
+    ui.btn.onclick = () => { const t = this.talkTarget(); if (t && t !== this) t.tap(); else this.tap(); }; ui.mute = q('.mute'); this.syncMuteBtn(); ui.mute.onclick = () => { this.setVoiceOn(!this.voiceOn()); };
     ui.mic = q('.mic'); this.syncMicBtn(); ui.mic.onclick = () => { this.handsFree = !this.handsFree; this.syncMicBtn(); if (this.handsFree) { this.unlockAudio(); this.armListen(100); } else { clearTimeout(this._listenArm); if (this.rec) this.stopListen(); this.state = 'idle'; } };
     q('.tog').onclick = () => d.classList.toggle('open'); d.addEventListener('pointerdown', () => this.unlockAudio(), {passive: true});
-    const sendTxt = () => { const v = ui.txt.value.trim(); if (v) { ui.txt.value = ''; this.send(v); } };
+    const dest = () => this.talkTarget() || this;
+    const sendTxt = () => { const v = ui.txt.value.trim(); if (v) { ui.txt.value = ''; dest().send(v); } };
     q('.snd').onclick = sendTxt; ui.txt.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') sendTxt(); };
-    ui.sel.onchange = () => this.pick(ui.sel.value); q('.come').onclick = () => this.comeHere(); q('.fgt').onclick = () => { this.hist = []; this.save(); this.subtitle('(conversation cleared)'); };
+    ui.sel.onchange = () => { const id = ui.sel.value, c = this.roster.find(x => x.id === id);
+      if (c && FAMILY(c.role)) { this.setTalkTarget(id); const r = this.family.get(id); if (r) r.tap(); return; }
+      if (this._dismissed) this.recall(); if (this.ch && this.ch.id !== id) this.pick(id); this._talkId = id; this.claimTalk(); this.tap(); };
+    q('.come').onclick = () => { if (this._dismissed) this.recall(); else this.comeHere(); }; q('.fgt').onclick = () => { this.hist = []; this.save(); this.subtitle('(conversation cleared)'); };
     q('.pws').onclick = () => { this.setPass(q('.pw').value); q('.pw').value = ''; this.subtitle('Passphrase saved.', ' '); };
     q('.pw').onkeydown = e => e.stopPropagation();
     if (this.o.hideUiInXR !== false && this.sceneEl && this.sceneEl.addEventListener) { const f = () => { d.style.display = this.inXR ? 'none' : ''; }; this.sceneEl.addEventListener('enter-vr', f); this.sceneEl.addEventListener('exit-vr', f); }
@@ -445,9 +583,17 @@ class Companion {
     this.subtitle(reason === 'wrong' ? 'That passphrase was not right. Enter it in the box in the middle of the screen.' : 'Enter the companion passphrase in the box in the middle of the screen, then talk to me again.', ' ', 7000); }
 
   // ---------- listening (v1.2.5: hands-free turn-taking) ----------
-  armListen(ms) { clearTimeout(this._listenArm); if (!this.handsFree || this.dead) return;
-    this._listenArm = setTimeout(() => { if (!this.dead && this.handsFree && !this.rec && !this.speaking && this.state !== 'thinking') this.listen(false, true); }, ms == null ? 400 : ms); }
-  afterSpeak(gen) { if (gen != null && gen !== this._speakGen) return; this.speaking = false; if (this.sub) this.sub.until = performance.now() + 2500; if (this.handsFree) this.armListen(400); }
+  armListen(ms) { clearTimeout(this._listenArm); if (!this.handsFree || this.dead || this._dismissed || (Companion.talker && Companion.talker !== this)) return;
+    this._listenArm = setTimeout(() => { if (!this.dead && this.handsFree && !this.rec && !this.speaking && this.state !== 'thinking' && !this._dismissed && (!Companion.talker || Companion.talker === this)) this.listen(false, true); }, ms == null ? 400 : ms); }
+  afterSpeak(gen) {
+    if (gen != null && gen !== this._speakGen) return; this.speaking = false; if (this.sub) this.sub.until = performance.now() + 2500;
+    if (this._afterGoodbye) { const f = this._afterGoodbye; this._afterGoodbye = null; f(); return; }
+    if (this._afterBanter) { const f = this._afterBanter; this._afterBanter = null; f(); return; }
+    if (this._dismissed || this._leaving) return;
+    if (Companion.talker && Companion.talker !== this) return;
+    if (!this._fromBanter) this.maybeBanter();
+    if (this.handsFree && !Companion._banterBusy) this.armListen(400);
+  }
   isEcho(t) { const n = s => String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); const a = n(t), b = n(this._lastSpoken); return !!(a && b && (b.includes(a) || a.includes(b) || (a.length > 12 && b.length > 12 && a.slice(0, 24) === b.slice(0, 24)))); }
   showStartGate() {
     if (this.resident || this._gate || this.dead) return;
@@ -460,14 +606,14 @@ class Companion {
   needsTypeFallback() { return this.isQuest() || this._micFailed || Companion.srBroken || !(window.SpeechRecognition || window.webkitSpeechRecognition); }
   showTalkStrip() {
     if (this.dead || this.resident || this._talkUi) return;
-    const name = (this.ch && this.ch.name) || 'Lila';
+    const name = (Companion.talker && Companion.talker.ch && Companion.talker.ch.name) || (this.talkTarget() && this.talkTarget().ch && this.talkTarget().ch.name) || (this.ch && this.ch.name) || 'Lila';
     const d = document.createElement('div'); d.className = 'fpc-type';
     d.innerHTML = '<style>.fpc-type{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:9998;width:min(520px,94vw);font:18px/1.3 system-ui,sans-serif;color:#fff;-webkit-tap-highlight-color:transparent}.fpc-type .row{display:flex;gap:8px}.fpc-type input,.fpc-type button{font:inherit;padding:14px 12px;border-radius:10px;border:1px solid #c9a24a}.fpc-type input{flex:1;min-width:0;background:rgba(16,16,22,.96);color:#fff}.fpc-type button{background:#c9a24a;color:#1a1408;font-weight:700;min-width:5em}</style>' +
       '<div class="row"><input class="txt" type="text" enterkeyhint="send" placeholder="Type to ' + name + '" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><button type="button" class="snd">Send</button></div>';
-    const inp = d.querySelector('.txt'), send = () => { const v = (inp.value || '').trim(); if (!v) { try { inp.focus(); } catch (e) {} return; } inp.value = ''; this.unlockAudio(); this.send(v); };
+    const inp = d.querySelector('.txt'), send = () => { const v = (inp.value || '').trim(); if (!v) { try { inp.focus(); } catch (e) {} return; } inp.value = ''; this.unlockAudio(); const t = this.talkTarget() || this; t.send(v); };
     d.querySelector('.snd').onclick = send; inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); send(); } });
     d.addEventListener('pointerdown', () => this.unlockAudio(), {passive: true});
-    (document.body || document.documentElement).appendChild(d); this._talkUi = {el: d, inp}; this.cleanup.push(() => { try { d.remove(); } catch (e) {} this._talkUi = null; });
+    (document.body || document.documentElement).appendChild(d); this._talkUi = {el: d, inp}; this.relabelStrip(name); this.cleanup.push(() => { try { d.remove(); } catch (e) {} this._talkUi = null; });
   }
   hideTalkStrip() { if (!this._talkUi) return; try { this._talkUi.el.remove(); } catch (e) {} this._talkUi = null; }
   async beginTalk() {
@@ -487,7 +633,10 @@ class Companion {
   async listen(hold, auto) {
     if (this.o.residentsOnly && !this.resident) { const r = this.talkTarget(); return r ? r.listen(hold, auto) : undefined; }
     this.unlockAudio();
+    if (this._dismissed && !auto) this.recall();
+    if (auto && (this._dismissed || (Companion.talker && Companion.talker !== this))) return;
     if (!auto) this.handsFree = true;   // a click or Talk tap starts continuous turn-taking (needed for family residents, whose handsFree starts off)
+    if (!auto) this.claimTalk();
     if (this.dead || this.rec || this.state === 'thinking' || this.speaking) return; if (!this.pass()) { this._afterPass = () => this.listen(); return this.needPass(); }
     if (!auto) this.stopSpeaking();
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -537,7 +686,8 @@ class Companion {
   // ---------- talking to the proxy ----------
   async send(text, audio) { if (this.o.residentsOnly && !this.resident) { const r = this.talkTarget(); return r ? r.send(text, audio) : undefined; }
     this.unlockAudio();
-    if (!this.pass()) { this._afterPass = () => this.send(text, audio); return this.needPass(); } const c = this.ch; this.state = 'thinking'; this.subtitle(text ? text : '...', text ? 'You' : ' ', 20000);
+    if (!this.pass()) { this._afterPass = () => this.send(text, audio); return this.needPass(); }
+    if (text) { const who = this.leaveIntent(text); if (who) return who.dismiss(); } this.claimTalk(); const c = this.ch; this.state = 'thinking'; this.subtitle(text ? text : '...', text ? 'You' : ' ', 20000);
     if (text) this.hist.push({role: 'user', content: String(text).slice(0, 800)});
     let res; try {
       const r = await fetch(this.proxy, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-FP-Pass': this.pass()}, body: JSON.stringify({
@@ -548,7 +698,7 @@ class Companion {
     if (this.dead || this.ch !== c) return;
     this.state = 'idle';
     if (res.status === 401) { if (text) this.hist.pop(); try { localStorage.removeItem('fpc.pass'); } catch (e) {} this._afterPass = () => this.send(text, audio); return this.needPass('wrong'); }
-    if (res.heard) { this.hist.push({role: 'user', content: res.heard}); this.emit('heard', {text: res.heard}); }
+    if (res.heard) { this.hist.push({role: 'user', content: res.heard}); this.emit('heard', {text: res.heard}); const who = this.leaveIntent(res.heard); if (who) { this.state = 'idle'; return who.dismiss(); } }
     if (!res.reply) { if (text) this.hist.pop(); this.subtitle(res.error === 'no speech' ? 'I didn\'t catch that.' : 'I can\'t reach my thoughts right now. Try again in a moment.', ' ', 4000); this.emit('error', {error: res.error || res.status}); return; }
     if (res.limited) { this.subtitle(res.reply, ' ', 5000); return; }
     this.hist.push({role: 'assistant', content: res.reply}); this.save();
@@ -602,7 +752,7 @@ class Companion {
     if (!text) return; this._lastSpoken = String(text);
     if (!this.pass()) { this._afterPass = () => this.speak(text); return this.needPass(); }
     if (!this.voiceOn()) { this.subtitle(text); this.speaking = true; this._speakGen = (this._speakGen || 0) + 1; const gen = this._speakGen; clearTimeout(this.spT); this.spT = setTimeout(() => this.afterSpeak(gen), 600 + text.length * 55); return; }
-    this.stopSpeaking(true); this.speaking = true; this.emit('speaking'); this._speakGen = (this._speakGen || 0) + 1; const gen = this._speakGen;
+    this.stopSpeaking(true); this.claimTalk(); this.speaking = true; this.emit('speaking'); this._speakGen = (this._speakGen || 0) + 1; const gen = this._speakGen;
     const [head, rest] = this.firstUtterance(text), t0 = performance.now();
     const headP = this.fetchTts(head), restP = rest ? this.fetchTts(rest) : null;
     const finish = () => { if (gen === this._speakGen && this.speaking) this.afterSpeak(gen); };
@@ -667,8 +817,11 @@ class Companion {
     this.dead = true; clearTimeout(this._listenArm); this.hidePassPrompt && this.hidePassPrompt(); this.hideTalkStrip && this.hideTalkStrip(); this.stopSpeaking(); if (this._gate) { try { this._gate.remove(); } catch (e) {} this._gate = null; } if (this.rec) { try { this.rec.kind === 'sr' ? this.rec.r.abort() : this.rec.stop(); } catch (e) {} this.rec = null; }
     if (this.raf) cancelAnimationFrame(this.raf); for (const f of this.cleanup) { try { f(); } catch (e) {} } this.cleanup = [];
     if (this.holder) { if (this.holder.parent) this.holder.parent.remove(this.holder); dispose(this.holder); }
+    if (Companion.alls) Companion.alls.delete(this); if (Companion.host === this) Companion.host = null; if (Companion.talker === this) Companion.talker = null;
   }
 }
+Companion.alls = Companion.alls || new Set();
+
 
 function dispose(o) { o.traverse(n => { if (n.geometry) n.geometry.dispose(); for (const m of n.material ? [].concat(n.material) : []) { for (const k in m) { const v = m[k]; if (v && v.isTexture) v.dispose(); } m.dispose(); } }); }
 function round(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
