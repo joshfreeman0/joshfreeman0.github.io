@@ -3,7 +3,7 @@
    Replies come from an LLM through a server-side proxy (Cloudflare Worker; the OpenRouter key never reaches the browser).
    See README.md next to this file. */
 const HERE = new URL('./', import.meta.url).href;
-export const VERSION = '1.2.4';
+export const VERSION = '1.2.5';
 export const DEFAULT_PROXY = 'https://fp-companion.tesseractprogram.workers.dev/chat';
 export const WORLDS = {
   earth: 'Earth, Fowling Pond: a restored pond in Raynham, Massachusetts, on real terrain. Above it stands an Egyptian-style concept bank compound (terrace pavilion, banking hall, vault, Josh\'s office, conservatory, sphinxes and temple gate). Around it: a pyramid park at Route 24 and I-495, a houseboat, the Pharos lighthouse, King\'s Pond and the Forge River, Vesta\'s house, a zoo, and a launch pad in Bridgewater with a rocket to Mars. Flying saucers visit other cities.',
@@ -70,6 +70,7 @@ class Companion {
     if (!this.roster.length) throw new Error('companion: empty roster');
     this.holder = new T.Group(); this.holder.name = 'fp-companion'; this.holder.visible = false; this.root3d.add(this.holder);   // v1.2.2: hidden until placed (never shown at the origin)
     this.sub = this.makeSubtitle(); this.holder.add(this.sub.sprite);
+    this.handsFree = this.o.handsFree !== false && !this.resident;
     this.hookTick(); this.hookInput(); if (this.o.ui !== false) this.makeUI();
     let pick = this.o.pick || this.store.get && (await this.store.get('fpc:v1:' + this.playerId + ':pick')) || ro.default || this.roster[0].id;
     { const pc = this.roster.find(r => r.id === pick); if (!pc || pc.role === 'child' || !this.inWorld(pc)) pick = this.firstAdult(ro.default); }   // a child is never the default slot
@@ -78,7 +79,7 @@ class Companion {
       version: VERSION, list: () => this.roster.map(c => ({id: c.id, name: c.name, gender: c.gender, role: c.role, canTravel: !!c.canTravel})),
       current: () => this.ch && {id: this.ch.id, name: this.ch.name}, pick: id => this.pick(id),
       talk: text => text ? this.send(text) : this.listen(), listen: () => this.listen(), say: text => this.speak(text),
-      voiceOn: () => this.voiceOn(), setVoiceOn: on => this.setVoiceOn(on), unlockAudio: () => this.unlockAudio(),
+      voiceOn: () => this.voiceOn(), setVoiceOn: on => this.setVoiceOn(on), unlockAudio: () => this.unlockAudio(), startTalk: () => this.beginTalk(), setHandsFree: on => { this.handsFree = !!on; if (!on) { clearTimeout(this._listenArm); if (this.rec) this.stopListen(); } else this.armListen(200); },
       setWorld: (w, d) => { this.world = w; this.worldDesc = d || WORLDS[w] || ''; }, moveTo: (x, y, z, yaw) => this.placeWorld(x, y, z, yaw),
       comeHere: () => this.comeHere(), forget: () => { this.hist = []; this.save(); }, setPassphrase: p => this.setPass(p),
       update: dt => this.update(dt), unmount: () => unmount(), object3D: this.holder,
@@ -89,6 +90,7 @@ class Companion {
       this.syncFamily(); const onHome = () => this.placeFamily();
       for (const t of [this.sceneEl, window]) if (t && t.addEventListener) { t.addEventListener('fp-home-ready', onHome); this.cleanup.push(() => t.removeEventListener('fp-home-ready', onHome)); } }
     this.emit('ready', {roster: this.api.list()});
+    if (this.handsFree && (this.o.tapToStart !== undefined ? this.o.tapToStart : this.world !== 'mars') && this.o.ui !== false) this.showStartGate();
     return this.api;
   }
 
@@ -366,12 +368,12 @@ class Companion {
     on(window, 'keydown', e => { if (e.repeat || /input|textarea/i.test((e.target && e.target.tagName) || '')) return; if (e.code === 'KeyT') { this.unlockAudio(); if (this.rec) this.stopListen(); else this.listen(true); } });
     on(window, 'keyup', e => { if (e.code === 'KeyT' && this.rec && this.rec.hold && performance.now() - this.rec.t0 > 600) this.stopListen(); });
   }
-  tap() { this.unlockAudio(); const n = performance.now(); if (n - this.lastTap < 500) return; this.lastTap = n; if (this.rec) this.stopListen(); else if (this.speaking) this.stopSpeaking(); else this.listen(false); }
+  tap() { this.unlockAudio(); const n = performance.now(); if (n - this.lastTap < 500) return; this.lastTap = n; if (this.rec) this.stopListen(); else if (this.speaking) { this.stopSpeaking(); if (this.handsFree) this.armListen(200); } else this.listen(false); }
 
   makeUI() {
     const d = document.createElement('div'); d.className = 'fpc-ui';
-    d.innerHTML = '<style>.fpc-ui{position:fixed;left:12px;bottom:12px;z-index:30;font:14px system-ui,sans-serif;color:#fff;max-width:min(420px,92vw);transition:opacity .2s ease,bottom .2s ease}.fpc-ui.fpc-raised{bottom:calc(var(--fpc-menu-h, 56px) + env(safe-area-inset-bottom, 0px))}.fpc-ui.fpc-menu-open{opacity:0;pointer-events:none}.fpc-ui .row{display:flex;gap:6px;margin-top:6px}.fpc-ui button,.fpc-ui select,.fpc-ui input{font:inherit;border-radius:8px;border:1px solid #c9a24a;background:rgba(20,20,26,.85);color:#fff;padding:7px 10px}.fpc-ui button.main{background:#c9a24a;color:#1a1408;font-weight:600}.fpc-ui button.mute{min-width:3.6em}.fpc-ui input{flex:1;min-width:0}.fpc-ui .log{background:rgba(10,12,18,.72);border-radius:8px;padding:7px 10px;margin-top:6px;display:none}.fpc-ui.open .log{display:block}.fpc-ui .more{display:none}.fpc-ui.open .more{display:flex}</style>' +
-      '<div class="row"><button class="main" type="button"></button><button class="mute" type="button" title="Voice on"></button><button class="tog" type="button" title="Type, choose a companion">...</button></div>' +
+    d.innerHTML = '<style>.fpc-ui{position:fixed;left:12px;bottom:12px;z-index:30;font:14px system-ui,sans-serif;color:#fff;max-width:min(420px,92vw);transition:opacity .2s ease,bottom .2s ease}.fpc-ui.fpc-raised{bottom:calc(var(--fpc-menu-h, 56px) + env(safe-area-inset-bottom, 0px))}.fpc-ui.fpc-menu-open{opacity:0;pointer-events:none}.fpc-ui .row{display:flex;gap:6px;margin-top:6px}.fpc-ui button,.fpc-ui select,.fpc-ui input{font:inherit;border-radius:8px;border:1px solid #c9a24a;background:rgba(20,20,26,.85);color:#fff;padding:7px 10px}.fpc-ui button.main{background:#c9a24a;color:#1a1408;font-weight:600}.fpc-ui button.mute{min-width:3.6em}.fpc-ui button.mic{min-width:3.2em}.fpc-gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.72);color:#fff;font:20px/1.35 system-ui,sans-serif;text-align:center;padding:24px;cursor:pointer;-webkit-tap-highlight-color:transparent}.fpc-gate b{display:block;font-size:26px;margin-bottom:8px;color:#ffe9a8}.fpc-ui input{flex:1;min-width:0}.fpc-ui .log{background:rgba(10,12,18,.72);border-radius:8px;padding:7px 10px;margin-top:6px;display:none}.fpc-ui.open .log{display:block}.fpc-ui .more{display:none}.fpc-ui.open .more{display:flex}</style>' +
+      '<div class="row"><button class="main" type="button"></button><button class="mute" type="button" title="Voice on"></button><button class="mic" type="button" title="Microphone"></button><button class="tog" type="button" title="Type, choose a companion">...</button></div>' +
       '<div class="row more"><input class="txt" placeholder="Type to talk" maxlength="400"><button class="snd" type="button">Send</button></div>' +
       '<div class="row more"><select class="sel"></select><button class="come" type="button">Come here</button><button class="fgt" type="button" title="Forget this conversation">Forget</button></div>' +
       '<div class="row more"><input class="pw" type="password" placeholder="Passphrase" autocomplete="off"><button class="pws" type="button">Save</button></div>' +
@@ -384,6 +386,7 @@ class Companion {
         const o = document.createElement('option'); o.value = c.id; o.textContent = c.name + (c.role === 'wife' ? ' (wife)' : c.role === 'child' ? ' (' + (c.relation || 'kid') + ')' : ''); g.appendChild(o); }
       for (const gn of ['Girlfriends', 'Companions', 'Family']) if (groups[gn]) ui.sel.appendChild(groups[gn]); }
     ui.btn.onclick = () => this.tap(); ui.mute = q('.mute'); this.syncMuteBtn(); ui.mute.onclick = () => { this.setVoiceOn(!this.voiceOn()); };
+    ui.mic = q('.mic'); this.syncMicBtn(); ui.mic.onclick = () => { this.handsFree = !this.handsFree; this.syncMicBtn(); if (this.handsFree) { this.unlockAudio(); this.armListen(100); } else { clearTimeout(this._listenArm); if (this.rec) this.stopListen(); this.state = 'idle'; } };
     q('.tog').onclick = () => d.classList.toggle('open'); d.addEventListener('pointerdown', () => this.unlockAudio(), {passive: true});
     const sendTxt = () => { const v = ui.txt.value.trim(); if (v) { ui.txt.value = ''; this.send(v); } };
     q('.snd').onclick = sendTxt; ui.txt.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') sendTxt(); };
@@ -410,7 +413,7 @@ class Companion {
 
   // ---------- passphrase ----------
   pass() { if (this.o.passphrase) return this.o.passphrase; try { const u = new URLSearchParams(location.search).get('fppass'); if (u) this.setPass(u); return localStorage.getItem('fpc.pass') || ''; } catch (e) { return ''; } }
-  setPass(p) { try { localStorage.setItem('fpc.pass', String(p || '').trim().toLowerCase()); } catch (e) {} }
+  setPass(p) { try { localStorage.setItem('fpc.pass', String(p || '').trim().toLowerCase()); } catch (e) {} if (this._wantStart && this.pass()) { this._wantStart = false; this.beginTalk(); } }
   needPass(reason) { reason = reason || 'missing'; this.emit('error', {error: 'passphrase', reason});
     if (typeof this.o.onNeedPass === 'function') {   // host shows its own prompt (Mars: in-world VR keyboard)
       const self = this; let used = false;
@@ -422,21 +425,57 @@ class Companion {
     if (!this.inXR && this.ui) { this.ui.el.classList.add('open'); this.subtitle(txt || 'Enter the companion passphrase in the box (bottom left), then talk to me again.', ' ', 7000); }
     else this.subtitle(txt || 'I need the passphrase first. Take off the headset and enter it on the page (bottom left).', ' ', 7000); }
 
-  // ---------- listening ----------
-  async listen(hold) {
+  // ---------- listening (v1.2.5: hands-free turn-taking) ----------
+  armListen(ms) { clearTimeout(this._listenArm); if (!this.handsFree || this.dead) return;
+    this._listenArm = setTimeout(() => { if (!this.dead && this.handsFree && !this.rec && !this.speaking && this.state !== 'thinking') this.listen(false, true); }, ms == null ? 400 : ms); }
+  afterSpeak(gen) { if (gen != null && gen !== this._speakGen) return; this.speaking = false; if (this.sub) this.sub.until = performance.now() + 2500; if (this.handsFree) this.armListen(400); }
+  isEcho(t) { const n = s => String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); const a = n(t), b = n(this._lastSpoken); return !!(a && b && (b.includes(a) || a.includes(b) || (a.length > 12 && b.length > 12 && a.slice(0, 24) === b.slice(0, 24)))); }
+  showStartGate() {
+    if (this.resident || this._gate || this.dead) return;
+    const n = (this.ch && this.ch.name) || 'Lila', d = document.createElement('div'); d.className = 'fpc-gate';
+    d.innerHTML = '<div><b>Tap to talk with ' + n + '</b>Then just speak — she will listen and answer.</div>';
+    d.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); this.unlockAudio(); this.beginTalk(); }, {once: true});
+    (document.body || document.documentElement).appendChild(d); this._gate = d; this.cleanup.push(() => d.remove());
+  }
+  async beginTalk() {
+    if (this._gate) { try { this._gate.remove(); } catch (e) {} this._gate = null; }
+    this.unlockAudio(); this.handsFree = true; this.syncMicBtn();
+    try { const st = await navigator.mediaDevices.getUserMedia({audio: true}); st.getTracks().forEach(t => t.stop()); } catch (e) {}
+    if (!this.pass()) { this._wantStart = true; return this.needPass(); }
+    if (!this._greeted) { this._greeted = true; const n = (this.ch && this.ch.name) || 'Lila'; this.speak('Hi, it\'s ' + n + '. I\'m here with you — go ahead and talk to me.'); }
+    else this.armListen(200);
+  }
+  syncMicBtn() { const b = this.ui && this.ui.mic; if (!b) return; b.textContent = this.handsFree ? 'Mic' : 'Mic off'; b.title = this.handsFree ? 'Listening automatically — tap to pause' : 'Microphone paused — tap to listen'; }
+
+  async listen(hold, auto) {
     this.unlockAudio();
-    if (this.rec || this.state === 'thinking') return; if (!this.pass()) return this.needPass();
-    this.stopSpeaking(); const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    this.state = 'listening'; this.subtitle('Listening...', ' ', 15000); this.emit('listening');
+    if (this.dead || this.rec || this.state === 'thinking' || this.speaking) return; if (!this.pass()) return this.needPass();
+    if (!auto) this.stopSpeaking();
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    this.state = 'listening'; this.subtitle('Listening...', ' ', 20000); this.emit('listening'); this.syncMicBtn();
     if (SR && !Companion.srBroken) {
-      const r = new SR(); r.lang = (this.ch.voice && this.ch.voice.lang) || 'en-US'; r.interimResults = true; r.maxAlternatives = 1; let final = '', got = false;
-      this.rec = {kind: 'sr', r, hold, t0: performance.now()};
-      r.onresult = e => { let s = ''; for (let i = 0; i < e.results.length; i++) s += e.results[i][0].transcript; final = s; got = true; this.subtitle(s, 'You', 15000); };
-      r.onerror = e => { if (/not-allowed|service-not-allowed|network|language/.test(e.error)) { Companion.srBroken = !got; } };
-      r.onend = () => { const was = this.rec; this.rec = null; if (final.trim()) this.send(final.trim()); else if (Companion.srBroken && was) { this.state = 'idle'; this.listen(hold); } else { this.state = 'idle'; this.subtitle('I didn\'t catch that.', ' ', 2500); } };
-      try { r.start(); } catch (e) { this.rec = null; Companion.srBroken = true; this.state = 'idle'; return this.listen(hold); }
+      const r = new SR(); r.lang = (this.ch.voice && this.ch.voice.lang) || 'en-US'; r.interimResults = true; r.continuous = !hold; r.maxAlternatives = 1;
+      let final = '', interim = '', sil = 0;
+      const take = () => { if (sil) { clearTimeout(sil); sil = 0; } const t = (final || interim).trim();
+        if (this.rec && this.rec.r === r) { try { r.onresult = r.onerror = r.onend = null; r.stop(); } catch (e) {} this.rec = null; }
+        if (t && !this.isEcho(t)) this.send(t);
+        else if (this.handsFree && !this.dead && !this.speaking) { this.state = 'idle'; this.armListen(280); }
+        else { this.state = 'idle'; if (!this.handsFree) this.subtitle('I didn\'t catch that.', ' ', 2500); } };
+      this.rec = {kind: 'sr', r, hold, t0: performance.now(), take};
+      r.onresult = e => { if (this.speaking) return; let f = '', i = ''; for (let k = 0; k < e.results.length; k++) { const x = e.results[k]; if (x.isFinal) f += x[0].transcript; else i += x[0].transcript; }
+        final = f; interim = i; this.subtitle((f || i).trim(), 'You', 15000); if (sil) clearTimeout(sil);
+        if (!hold && (f.trim() || i.trim())) sil = setTimeout(take, f.trim() ? 550 : 1500); };
+      r.onerror = e => { if (e.error === 'no-speech' || e.error === 'aborted') return; if (/not-allowed|service-not-allowed/.test(e.error)) { Companion.srBroken = true; this.rec = null; this.state = 'idle'; this.subtitle('I can\'t hear the microphone. You can type to me instead.', ' ', 5000); return; } if (/network|language/.test(e.error)) Companion.srBroken = !final && !interim; };
+      r.onend = () => { if (!(this.rec && this.rec.r === r)) return; if (sil) { clearTimeout(sil); sil = 0; } const t = (final || interim).trim(); this.rec = null;
+        if (t && !this.isEcho(t)) this.send(t);
+        else if (this.handsFree && !this.speaking && this.state !== 'thinking' && !this.dead) { this.state = 'idle'; this.armListen(250); }
+        else { this.state = 'idle'; if (!this.handsFree) this.subtitle('I didn\'t catch that.', ' ', 2500); } };
+      try { r.start(); } catch (e) { this.rec = null; Companion.srBroken = true; return this.listenWav(hold); }
       return;
     }
+    return this.listenWav(hold);
+  }
+  async listenWav(hold) {
     // no browser speech recognition (Quest Browser, Firefox): record a short clip, the proxy transcribes it
     try {
       const stream = await navigator.mediaDevices.getUserMedia({audio: {channelCount: 1, echoCancellation: true, noiseSuppression: true}});
@@ -450,7 +489,7 @@ class Companion {
     } catch (e) { this.state = 'idle'; this.rec = null; this.subtitle('I can\'t hear you: microphone not available. You can type to me on the page instead.', ' ', 6000); this.emit('error', {error: 'mic'}); }
   }
   stopListen() { const r = this.rec; if (!r) return; if (r.kind === 'sr') { try { r.r.stop(); } catch (e) {} return; }
-    this.rec = null; const b64 = r.stop(); if (!b64) { this.state = 'idle'; this.subtitle('I didn\'t catch that.', ' ', 2500); return; } this.send(null, b64); }
+    this.rec = null; const b64 = r.stop(); if (!b64) { this.state = 'idle'; if (this.handsFree && !this.dead) { this.armListen(400); return; } this.subtitle('I didn\'t catch that.', ' ', 2500); return; } this.send(null, b64); }
 
   // ---------- talking to the proxy ----------
   async send(text, audio) { this.unlockAudio();
@@ -499,11 +538,11 @@ class Companion {
     const nat = pool.filter(v => /natural|neural|online|premium|enhanced/i.test(v.name)); const g2 = (nat.length ? nat : pool).find(v => new RegExp(gender === 'male' ? '\\bmale\\b|guy|david|mark|daniel|alex|fred' : 'female|samantha|zira|aria|jenny|ava|victoria|karen|moira|serena|samantha|karen', 'i').test(v.name));
     return g2 || nat[0] || pool[0]; }
   speak(text) {
-    this.subtitle(text); if (!text) return;
-    if (!this.voiceOn()) { this.speaking = true; clearTimeout(this.spT); this.spT = setTimeout(() => { this.speaking = false; }, 600 + text.length * 55); return; }
+    this.subtitle(text); if (!text) return; this._lastSpoken = String(text);
+    if (!this.voiceOn()) { this.speaking = true; this._speakGen = (this._speakGen || 0) + 1; const gen = this._speakGen; clearTimeout(this.spT); this.spT = setTimeout(() => this.afterSpeak(gen), 600 + text.length * 55); return; }
     this.stopSpeaking(true); this.speaking = true; this.emit('speaking'); this._speakGen = (this._speakGen || 0) + 1; const gen = this._speakGen;
     this.fetchTts(text).then(blob => { if (this.dead || gen !== this._speakGen) return; if (blob) return this.playAudio(blob, gen); this.speakBrowser(text, gen); }).catch(e => { console.warn('[fpc] tts', e); if (!this.dead && gen === this._speakGen) this.speakBrowser(text, gen); });
-    clearTimeout(this.spT); this.spT = setTimeout(() => { if (this.speaking && gen === this._speakGen) this.speaking = false; }, 8000 + text.length * 80);
+    clearTimeout(this.spT); this.spT = setTimeout(() => { if (gen !== this._speakGen) return; const a = this.player; if (a && !a.paused && !a.ended) return; if (this.speaking) this.afterSpeak(gen); }, 8000 + text.length * 80);
   }
   ttsEndpoint() { return this.ttsUrl || (this.proxy || DEFAULT_PROXY).replace(/\/chat\/?$/, '/tts'); }
   async fetchTts(text) {
@@ -517,10 +556,10 @@ class Companion {
       try {
         const a = this.player = this.player || new Audio(); if (this._ttsUrl) { try { URL.revokeObjectURL(this._ttsUrl); } catch (e) {} }
         const url = this._ttsUrl = URL.createObjectURL(blob); a.muted = false; a.volume = 1; a.src = url;
-        const done = () => { a.onended = a.onerror = null; if (this._ttsUrl === url) { try { URL.revokeObjectURL(url); } catch (e) {} this._ttsUrl = null; } if (gen === this._speakGen) { this.speaking = false; if (this.sub) this.sub.until = performance.now() + 2500; } resolve(); };
+        const done = () => { a.onended = a.onerror = null; if (this._ttsUrl === url) { try { URL.revokeObjectURL(url); } catch (e) {} this._ttsUrl = null; } this.afterSpeak(gen); resolve(); };
         a.onended = done; a.onerror = () => { if (this.ac) this.playViaContext(blob, gen, done); else done(); };
         a.ontimeupdate = () => { this.pulse = 0.08; };
-        const p = a.play(); if (p && p.catch) p.catch(() => { if (this.ac) this.playViaContext(blob, gen, done); else { this.speakBrowser(this.sub && this.sub.text || '', gen); done(); } });
+        const p = a.play(); if (p && p.catch) p.catch(() => { if (this.ac) this.playViaContext(blob, gen, done); else { this.speakBrowser(this.sub && this.sub.text || '', gen); resolve(); } });
       } catch (e) { this.speakBrowser(this.sub && this.sub.text || '', gen); resolve(); }
     });
   }
@@ -530,12 +569,12 @@ class Companion {
     }).catch(done);
   }
   speakBrowser(text, gen) {
-    const ss = window.speechSynthesis; if (!ss || !text) { if (gen === this._speakGen) { this.speaking = true; clearTimeout(this.spT); this.spT = setTimeout(() => { if (gen === this._speakGen) this.speaking = false; }, 600 + text.length * 55); } return; }
+    const ss = window.speechSynthesis; if (!ss || !text) { if (gen === this._speakGen) { this.speaking = true; clearTimeout(this.spT); this.spT = setTimeout(() => this.afterSpeak(gen), 600 + (text && text.length || 0) * 55); } return; }
     const go = () => { if (this.dead || gen !== this._speakGen) return; try { ss.cancel(); ss.resume && ss.resume(); } catch (e) {}
       const u = new SpeechSynthesisUtterance(text), V = (this.ch && this.ch.voice) || {}; const v = this.voice(); if (v) u.voice = v; u.lang = (v && v.lang) || V.lang || 'en-US';
       u.pitch = V.pitch || 1; u.rate = V.rate || 1; u.volume = 1;
       u.onstart = () => { if (gen === this._speakGen) { this.speaking = true; this.emit('speaking'); } }; u.onboundary = () => { this.pulse = 0.08; };
-      u.onend = u.onerror = () => { if (gen === this._speakGen) { this.speaking = false; if (this.sub) this.sub.until = performance.now() + 2500; } };
+      u.onend = u.onerror = () => { this.afterSpeak(gen); };
       this._utt = u; ss.speak(u); setTimeout(() => { try { if (ss.paused) ss.resume(); } catch (e) {} }, 250);
       if (!this._voicesTried && !v) { this._voicesTried = true; ss.addEventListener && ss.addEventListener('voiceschanged', () => { if (this._utt === u && gen === this._speakGen) { const v2 = this.voice(); if (v2) { try { ss.cancel(); u.voice = v2; ss.speak(u); } catch (e) {} } } }); }
     };
@@ -548,7 +587,7 @@ class Companion {
 
   destroy() {
     for (const r of this.family.values()) { try { r.destroy(); } catch (e) {} } this.family.clear();
-    this.dead = true; this.stopSpeaking(); if (this.rec) { try { this.rec.kind === 'sr' ? this.rec.r.abort() : this.rec.stop(); } catch (e) {} this.rec = null; }
+    this.dead = true; clearTimeout(this._listenArm); this.stopSpeaking(); if (this._gate) { try { this._gate.remove(); } catch (e) {} this._gate = null; } if (this.rec) { try { this.rec.kind === 'sr' ? this.rec.r.abort() : this.rec.stop(); } catch (e) {} this.rec = null; }
     if (this.raf) cancelAnimationFrame(this.raf); for (const f of this.cleanup) { try { f(); } catch (e) {} } this.cleanup = [];
     if (this.holder) { if (this.holder.parent) this.holder.parent.remove(this.holder); dispose(this.holder); }
   }
