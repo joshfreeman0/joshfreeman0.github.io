@@ -1,10 +1,10 @@
-# Live family companions
+# Live companions
 
-Family-only mount for [Fowling Pond](https://joshfreeman.org/vr/): Astrid (wife), Linnea (8) and Oskar (6). They stand at `window.FP_HOME` when the house is on live, otherwise at the bank terrace placeholder.
+On [Fowling Pond](https://joshfreeman.org/vr/): Lila is the travelling companion (hands-free, one-tap "Tap to talk with Lila" overlay). Astrid, Linnea (8) and Oskar (6) stand at `window.FP_HOME` when the house is on live, otherwise at the bank terrace placeholder.
 
-Girlfriends and other companions are not on live; they stay on staging (`/vr-staging/companion/`).
+Other girlfriends and companions stay on staging (`/vr-staging/companion/`).
 
-- Module: `/vr/companion/companion.js` (v1.2.5, `residentsOnly` so the wife stays at home)
-- Roster: `/vr/companion/roster.json` (these three only)
-- Host: `/vr/companion/fphost.js` (mounted from `/vr/index.html`). `?companion=0` turns it off.
+- Module: `/vr/companion/companion.js` (v1.2.5)
+- Roster: `/vr/companion/roster.json` (lila, astrid, linnea, oskar)
+- Host: `/vr/companion/fphost.js` (`?companion=0` turns it off; `?pick=` chooses a character)
 - Kid replies are filtered on the shared `fp-companion` Worker (allowlist: linnea, oskar only; G-rated).

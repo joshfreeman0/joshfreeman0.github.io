@@ -1,8 +1,9 @@
-/* Fowling Pond live host: family only (Astrid, Linnea, Oskar). Girlfriends stay on staging.
-   family:true + residentsOnly: they stand at FP_HOME when B's house is live, else the terrace placeholder.
-   No full-screen talk overlay; Talk is on the companion bar and in the existing menu. ?companion=0 turns it off. */
+/* Fowling Pond live host: Lila (travelling, hands-free) plus family residents at the house
+   (Astrid, Linnea, Oskar). Other girlfriends stay on staging. family:true with pick lila
+   leaves the wife and kids at FP_HOME (terrace placeholder if the house is not ready).
+   One "Tap to talk with Lila" overlay unlocks audio and the mic. ?companion=0 turns it off; ?pick= chooses a character. */
 const QS = new URLSearchParams(location.search);
-const MOD = new URL('./companion.js?v=1.2.5f', import.meta.url).href;
+const MOD = new URL('./companion.js?v=1.2.5l', import.meta.url).href;
 function playerId() { try { let id = localStorage.getItem('fpc.player'); if (!id) { id = 'p-' + Math.random().toString(36).slice(2, 10); localStorage.setItem('fpc.player', id); } return id; } catch (e) { return 'guest'; } }
 async function go() {
   if (QS.get('companion') === '0') return;
@@ -16,8 +17,9 @@ async function go() {
   window.FPC = await mount(sc, root, {
     playerId: playerId(), world: 'earth',
     roster: new URL('./roster.json', import.meta.url).href,
-    family: true, residentsOnly: true, follow: false,
-    handsFree: false, tapToStart: false,
+    pick: QS.get('pick') || 'lila',
+    family: true, follow: true,
+    handsFree: true, tapToStart: true,
     quest: /OculusBrowser|Quest/i.test(navigator.userAgent),
     groundAt: (x, z) => (window.W3D && W3D.groundAt && !W3D.spaceView) ? W3D.groundAt(x, z, camY() + 0.4) : NaN,
     onEvent: e => { if (e.type === 'error') console.warn('[fpc]', e.error); }
