@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   const W3D = window.W3D = window.W3D || {};
-  const SRC = '/vr/fx/lakeextent.json?v=5';
+  const SRC = '/vr/fx/lakeextent.json?v=6';
   const WATER = 16.5, ROAD_W = 16, BUFFER = 45;
   let J = null, mask = null, lakeTex = null, mw = 0, mh = 0, inLake = () => false;
 
@@ -400,12 +400,10 @@
       const t = W3D.terrainH ? W3D.terrainH(x, z) : WATER + 1;
       return (isFinite(t) ? t : WATER + 1) + 0.16;
     };
-    /* Gap the ring around the family home so it does not wrap the yard. */
-    const avoid = J.ring_avoid || { x: -705, z: 678, r: 80 };
-    gapRing(J.ring.xz, avoid).forEach((run, i) => {
-      const mesh = ribbon(run, ROAD_W / 2, yFn, roadTex(), i ? ('lake-ring-' + i) : 'lake-ring', 0, 1);
-      if (mesh) g.add(mesh);
-    });
+    /* One continuous loop. The path already curves south of the family home
+       and compound (centreline stays >= 80 m from the lot). */
+    const ring = ribbon(J.ring.xz, ROAD_W / 2, yFn, roadTex(), 'lake-ring', 0, 1);
+    if (ring) g.add(ring);
     /* Shore strip between the water (~4 m out) and the inner edge of the ring (~37 m). */
     const mid = [];
     const inner = BUFFER - ROAD_W * 0.5;
