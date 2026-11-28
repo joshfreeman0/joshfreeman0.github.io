@@ -1,5 +1,5 @@
 /* Foresight Institute exhibit (T-30, Nov 27 2026): an open round court with a slowly turning "molecular gear" sculpture and a ring of
-   boards - Foresight history, the Foresight Tech Tree wall (focus areas, fellowships, grants, prizes, Existential Hope; Allison Duettmann),
+   boards - Foresight history, the Foresight Tech Tree wall (focus areas, fellowships, grants, prizes, Existential Hope),
    Gigafund / Luke Nosek, Steve Jurvetson (3 CC BY 2.0 photos from his Flickr via Wikimedia Commons, credited), and two MIRI panels
    (Singularity Institute history, AI alignment). Public history only, checked Nov 27 2026: foresight.org/about, foresight.org/impact2026,
    Wikipedia (Foresight Institute, Luke Nosek, Steve Jurvetson, MIRI), gigafund.com, space.com (Aug 2008), SpaceX press release
@@ -16,7 +16,7 @@
     {t: 'foresight.org', s: 'sub', c: '#FFD700'}];
   const TREE = [{t: 'The Foresight Tech Tree', s: 'title', k: 0.9},
     {t: 'Like the tech tree in a strategy game: each field is mapped from today\u2019s capabilities to long-term goals, with who is working on what and which open challenges are still waiting for people and funders.'},
-    {t: 'Allison Duettmann joined Foresight in 2015, led it as President and CEO until October 2026 and now serves on its board. She led its tech trees, fellowships, grants and prizes, and founded existentialhope.com - a hub for picturing good futures and working toward them.', s: 'small'}];
+    {t: 'Foresight\u2019s tech trees, fellowships, grants and prizes help people picture good futures and work toward them (existentialhope.com).', s: 'small'}];
   const AREAS = [['Molecular nanotech', 'atomically precise manufacturing'], ['Longevity biotech', 'health extension'], ['Neurotech', 'brain-computer, whole-brain'], ['Secure AI', 'intelligent cooperation'], ['Space', 'settlement and industry']];
   const NOSEK = [{t: 'Gigafund - Luke Nosek', s: 'title', k: 0.85},
     {t: 'Luke Nosek co-founded PayPal (started in 1998 as Confinity with Max Levchin, Peter Thiel, Yu Pan and Ken Howery). eBay bought PayPal for $1.5 billion in 2002.'},
