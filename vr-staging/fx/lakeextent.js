@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   const W3D = window.W3D = window.W3D || {};
-  const SRC = '/vr-staging/fx/lakeextent.json?v=4';
+  const SRC = '/vr-staging/fx/lakeextent.json?v=5';
   const WATER = 16.5, ROAD_W = 16, BUFFER = 45;
   let J = null, mask = null, lakeTex = null, mw = 0, mh = 0, inLake = () => false;
 
@@ -331,6 +331,12 @@
       g.closePath();
     });
     g.fill(); g.stroke();
+    if (J.home_clip && J.home_clip.poly) {
+      g.beginPath();
+      J.home_clip.poly.forEach((p, i) => { const x = X(p[0]), y = Z(p[1]); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+      g.closePath();
+      g.fill();
+    }
     if (J.holes && J.holes.length) {
       g.globalCompositeOperation = 'destination-out';
       g.lineWidth = 0;
