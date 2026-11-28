@@ -1,6 +1,6 @@
 /* Fowling Pond structure + master plan exhibit, "Show my design" overlay and Street View (Josh, Nov 27 2026).
-   - Exhibit: five big readable panels in a half-ring near the bank compound (placed on clear dry ground, picked at run time):
-     org chart, budget + money flow (PLAY MONEY), Church vs Fowling Pond, timeline wall (Gantt), progress bars. Data comes from
+   - Exhibit: six big readable panels in a half-ring near the bank compound (placed on clear dry ground, picked at run time):
+     org chart, budget + money flow (PLAY MONEY), Church vs Fowling Pond, parishes & town governments, timeline wall (Gantt), progress bars. Data comes from
      /vr/structure/data.json, /vr/structure/progress.json and /vr/plan/plan.json - the same files the web pages and PDFs use.
      ?spot=structure faces the chart, ?spot=plan the timeline. One canvas texture per panel, built on first visit (~0 tris to speak of).
    - Show my design: semi-transparent ghosts of the plan over the real Google 3D tiles - restored lake outline, ring road, beaches,
@@ -54,6 +54,15 @@ function pCompare() { const [c, g] = cv(W, H); title(g, 'Catholic Church vs Fowl
     if (i % 2) { g.fillStyle = 'rgba(255,255,255,0.05)'; g.fillRect(40, y - 4, W - 80, rh); }
     text(g, r[0], 52, y + 18, 230, 21, '#ffe9a8', true); text(g, r[1], 300, y + 18, 630, 20, '#e3d6c8', false, 24); text(g, r[2], 960, y + 18, 590, 20, '#c8f0d0', false, 24); y = h0 + rh; });
   return c; }
+function pLocal() { const [c, g] = cv(W, H), L = DATA.local || {}; title(g, 'Parishes & town governments', 'Lighthouse lot on the Raynham–Taunton line, Bristol County, Massachusetts. Draft only — nobody has been contacted.', W);
+  text(g, 'The town line runs NW–SE through St. Joseph Cemetery. Northeast of the line is Raynham; southwest is Taunton. The lot (Raynham parcel 10A-16-0, 0 East Britannia St) sits about 60 m on the Raynham side (Census TIGER 2024). The cemetery office at 475 East Britannia St is in Taunton. The cemetery straddles the line.', 40, 150, W - 80, 24, '#eef4f6', false, 30);
+  text(g, 'Owner: Roman Catholic Bishop of Fall River, a corporation sole — not a parish. Bishop Edgar M. da Cunha decides, with the finance council and college of consultors. Cemetery: Diocese of Fall River Catholic Cemeteries (director David Raposa). Parishes can offer pastoral support; they cannot sell or lease the lot.', 40, 250, W - 80, 24, '#ffe9a8', false, 30);
+  text(g, "Raynham side — St. Ann's Parish, 675 North Main St. Pastor: Fr. Matthew Laird (installed July 26, 2025). The only Catholic parish in Raynham. Its 1960 founding bounds (Route 24–Broadway, Route 44 to the north town line) would include the lot if they still hold. No current official parish-boundary map was found.", 40, 360, W - 80, 24, '#cfe3ea', false, 30);
+  text(g, 'Taunton side — nearest parish, territory not published: Taunton Catholic North (St. Jude the Apostle, 249 Whittenton St, and St. Anthony, 126 School St). Pastor: Fr. Bill Rodrigues. St. Mary Parish was suppressed Sept 15, 2025; its territory went to St. Anthony. St. Andrew the Apostle and Annunciation of the Lord are farther away and are not claimed here.', 40, 490, W - 80, 24, '#cfe3ea', false, 30);
+  text(g, 'Raynham (primary if the tower stays on the parcel): Select Board (Matthew Andrade, Joseph R. Pacheco, Patricia Riley), Planning Board, Zoning Board of Appeals, Conservation Commission, Building Commissioner.', 40, 630, W - 80, 24, '#ffe08a', false, 30);
+  text(g, "Taunton (if access or work crosses the line): Mayor Shaunna O'Connell, City Council (president Barry C. Sanders and eight councilors), Planning Board, ZBA, Conservation Commission.", 40, 730, W - 80, 24, '#ffe08a', false, 30);
+  text(g, 'If the structure, its access, or associated work crosses the town line, both towns would need to act. Full names, phones and sources: joshfreeman.org/vr/structure/', 40, 830, W - 80, 23, '#a8e0b0', true, 28);
+  return c; }
 function pTimeline() { const [c, g] = cv(W, H); title(g, 'Master plan timeline: Nov 2026 > ' + PLAN.end, 'Estimated - range ' + PLAN.end_range + '. Phase 1 is the lighthouse deal with the Diocese of Fall River.', W);
   const y0 = 2026, y1 = 2038, X0 = 560, X1 = W - 50, xo = s => { const [yy, mm] = s.split('-').map(Number); return X0 + (yy + (mm - 1) / 12 - y0) / (y1 - y0) * (X1 - X0); };
   g.font = '20px system-ui'; for (let yr = y0; yr <= y1; yr++) { const x = xo(yr + '-01'); g.fillStyle = 'rgba(255,255,255,0.15)'; g.fillRect(x, 150, 2, 680); g.fillStyle = '#9fb4bd'; g.fillText(String(yr), x + 4, 172); }
@@ -75,8 +84,8 @@ function panelMesh(cnv, w) { const t = new THREE.CanvasTexture(cnv); t.colorSpac
 function buildExhibit() {
   EXP = pickSite(); const grp = new THREE.Group(); grp.name = 'fp-structure-exhibit'; const R = 6.6, y = tH(EXP.x, EXP.z), yaw = EXP.yaw * Math.PI / 180;
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);   // facing direction of a visitor at the centre
-  const P = [pOrg, pBudget, pCompare, pTimeline, pProgress], post = new THREE.MeshLambertMaterial({color: 0x3a3d42});
-  P.forEach((fn, i) => { const a = yaw + (i - 2) * 0.62, dx = -Math.sin(a), dz = -Math.cos(a), m = panelMesh(fn(), 4.1);
+  const P = [pOrg, pBudget, pCompare, pLocal, pTimeline, pProgress], post = new THREE.MeshLambertMaterial({color: 0x3a3d42});
+  P.forEach((fn, i) => { const a = yaw + (i - 2.5) * 0.52, dx = -Math.sin(a), dz = -Math.cos(a), m = panelMesh(fn(), 4.1);
     const px = EXP.x + dx * R, pz = EXP.z + dz * R, gy = tH(px, pz); m.position.set(px, Math.max(gy, y) + 2.45, pz); m.lookAt(EXP.x, Math.max(gy, y) + 2.0, EXP.z); m.name = 'fp-panel-' + i; grp.add(m);
     for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.4, 0.1), post); p.position.copy(m.position); p.position.y = Math.max(gy, y) + 0.6; p.position.x += Math.cos(a) * s * 1.95; p.position.z -= Math.sin(a) * s * 1.95; grp.add(p); } });
   { const pad = new THREE.Mesh(new THREE.CircleGeometry(10, 32), new THREE.MeshStandardMaterial({color: 0x9b9384, roughness: 1})); pad.rotation.x = -Math.PI / 2; pad.position.set(EXP.x, y + 0.08, EXP.z); pad.name = 'fp-exhibit-pad'; grp.add(pad); }
@@ -86,7 +95,7 @@ function clearTrees(cx, cz, r) { let n = 0; for (const im of (W3D.root ? W3D.roo
     if (ch) im.instanceMatrix.needsUpdate = true; } return n; }
 function ensureExhibit(cb) { if (ex) return cb && cb(); (DATA ? Promise.resolve() : load()).then(() => { if (!ex) { ex = buildExhibit(); clearTrees(EXP.x, EXP.z, 13); W3D.keepOut = (W3D.keepOut || []).concat([{x: EXP.x, z: EXP.z, r: 12, name: 'structure exhibit'}]); (W3D.root || document.querySelector('a-scene').object3D).add(ex); console.log('fpplan: exhibit at ' + EXP.x + ',' + EXP.z); } cb && cb(); }).catch(e => { console.error('fpplan', e); hud('Exhibit data did not load'); }); }
 function face(yawDeg, step) { const y = tH(EXP.x, EXP.z) + 0.1; W3D.teleportTo(EXP.x, y, EXP.z, yawDeg); const lc = document.querySelector('[camera]') && document.querySelector('[camera]').components['look-controls']; if (lc) lc.pitchObject.rotation.x = 0.12; }
-const SP = {structure: () => ensureExhibit(() => { face(EXP.yaw - 36); hud('Fowling Pond structure & budget - turn to see all five panels'); }),
+const SP = {structure: () => ensureExhibit(() => { face(EXP.yaw - 36); hud('Fowling Pond structure & budget - turn to see all six panels'); }),
   plan: () => ensureExhibit(() => { face(EXP.yaw + 53); hud('Master plan timeline + progress'); })};
 SP['fp-structure'] = SP.structure; SP['master-plan'] = SP.plan; SP.timeline = SP.plan;
 (function reg() { if (!W3D.spots) return setTimeout(reg, 300); Object.assign(W3D.spots, SP); })();

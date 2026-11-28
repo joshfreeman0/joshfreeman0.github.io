@@ -82,12 +82,12 @@ let board = null;
 function wrap(g, t, w) { const out = []; let line = ''; t.split(' ').forEach(wd => { const n = line ? line + ' ' + wd : wd; if (g.measureText(n).width > w && line) { out.push(line); line = wd; } else line = n; }); if (line) out.push(line); return out; }
 function showBoard(title, lines, foot, dist, dy, left) { left = left || 0; if (board) { board.parent && board.parent.remove(board); dispose(board); board = null; }
   const sc = document.querySelector('a-scene'); if (!sc || !sc.camera) return;
-  const c = document.createElement('canvas'); c.width = 1024; c.height = 512; const g = c.getContext('2d');
-  g.fillStyle = 'rgba(12,30,40,0.92)'; g.fillRect(0, 0, 1024, 512); g.strokeStyle = '#c9a24a'; g.lineWidth = 8; g.strokeRect(10, 10, 1004, 492);
-  g.fillStyle = '#ffe08a'; g.font = 'bold 54px system-ui, sans-serif'; g.fillText(title, 40, 88); g.fillStyle = '#eef4f6'; g.font = '32px system-ui, sans-serif'; let y = 146;
-  lines.forEach(l => { wrap(g, l, 944).forEach(r => { if (y < 470) g.fillText(r, 40, y); y += 40; }); y += 6; }); g.fillStyle = '#9fb4bd'; g.font = '22px system-ui, sans-serif'; g.fillText(foot, 40, 488);
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 640; const g = c.getContext('2d');
+  g.fillStyle = 'rgba(12,30,40,0.92)'; g.fillRect(0, 0, 1024, 640); g.strokeStyle = '#c9a24a'; g.lineWidth = 8; g.strokeRect(10, 10, 1004, 620);
+  g.fillStyle = '#ffe08a'; g.font = 'bold 42px system-ui, sans-serif'; g.fillText(title, 40, 70); g.fillStyle = '#eef4f6'; g.font = '26px system-ui, sans-serif'; let y = 116;
+  lines.forEach(l => { wrap(g, l, 944).forEach(r => { if (y < 590) g.fillText(r, 40, y); y += 32; }); y += 8; }); g.fillStyle = '#9fb4bd'; g.font = '20px system-ui, sans-serif'; g.fillText(foot, 40, 616);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  board = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.6), new THREE.MeshBasicMaterial({map: t, fog: false, toneMapped: false, side: THREE.DoubleSide})); board.name = 'davol-board';
+  board = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 2.12), new THREE.MeshBasicMaterial({map: t, fog: false, toneMapped: false, side: THREE.DoubleSide})); board.name = 'davol-board';
   const cam = sc.camera, p = cam.getWorldPosition(new THREE.Vector3()), f = new THREE.Vector3(); cam.getWorldDirection(f); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize();
   board.position.set(p.x + f.x * dist + f.z * left, p.y + dy, p.z + f.z * dist - f.x * left); board.lookAt(p.x, p.y + dy, p.z); sc.object3D.add(board); }
 setInterval(() => { if (!board) return; const sc = document.querySelector('a-scene'); if (!sc || !sc.camera) return; const v = sc.camera.getWorldPosition(new THREE.Vector3());
@@ -97,8 +97,11 @@ const SP = {
   'davol-park': () => { const go = () => { W3D.teleportTo(-3422, (site ? Y0 + 0.1 : undefined), 3642, 0); level(); setTimeout(() => { level(); showBoard('Davol Park, Taunton', ['A neighborhood park at Oak Street and Oak Avenue: six pickleball courts in two fenced blocks of three,',
       'shuffleboard and bocce courts, outdoor fitness stations, gardens, a dog park and a small shelter.'], 'Davol Park pickleball  -  built from OpenStreetMap', 4.5, -0.45, 2.3); }, 900); };
     go(); setTimeout(() => { if (site) W3D.teleportTo(-3422, Y0 + 0.1, 3642, 0); }, 1500); },
-  'raynham-lighthouse': () => { if (W3D.spots.pharos) W3D.spots.pharos(); setTimeout(() => showBoard('The lighthouse, Raynham', ['In the real world, the Fowling Pond lighthouse stands on East Britannia Street in Raynham, on the Taunton Catholic Cemeteries\' office lot, across the street from St. Joseph Cemetery.',
-      'A quiet place of remembrance on the Raynham-Taunton line.'], 'Raynham  -  Fowling Pond lighthouse', 4.5, -0.3, 1.2), 1800); }
+  'raynham-lighthouse': () => { if (W3D.spots.pharos) W3D.spots.pharos(); setTimeout(() => showBoard('The lighthouse, Raynham', [
+      'In the real world the Fowling Pond lighthouse stands on Raynham parcel 10A-16-0 (0 East Britannia St), about 60 m on the Raynham side of the town line (U.S. Census TIGER 2024). St. Joseph Cemetery across the street straddles the line: its East Britannia frontage is in Raynham; the office at 475 East Britannia St and most of the grounds are in Taunton.',
+      "Raynham side: St. Ann's Parish, 675 North Main St, pastor Fr. Matthew Laird. Taunton side (nearest parish; territory not published): Taunton Catholic North — St. Jude the Apostle (249 Whittenton St) and St. Anthony (126 School St), pastor Fr. Bill Rodrigues.",
+      'The lot is owned by the Roman Catholic Bishop of Fall River, a corporation sole, not by a parish. St. Joseph Cemetery is run by Diocese of Fall River Catholic Cemeteries (director David Raposa). Parishes can offer pastoral support; they cannot sell or lease the lot.'
+    ], 'On the Raynham–Taunton line, Bristol County, Massachusetts', 4.6, -0.15, 1.15), 1800); }
 };
 SP.davol = SP['davol-park']; SP['davol-pickleball'] = SP['davol-park']; SP.lighthouse = SP['raynham-lighthouse'];
 (function reg() { if (!W3D.spots) return setTimeout(reg, 300); Object.assign(W3D.spots, SP); })();

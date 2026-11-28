@@ -28,6 +28,9 @@
 <h2>Budget &amp; money flow</h2><div class="play" id="label"></div><div id="budget"></div>
 <h2>Written rules &amp; appeals</h2><ul id="rules"></ul>
 <h2>Catholic Church vs Fowling Pond</h2><table id="cmp"><tr><th>Topic</th><th>Catholic Church</th><th>Fowling Pond</th></tr></table><p class="small" id="corr"></p>
+<h2>Parishes &amp; town governments at the lighthouse lot</h2>
+<p class="small" id="locdraft"></p>
+<div id="local"></div>
 <p class="small">Fowling Pond is Josh Freeman's VR world at joshfreeman.org/vr. The budget is play money on the Bank of the United States (3rd ed.) ledger - not legal tender, not real money.</p>
 </main><script>
 const E=(t,h,c)=>{const e=document.createElement(t);if(h!=null)e.innerHTML=h;if(c)e.className=c;return e},esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -48,5 +51,18 @@ fetch('data.json?v='+Date.now()).then(r=>r.json()).then(D=>{document.getElementB
  h+='</table><p class="small">'+esc(B.example_note)+' Source of funds: '+esc(B.source)+'.</p>';document.getElementById('budget').innerHTML=h;
  const ul=document.getElementById('rules');D.rules.forEach(r=>ul.appendChild(E('li',esc(r))));
  const ct=document.getElementById('cmp');D.compare.forEach(r=>{const tr=E('tr');tr.appendChild(E('td','<b>'+esc(r[0])+'</b>'));tr.appendChild(E('td',esc(r[1])));tr.appendChild(E('td',esc(r[2])));ct.appendChild(tr);});
- document.getElementById('corr').textContent=D.church_corrections;});
+ document.getElementById('corr').textContent=D.church_corrections;
+ const L=D.local; if(L){ document.getElementById('locdraft').textContent=L.draft+' Checked '+L.checked+'.';
+  let h='<div class="card"><b>The town line.</b> '+esc(L.town_line)+'</div>';
+  h+='<div class="card"><b>Who owns the lot.</b> '+esc(L.owner)+'</div>';
+  const C=L.cemetery; h+='<div class="card"><b>'+esc(C.name)+'.</b> '+esc(C.address)+'. Run by '+esc(C.run_by)+'. Director: '+esc(C.director)+'. '+esc(C.also)+'</div>';
+  h+='<p><b>Parish role.</b> '+esc(L.parish_role)+'</p>';
+  h+='<table><tr><th>Side</th><th>Parish</th><th>Pastor</th><th>Address</th></tr>';
+  L.parishes.forEach(r=>{h+='<tr><td>'+esc(r.side)+'</td><td><b>'+esc(r.name)+'</b><br><span class="small">'+esc(r.note)+'</span></td><td>'+esc(r.pastor)+'<br>'+esc(r.phone)+'<br><a href="'+esc(r.site)+'">'+esc(r.site.replace(/^https:\/\//,''))+'</a></td><td>'+esc(r.address)+'</td></tr>';});
+  h+='</table>';
+  L.towns.forEach(t=>{h+='<div class="card"><b>'+esc(t.name)+'.</b> '+esc(t.why)+'<ul>'+t.bodies.map(b=>'<li>'+esc(b)+'</li>').join('')+'</ul><p class="small"><a href="'+esc(t.site)+'">'+esc(t.site)+'</a></p></div>';});
+  h+='<p><b>If work crosses the line.</b> '+esc(L.if_crosses)+'</p>';
+  h+='<p class="small">Sources: '+L.sources.map(esc).join('; ')+'.</p>';
+  document.getElementById('local').innerHTML=h; }
+});
 </script></body></html>

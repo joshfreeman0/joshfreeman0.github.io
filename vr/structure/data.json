@@ -186,5 +186,80 @@
 "Each level decides inside its own budget line without asking up."
 ]
 ],
-"church_corrections": "Church facts: ~575 provinces worldwide (each headed by a metropolitan archdiocese), 33 Latin-rite provinces in the US (50 states + DC). The Boston province covers Massachusetts, Maine, New Hampshire and Vermont. ~5,300-5,430 bishops, ~2,262-2,265 dioceses."
+"church_corrections": "Church facts: ~575 provinces worldwide (each headed by a metropolitan archdiocese), 33 Latin-rite provinces in the US (50 states + DC). The Boston province covers Massachusetts, Maine, New Hampshire and Vermont. ~5,300-5,430 bishops, ~2,262-2,265 dioceses.",
+"local": {
+"title": "Parishes & town governments at the lighthouse lot",
+"checked": "2026-11-27",
+"draft": "Background only. Nobody has been contacted. Nothing here is a request or a commitment by the Diocese, a parish, or either town.",
+"town_line": "The Raynham–Taunton line runs northwest–southeast through St. Joseph Cemetery (Taunton Catholic Cemetery). Along this stretch the northeast side is Raynham and the southwest side is Taunton. Both towns are in Bristol County, in the Commonwealth of Massachusetts, in the United States. The lighthouse lot (Raynham parcel 10A-16-0, 0 East Britannia St) sits about 60 m on the Raynham side (U.S. Census TIGER 2024 county-subdivision boundary, and the Town of Raynham assessor). The cemetery office at 475 East Britannia St is addressed in Taunton and sits about 75 m on the Taunton side. The cemetery itself straddles the line: its East Britannia Street frontage is in Raynham; most of the grounds and the Broadway side are in Taunton.",
+"owner": "The lot is owned by the Roman Catholic Bishop of Fall River, a corporation sole (Mass. Acts 1904, c.390), not by a parish. Bishop Edgar M. da Cunha, S.D.V., is the current office-holder. Any lease or sale is decided by the bishop, with the consent of the diocesan finance council and college of consultors (canon 1292). The lot’s assessed value is under the Fall River USCCB limits ($250,000 / $3.5 million), so Holy See approval is not expected to be required.",
+"cemetery": {
+"name": "St. Joseph Cemetery (Taunton Catholic Cemeteries)",
+"address": "475 East Britannia Street, Taunton, MA 02780",
+"run_by": "Diocese of Fall River Catholic Cemeteries (a diocesan office, not a parish)",
+"director": "David J. Raposa Jr. (listed as David Raposa, Director of Catholic Cemeteries, on the diocese directory); appointed June 2020",
+"phone": "508-824-9570",
+"also": "The Taunton Catholic Cemeteries central office is at the same address. St. Mary Cemetery, 100 East Britannia St, Taunton, is also listed among the diocesan cemeteries on East Britannia Street."
+},
+"parishes": [
+{
+"side": "Raynham side (the lighthouse lot)",
+"name": "St. Ann's Parish",
+"note": "The only Catholic parish in Raynham. Its 1960 founding description is “that part of Raynham bounded by Route 24 on the East to Broadway on the West, from Route 44 in the South to the town line on the North.” The lot sits in Raynham, west of Route 24, east of Broadway, and north of Route 44 (Cape Highway), so it fits that description if the 1960 lines still hold. A current official parish-boundary map was not found on the diocese or parish sites (checked Nov 27, 2026).",
+"address": "675 North Main Street, Raynham, MA 02767",
+"pastor": "Fr. Matthew F. Laird, ninth pastor (parochial administrator from June 19, 2024; installed as pastor July 26, 2025)",
+"phone": "(508) 823-9833",
+"site": "https://www.stannsraynham.org/"
+},
+{
+"side": "Taunton side (most of the cemetery) — nearest parish; territory not published",
+"name": "Taunton Catholic North (St. Jude the Apostle and St. Anthony)",
+"note": "No current official parish-boundary map was found. The nearest church is St. Jude the Apostle, 249 Whittenton Street, about 1.6 km west of the cemetery office and at nearly the same latitude, in the Whittenton neighborhood of north Taunton. It is paired with St. Anthony of Lisbon, 126 School Street, as the Taunton Catholic North collaborative (formed 2019). St. Mary Parish — historically the mother church of Taunton, and the parish from which St. Ann’s was taken in 1960 — was suppressed effective September 15, 2025; its territory was assigned to St. Anthony, and pastoral care of that area is provided by the priests of St. Anthony and St. Jude. Two other Taunton parishes are farther away and are not claimed here as the covering parish: St. Andrew the Apostle, 19 Kilmer Avenue (successor of the former St. Joseph Parish, merged 2007), and Annunciation of the Lord, 31 First Street (pastor Fr. David Deston, Jr.).",
+"address": "Collaborative office: St. Anthony Parish Center, 126 School Street, Taunton, MA 02780. St. Jude: 249 Whittenton Street, Taunton, MA 02780.",
+"pastor": "Fr. Bill Rodrigues, pastor of the collaborative (parochial vicar: Fr. Marcos Caldeira)",
+"phone": "(508) 824-3333",
+"site": "https://www.cntaunton.org/"
+}
+],
+"parish_role": "Parishes do not own the lot and cannot sell or lease it. Their likely role is pastoral and community support — a friendly first conversation, and later a blessing or local goodwill — not a land-use decision. Cemetery operations are run by the diocesan Director of Catholic Cemeteries.",
+"towns": [
+{
+"name": "Town of Raynham",
+"why": "Primary local government if the lighthouse stays on parcel 10A-16-0. That covers zoning (including the 40 ft height limit and any special permit or variance), site plan review, a building permit, and a Conservation Commission review if wetlands are involved.",
+"bodies": [
+"Select Board (the town’s executive board). Members as of the April 25, 2026 town election and the Massachusetts Municipal Association listing: Matthew Andrade, Joseph R. Pacheco, and Patricia Riley. Town Administrator: Gregory Barnes. Chair titles were not confirmed on a live official roster.",
+"Planning Board",
+"Zoning Board of Appeals (special-permit granting authority for height under the zoning bylaw)",
+"Conservation Commission",
+"Building Commissioner"
+],
+"site": "https://www.town.raynham.ma.us/"
+},
+{
+"name": "City of Taunton",
+"why": "The cemetery, the cemetery office, and parts of East Britannia Street and Broadway sit in Taunton. Taunton would be involved if access, utilities, staging, or any part of the structure or its work crosses the town line, and for any wetland filing on the Taunton side.",
+"bodies": [
+"Mayor Shaunna O’Connell (in office since January 2020; official city site, checked Nov 27, 2026)",
+"Municipal City Council (official roster, checked Nov 27, 2026): Council President Barry C. Sanders; councilors Debra A. Botellio, Deborah A. Carr, David F. Chaves, Edward A. Correira, Phillip Duarte, Scott Martin, John M. McCaul, and David W. Pottier",
+"Planning Board",
+"Zoning Board of Appeals",
+"Conservation Commission"
+],
+"site": "https://www.taunton-ma.gov/"
+}
+],
+"if_crosses": "If the structure, its access, or associated work crosses the town line, both Raynham and Taunton would need to act — including, for wetlands, both Conservation Commissions.",
+"sources": [
+"St. Ann’s Parish, Our Staff; History of St. Ann’s Parish; Fr. Matthew Laird — stannsraynham.org (checked Nov 27, 2026)",
+"Diocese of Fall River, St. Ann parish page — fallriverdiocese.org/parish/st-ann/",
+"Taunton Catholic North, I’m New; Our Staff — cntaunton.org",
+"Diocese of Fall River, decree suppressing St. Mary Parish, Taunton, issued Aug 19, 2025, effective Sept 15, 2025 — fallriverdiocese.org",
+"Diocese of Fall River Catholic Cemeteries, St. Joseph Cemetery — fallriverdiocesancemeteries.org/cemeteries/st-joseph-cemetery/",
+"Diocese of Fall River, Cemeteries office (David Raposa, Director; Taunton Catholic Cemeteries Central Office, 475 East Britannia St) — fallriverdiocese.org/directory-offices/office/cemeteries/",
+"U.S. Census TIGER 2024 county subdivisions (Raynham town, Taunton city) and Census geocoder; Town of Raynham assessor, parcel 10A-16-0",
+"City of Taunton, Mayor’s Office; City Council — taunton-ma.gov",
+"Town of Raynham official election results, April 26, 2025 and April 25, 2026; Massachusetts Municipal Association, Raynham community page (Select Board listing)",
+"St. Andrew the Apostle, Taunton — standrewtaunton.org (address only). Annunciation of the Lord, Taunton — annunciationtaunton.com (address only)."
+]
+}
 }
