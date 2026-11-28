@@ -3,7 +3,7 @@
    Replies come from an LLM through a server-side proxy (Cloudflare Worker; the OpenRouter key never reaches the browser).
    See README.md next to this file. */
 const HERE = new URL('./', import.meta.url).href;
-export const VERSION = '1.2.2';
+export const VERSION = '1.2.3';
 export const DEFAULT_PROXY = 'https://fp-companion.tesseractprogram.workers.dev/chat';
 export const WORLDS = {
   earth: 'Earth, Fowling Pond: a restored pond in Raynham, Massachusetts, on real terrain. Above it stands an Egyptian-style concept bank compound (terrace pavilion, banking hall, vault, Josh\'s office, conservatory, sphinxes and temple gate). Around it: a pyramid park at Route 24 and I-495, a houseboat, the Pharos lighthouse, King\'s Pond and the Forge River, Vesta\'s house, a zoo, and a launch pad in Bridgewater with a rocket to Mars. Flying saucers visit other cities.',
@@ -246,15 +246,15 @@ class Companion {
     for (const [a, b] of [[1.7, 0.5], [0.4, 1.6], [0.4, -1.6], [-1.6, 0.4]]) { const x = p.x + f.x * a + r.x * b, z = p.z + f.z * a + r.z * b;   // front, right, left, behind: first spot outside the house walls
       if (hi && hi.inside(x, z, 0.4)) continue; this.placeWorld(x, null, z); this.faceW(p, true); this.emit('moved'); return; }
     if (hi && hi.spot) { this.placeWorld(hi.spot[0], hi.spot[1], hi.spot[2]); this.faceW(p, true); this.emit('moved', {reason: 'porch'}); } }
-  /* v1.2.2: B's family home (window.FP_HOME). House footprint from FP_HOME.bounds / .house {x0, x1, z0, z1} (world), else FP_HOME.site centre +- 6.4 x 4.9 m (familyhome v1/v2 shell),
-     else a 6 m circle round the porch. The waiting spot is 1.6 m beside spawns.porch, on the side away from the wife. */
+  /* v1.2.2/1.2.3: B's family home (window.FP_HOME). House footprint from FP_HOME.bounds / .house {x0, x1, z0, z1} (world), else FP_HOME.site centre +- 6.4 x 4.9 m,
+     else a 6 m circle round the porch. FP_HOME.porchBounds is treated as not-inside (the player on the porch is outdoors). Waiting spot: 1.6 m beside spawns.porch, away from the wife. */
   houseInfo() { const H = window.FP_HOME; if (!H || !H.spawns || H.ready === false || this.world !== 'earth' || this.o.houseAware === false) return null;
-    const P = v => !v ? null : Array.isArray(v) ? v : Array.isArray(v.position) ? v.position : isFinite(v.x) ? [v.x, v.y, v.z] : null;
-    const porch = P(H.spawns.porch), wife = P(H.spawns.wife), b = H.bounds || H.house; let rect = null, circ = null;
+    const P = v => !v ? null : Array.isArray(v) ? v : Array.isArray(v.position) ? v.position : isFinite(v.x) ? [v.x, v.y, v.z] : null, inRect = (r, x, z, m) => !!(r && isFinite(r.x0) && x > r.x0 - m && x < r.x1 + m && z > r.z0 - m && z < r.z1 + m);
+    const porch = P(H.spawns.porch), wife = P(H.spawns.wife), b = H.bounds || H.house, pb = H.porchBounds; let rect = null, circ = null;
     if (b && isFinite(b.x0) && isFinite(b.z1)) rect = b; else if (H.site && isFinite(H.site.x) && isFinite(H.site.z)) rect = {x0: H.site.x - 6.4, x1: H.site.x + 6.4, z0: H.site.z - 4.9, z1: H.site.z + 4.9};
     else if (porch || wife) { const c0 = porch || wife; circ = {x: c0[0], z: c0[2], r: 6}; }
-    if (!rect && !circ) return null;
-    const inside = (x, z, m) => { m = m || 0; return rect ? x > rect.x0 - m && x < rect.x1 + m && z > rect.z0 - m && z < rect.z1 + m : Math.hypot(x - circ.x, z - circ.z) < circ.r + m; };
+    if (!rect && !circ && !pb) return null;
+    const inside = (x, z, m) => { m = m || 0; if (inRect(pb, x, z, 0)) return false; return rect ? inRect(rect, x, z, m) : !!(circ && Math.hypot(x - circ.x, z - circ.z) < circ.r + m); };
     let spot = null; if (porch) { const cx = rect ? (rect.x0 + rect.x1) / 2 : porch[0], cz = rect ? (rect.z0 + rect.z1) / 2 : porch[2] + 1; let dx = porch[0] - cx, dz = porch[2] - cz; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
       let px = -dz, pz = dx; if (wife && Math.hypot(porch[0] + px - wife[0], porch[2] + pz - wife[2]) < Math.hypot(porch[0] - px - wife[0], porch[2] - pz - wife[2])) { px = -px; pz = -pz; }
       spot = [porch[0] + px * 1.6, porch[1] === undefined ? null : porch[1], porch[2] + pz * 1.6]; }
@@ -369,7 +369,7 @@ class Companion {
 
   makeUI() {
     const d = document.createElement('div'); d.className = 'fpc-ui';
-    d.innerHTML = '<style>.fpc-ui{position:fixed;left:12px;bottom:12px;z-index:30;font:14px system-ui,sans-serif;color:#fff;max-width:min(420px,92vw)}.fpc-ui .row{display:flex;gap:6px;margin-top:6px}.fpc-ui button,.fpc-ui select,.fpc-ui input{font:inherit;border-radius:8px;border:1px solid #c9a24a;background:rgba(20,20,26,.85);color:#fff;padding:7px 10px}.fpc-ui button.main{background:#c9a24a;color:#1a1408;font-weight:600}.fpc-ui input{flex:1;min-width:0}.fpc-ui .log{background:rgba(10,12,18,.72);border-radius:8px;padding:7px 10px;margin-top:6px;display:none}.fpc-ui.open .log{display:block}.fpc-ui .more{display:none}.fpc-ui.open .more{display:flex}</style>' +
+    d.innerHTML = '<style>.fpc-ui{position:fixed;left:12px;bottom:12px;z-index:30;font:14px system-ui,sans-serif;color:#fff;max-width:min(420px,92vw);transition:opacity .2s ease,bottom .2s ease}.fpc-ui.fpc-raised{bottom:calc(var(--fpc-menu-h, 56px) + env(safe-area-inset-bottom, 0px))}.fpc-ui.fpc-menu-open{opacity:0;pointer-events:none}.fpc-ui .row{display:flex;gap:6px;margin-top:6px}.fpc-ui button,.fpc-ui select,.fpc-ui input{font:inherit;border-radius:8px;border:1px solid #c9a24a;background:rgba(20,20,26,.85);color:#fff;padding:7px 10px}.fpc-ui button.main{background:#c9a24a;color:#1a1408;font-weight:600}.fpc-ui input{flex:1;min-width:0}.fpc-ui .log{background:rgba(10,12,18,.72);border-radius:8px;padding:7px 10px;margin-top:6px;display:none}.fpc-ui.open .log{display:block}.fpc-ui .more{display:none}.fpc-ui.open .more{display:flex}</style>' +
       '<div class="row"><button class="main" type="button"></button><button class="tog" type="button" title="Type, choose a companion">...</button></div>' +
       '<div class="row more"><input class="txt" placeholder="Type to talk" maxlength="400"><button class="snd" type="button">Send</button></div>' +
       '<div class="row more"><select class="sel"></select><button class="come" type="button">Come here</button><button class="fgt" type="button" title="Forget this conversation">Forget</button></div>' +
@@ -389,7 +389,21 @@ class Companion {
     q('.pws').onclick = () => { this.setPass(q('.pw').value); q('.pw').value = ''; this.subtitle('Passphrase saved.', ' '); };
     q('.pw').onkeydown = e => e.stopPropagation();
     if (this.o.hideUiInXR !== false && this.sceneEl && this.sceneEl.addEventListener) { const f = () => { d.style.display = this.inXR ? 'none' : ''; }; this.sceneEl.addEventListener('enter-vr', f); this.sceneEl.addEventListener('exit-vr', f); }
+    this.hookMenuUI(d);
     this.cleanup.push(() => d.remove());
+  }
+  /* v1.2.3: the 2D world menu (#ui, menutabs) sits at the bottom and the companion bar (z-index 30) used to cover it on phones.
+     Open = #ui is visible and a pane is showing (ui.dataset.tab, .pane.cur, or #ui.help) or the Hide control has not hidden it.
+     While a pane is open the bar fades out; on narrow screens it also lifts above #ui whenever the menu strip is visible. */
+  hookMenuUI(d) {
+    const apply = () => { const ui = document.getElementById('ui'), vis = !!(ui && getComputedStyle(ui).display !== 'none' && ui.getClientRects().length), pane = !!(vis && (ui.dataset.tab || ui.querySelector('.pane.cur') || ui.classList.contains('help'))), narrow = window.matchMedia('(max-width: 700px)').matches;
+      d.classList.toggle('fpc-menu-open', vis && pane); const raise = vis && narrow; d.classList.toggle('fpc-raised', raise);
+      if (raise) d.style.setProperty('--fpc-menu-h', Math.ceil(ui.getBoundingClientRect().height + 10) + 'px'); else d.style.removeProperty('--fpc-menu-h'); };
+    const mo = new MutationObserver(apply); const watch = el => { if (el) mo.observe(el, {attributes: true, attributeFilter: ['style', 'class', 'data-tab', 'hidden'], childList: true, subtree: true}); };
+    watch(document.getElementById('ui')); watch(document.getElementById('uitog'));
+    window.addEventListener('resize', apply); const ro = window.ResizeObserver && document.getElementById('ui') ? new ResizeObserver(apply) : null; if (ro) ro.observe(document.getElementById('ui'));
+    apply(); this.syncMenuUI = apply;
+    this.cleanup.push(() => { mo.disconnect(); if (ro) ro.disconnect(); window.removeEventListener('resize', apply); });
   }
 
   // ---------- passphrase ----------

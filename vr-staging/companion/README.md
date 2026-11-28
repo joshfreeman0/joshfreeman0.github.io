@@ -6,7 +6,7 @@ One ES module that puts a talking, realistic AI companion into any A-Frame (or p
 - Default roster: `https://joshfreeman.org/vr-staging/companion/roster.json`
 - Demo page: `https://joshfreeman.org/vr-staging/companion/demo.html` (`?family=1` also shows the wife and kids)
 - Line-up page: `https://joshfreeman.org/vr-staging/companion/lineup.html?ids=lila,freya,maya,nina` (static side-by-side comparison, no talking)
-- Version: `1.2.2` (`api.version`)
+- Version: `1.2.3` (`api.version`)
 - Proxy: `https://fp-companion.tesseractprogram.workers.dev/chat` (Cloudflare Worker `fp-companion`, source `/workspace/fp-upgrade/worker`)
 - GitHub Pages serves everything with `Access-Control-Allow-Origin: *`, so redplanetlounge.pages.dev can `import()` the module and load its GLBs.
 
@@ -138,7 +138,9 @@ Where they stand (first match wins):
 
 **Visibility (v1.2.2).** Every companion and resident is created hidden and only becomes visible once it has been placed (`spawn`, `setHome`, roster `home`, `FP_HOME`, the placeholder after `homeWaitMs`, or beside the player). Nothing is ever drawn at the world origin while assets or the home load. A primary companion mounted without `spawn` appears beside the player as soon as there is a camera.
 
-**Following around the family home (v1.2.2).** While the player is inside the house, the active (travelling) companion does not follow indoors: she waits on the porch, 1.6 m beside `spawns.porch` on the side away from the wife, facing the player, and normal following resumes when the player leaves the house (followDist 14 m as before). "Come here" while indoors also sends her to the porch, and outdoors "Come here" / follow never puts her inside the walls (front, right, left, then behind the player, first spot clear of the house). House footprint: `FP_HOME.bounds` (or `.house`) `{x0, x1, z0, z1}` in world metres if B provides it, else `FP_HOME.site` centre +- 6.4 m (x) by +- 4.9 m (z), matching familyhome v1/v2's 12 x 9 m shell plus 0.4 m, else a 6 m circle round the porch. Other worlds and places are unaffected.
+**Following around the family home (v1.2.2).** While the player is inside the house, the active (travelling) companion does not follow indoors: she waits on the porch, 1.6 m beside `spawns.porch` on the side away from the wife, facing the player, and normal following resumes when the player leaves the house (followDist 14 m as before). "Come here" while indoors also sends her to the porch, and outdoors "Come here" / follow never puts her inside the walls (front, right, left, then behind the player, first spot clear of the house). House footprint: `FP_HOME.bounds` (or `.house`) `{x0, x1, z0, z1}` in world metres (familyhome v3 / fphome v2 provides this), else `FP_HOME.site` centre +- 6.4 m (x) by +- 4.9 m (z), else a 6 m circle round the porch. `FP_HOME.porchBounds` is treated as not-inside, so standing on the porch does not count as being in the house. Kids are not pinned by B's `setHome` (wife only); they stand at `spawns.kids[i]` in roster order (Linnea, Oskar; a third slot is unused) and wander in `play`. Other worlds and places are unaffected.
+
+**2D menu (v1.2.3).** The companion control bar hides (fades, no pointer events) while B's bottom menu (`#ui`, menutabs) has a pane open (`#ui[data-tab]`, `.pane.cur`, or Help). On narrow screens (max-width 700px) the bar also lifts above the menu whenever `#ui` is visible, so it does not cover the tab row; it returns to the bottom-left when the menu is hidden (Hide / Show menu). Detected with a MutationObserver on `#ui`.
 
 B's `?spot=home` URL lands the player on the porch (`spawns.porch`); the module does not move the player.
 
