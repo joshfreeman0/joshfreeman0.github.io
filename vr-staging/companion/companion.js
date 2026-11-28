@@ -3,7 +3,7 @@
    Replies come from an LLM through a server-side proxy (Cloudflare Worker; the OpenRouter key never reaches the browser).
    See README.md next to this file. */
 const HERE = new URL('./', import.meta.url).href;
-export const VERSION = '1.2.9';
+export const VERSION = '1.2.10';
 export const DEFAULT_PROXY = 'https://fp-companion.tesseractprogram.workers.dev/chat';
 export const WORLDS = {
   earth: 'Earth, Fowling Pond: a restored pond in Raynham, Massachusetts, on real terrain. Above it stands an Egyptian-style concept bank compound (terrace pavilion, banking hall, vault, Josh\'s office, conservatory, sphinxes and temple gate). Around it: a pyramid park at Route 24 and I-495, a houseboat, the Pharos lighthouse, King\'s Pond and the Forge River, Vesta\'s house, a zoo, and a launch pad in Bridgewater with a rocket to Mars. Flying saucers visit other cities.',
@@ -95,6 +95,7 @@ class Companion {
     this.emit('ready', {roster: this.api.list()});
     if (!this.o.residentsOnly && this.handsFree && (this.o.tapToStart !== undefined ? this.o.tapToStart : this.world !== 'mars') && this.o.ui !== false) this.showStartGate();
     if (this.o.residentsOnly) this.relabelTalk();
+    this.hookWrist();
     return this.api;
   }
 
@@ -110,6 +111,33 @@ class Companion {
     this.relabelStrip(n);
   }
   relabelStrip(n) { n = n || ((Companion.talker && Companion.talker.ch && Companion.talker.ch.name) || (this.ch && this.ch.name) || 'Lila'); if (this._talkUi && this._talkUi.inp) this._talkUi.inp.placeholder = 'Type to ' + n; }
+  hookWrist() {
+    if (this.resident || this.o.wrist === false) return;
+    const paint = (b) => {
+      const dismissed = !!(Companion.host || this)._dismissed, label = dismissed ? 'Call Lila' : 'Lila leave';
+      const c = document.createElement('canvas'); c.width = 256; c.height = 54; const g = c.getContext('2d');
+      g.fillStyle = '#ffd9a0'; g.fillRect(0, 0, 256, 54); g.fillStyle = '#111'; g.font = 'bold 26px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, 128, 28);
+      const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace;
+      const mesh = b._fpcLabel; if (mesh) { const old = mesh.material.map; mesh.material.map = tx; mesh.material.needsUpdate = true; if (old) old.dispose(); }
+      else { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.04), new THREE.MeshBasicMaterial({map: tx, transparent: true, depthTest: false, depthWrite: false, toneMapped: false}));
+        m.position.z = 0.001; m.renderOrder = 3002; b.object3D.add(m); b.object3D.renderOrder = 3001; b._fpcLabel = m; }
+    };
+    const place = () => {
+      const wr = document.getElementById('wristpanel'); if (!wr || document.getElementById('fpc-wrist-lila')) return !!document.getElementById('fpc-wrist-lila');
+      const Hh = (wr.object3D && wr.object3D.userData && wr.object3D.userData.H) || (wr.userData && wr.userData.H) || 0.2;
+      const b = document.createElement('a-plane'); b.id = 'fpc-wrist-lila'; b.className = 'btn';
+      b.setAttribute('width', 0.2); b.setAttribute('height', 0.042); b.setAttribute('position', '0 ' + (-Hh / 2 - 0.176).toFixed(4) + ' 0.002');
+      b.setAttribute('material', 'shader:flat;transparent:true;opacity:0;depthTest:false;depthWrite:false'); wr.appendChild(b);
+      b.addEventListener('loaded', () => { paint(b); setTimeout(() => document.querySelectorAll('[raycaster]').forEach(r => r.components.raycaster && r.components.raycaster.refreshObjects()), 300); });
+      b.addEventListener('click', () => { const h = Companion.host || this; if (h._dismissed) h.recall(); else if (h.isGuest && h.isGuest()) h.dismiss(); else { const g = h.guestHere && h.guestHere(); if (g && !g._dismissed) g.dismiss(); else h.recall(); } this.relabelWrist(); });
+      this._wristEl = b; this._wristPaint = () => { if (b.object3D) paint(b); };
+      this.cleanup.push(() => { try { b.remove(); } catch (e) {} this._wristEl = null; });
+      return true;
+    };
+    if (!place()) { let n = 0; const t = setInterval(() => { if (place() || ++n > 60) clearInterval(t); }, 500); this.cleanup.push(() => clearInterval(t)); }
+  }
+  relabelWrist() { try { this._wristPaint && this._wristPaint(); } catch (e) {} }
+
   hostOf() { return this.resident ? (Companion.host || this) : this; }
   isFamily() { return !!(this.ch && FAMILY(this.ch.role)); }
   isGuest() { return !!(this.ch && !FAMILY(this.ch.role)); }
@@ -175,7 +203,7 @@ class Companion {
     if (this.isGuest() && !this._dismissed) return this;
     return this.guestHere();
   }
-  recall() { this._dismissed = false; this._stayOut = null; this._leaving = false; Companion._banterLeft = 2; Companion._banterStarted = false; this.comeHere(); }
+  recall() { this._dismissed = false; this._stayOut = null; this._leaving = false; Companion._banterLeft = 2; Companion._banterStarted = false; this.comeHere(); this.relabelWrist(); }
   dismiss() {
     if (this.dead || this.isFamily() || this._leaving || this._dismissed) return;
     this._leaving = true; Companion._banterBusy = false; Companion._banterLeft = 0; clearTimeout(this._banterT);
@@ -190,11 +218,11 @@ class Companion {
         const r = h.family.get(prefer) || [...h.family.values()].find(x => x.ch && x.ch.role === 'wife') || [...h.family.values()][0];
         if (r) { h.setTalkTarget(r.ch.id); r.claimTalk(); r.handsFree = true; r.armListen(400); }
       }
-      this.emit('left', {reason: 'dismissed'});
+      this.emit('left', {reason: 'dismissed'}); this.relabelWrist();
     };
     this.speak("Of course. I'll leave you with your family.");
   }
-  maybeBanter() {
+  maybeBanter() { return; // v1.2.10: no woman-to-woman exchanges
     if (this._dismissed || this._leaving || this._fromBanter || (this.ch && this.ch.role === 'child')) return;
     if (Companion._banterBusy || Companion._banterStarted || this._afterGoodbye) return;
     const z = this.homeZone(); if (!z) return;
@@ -591,8 +619,7 @@ class Companion {
     if (this._afterBanter) { const f = this._afterBanter; this._afterBanter = null; f(); return; }
     if (this._dismissed || this._leaving) return;
     if (Companion.talker && Companion.talker !== this) return;
-    if (!this._fromBanter) this.maybeBanter();
-    if (this.handsFree && !Companion._banterBusy) this.armListen(400);
+    if (this.handsFree) this.armListen(400);
   }
   isEcho(t) { const n = s => String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); const a = n(t), b = n(this._lastSpoken); return !!(a && b && (b.includes(a) || a.includes(b) || (a.length > 12 && b.length > 12 && a.slice(0, 24) === b.slice(0, 24)))); }
   showStartGate() {
