@@ -1,0 +1,443 @@
+{
+"title": "Fowling Pond Master Plan, Budget & Timeline",
+"updated": "2026-11-27",
+"budget": {
+"items": [
+{
+"item": "Lighthouse tower (phase 1)",
+"qty": [
+1,
+1,
+1
+],
+"unit": "tower",
+"rates": [
+1000000.0,
+2900000.0,
+11000000.0
+],
+"cost": [
+1000000,
+2900000,
+11000000
+],
+"src": [
+"gp",
+"henlopen"
+],
+"note": "Low = Great Point 1986 price; mid = same in 2026 dollars (CPI x~2.9, estimate); high = Cape Henlopen-style with keeper's house"
+},
+{
+"item": "Lighthouse lot: lease/easement (preferred) or purchase at assessed value",
+"qty": [
+0,
+1,
+1
+],
+"unit": "lot",
+"rates": [
+0,
+303900,
+303900
+],
+"cost": [
+0,
+303900,
+303900
+],
+"src": [
+"assessor"
+],
+"note": "Lease cost not known until negotiated; purchase shown at assessed value as a ceiling placeholder"
+},
+{
+"item": "Lake: dredge open-water core (incl. dewatering/disposal)",
+"qty": [
+968000,
+2662000,
+6417840
+],
+"unit": "CY",
+"rates": [
+40,
+70,
+145
+],
+"cost": [
+38720000,
+186340000,
+930586800
+],
+"src": [
+"dredge_hat",
+"dredge_ma",
+"concord"
+],
+"note": "Low 150 ac x 4 ft; mid 330 ac x 5 ft; high full 663 ac x 6 ft"
+},
+{
+"item": "Wetland / cedar-swamp restoration around the open water",
+"qty": [
+513,
+333,
+100
+],
+"unit": "acre",
+"rates": [
+19000,
+33000,
+73000
+],
+"cost": [
+9747000,
+10989000,
+7300000
+],
+"src": [
+"harwich",
+"eel",
+"bog"
+],
+"note": "Rest of the basin restored as wetland (low/mid); high = 100 ac of planted margins"
+},
+{
+"item": "Ring road - new segments (rest uses existing streets; homes untouched)",
+"qty": [
+2.5,
+3.5,
+4.5
+],
+"unit": "mile",
+"rates": [
+2800000.0,
+4590000.0,
+5340000.0
+],
+"cost": [
+7000000,
+16065000,
+24030000
+],
+"src": [
+"modot",
+"compass"
+],
+"note": "Concept loop ~4.5 mi; high rate is 2018 dollars (not escalated)"
+},
+{
+"item": "Beaches (sand placed)",
+"qty": [
+13332,
+26664,
+44440
+],
+"unit": "CY",
+"rates": [
+35,
+54,
+72
+],
+"cost": [
+466620,
+1439856,
+3199680
+],
+"src": [
+"sand",
+"sand2"
+],
+"note": "Each beach ~600 x 100 ft x 2 ft = 4,444 CY; mid rate is the midpoint (estimate)"
+},
+{
+"item": "Bank compound - above ground (hall + 7-floor tower, ~165,000 sf)",
+"qty": [
+165000,
+165000,
+165000
+],
+"unit": "sf",
+"rates": [
+290,
+470,
+745
+],
+"cost": [
+47850000,
+77550000,
+122925000
+],
+"src": [
+"rlb26",
+"rlb"
+],
+"note": "Low = secondary office rate, mid/high = prime office range"
+},
+{
+"item": "Bank compound - underground levels in the sand pit (~150,000 sf)",
+"qty": [
+150000,
+150000,
+150000
+],
+"unit": "sf",
+"rates": [
+140,
+190,
+380
+],
+"cost": [
+21000000,
+28500000,
+57000000
+],
+"src": [
+"rlb"
+],
+"note": "Basement-parking rate as proxy; high = 2x (assumption for deep structure)"
+}
+],
+"subtotal": [
+125783620,
+324087756,
+1156345380
+],
+"design_permits": [
+12578362,
+32408776,
+115634538
+],
+"contingency": [
+27672396,
+71299306,
+254395984
+],
+"total": [
+166034378,
+427795838,
+1526375902
+],
+"dollars": "2026 US dollars, planning-level (Class 5) estimate; not a quote",
+"adders": [
+[
+"Design, studies & permitting",
+"10% of construction (Concord estimate used 10% design escalation)",
+[
+"concord"
+]
+],
+[
+"Contingency",
+"20% (Needham DPW practice)",
+[
+"needham"
+]
+],
+[
+"Escalation",
+"not included - add ~5%/yr to the mid-point of construction (Needham assumption)",
+[
+"needham"
+]
+]
+],
+"excluded": [
+"Buying the Raynham Corp hill and any ring-road right-of-way (needs appraisal)",
+"Tunnels between the compound and the pond (needs geotechnical study)",
+"Hill regrading / bulk earthwork, utilities extensions, operations and maintenance",
+"Contaminated-sediment handling if testing finds it"
+],
+"funding": [
+[
+"Josh / private founders & donors",
+"Lighthouse and visitor features; naming rights"
+],
+[
+"Two-town agreement (MGL c.40 s.4A intermunicipal agreement)",
+"Shares costs and upkeep between Taunton and Raynham"
+],
+[
+"MA Division of Ecological Restoration (DER) priority project + grants",
+"Wetland / pond restoration design and construction"
+],
+[
+"SNEP Watershed Implementation Grants (EPA Southeast New England Program)",
+"Restoration in the Taunton River watershed"
+],
+[
+"MassTrails grants & Chapter 90 / MassWorks",
+"Trails, ring-road segments, access"
+],
+[
+"Community Preservation Act funds (where each town has adopted CPA)",
+"Open space and recreation"
+],
+[
+"Private development financing",
+"Bank compound (commercial building - separate from public grants)"
+]
+],
+"sources": {
+"dredge_ma": [
+"Attleboro reservoir dredging plan (DredgeWire, Dec 2024): MA mechanical $50-75/CY; hydraulic ~$70/CY small, ~$50/CY large",
+"https://dredgewire.com/attleboro-looks-to-restore-wells-dredging-reservoirs-to-boost-shrinking-water-supply/"
+],
+"dredge_hat": [
+"Day Pond Restoration bids, Hatfield MA (Nov 2025): dredging + dewatering + disposal $40-$240/CY",
+"https://search.pinpointanalytics.ai/bids/details/2842c607-7415-4cf4-bbc2-6fc37cbaebe8"
+],
+"concord": [
+"Warner's Pond dredging estimate, Concord MA (SumCo, Dec 2024): $50/CY dredging; 10% preliminary design escalation",
+"https://concordma.gov/AgendaCenter/ViewFile/Minutes/_12042024-12408"
+],
+"bog": [
+"Windswept Bog restoration (SNEP, 2024): $821,535 for 14 ac; $2.9M projected for 40 ac",
+"https://estuaries.org/wp-content/uploads/2024/10/Executive-Summary_SNEP_Windswept.pdf"
+],
+"eel": [
+"Eel River Headwaters, Plymouth (Mass. DER): ~60 ac former bog restored for ~$2M",
+"https://www.mass.gov/info-details/eel-river-headwaters-restoration-plymouth"
+],
+"harwich": [
+"Cold Brook, Harwich (SNEP case study): 66 ac, $1.25-1.5M",
+"https://snepnetwork.org/wp-content/uploads/2021/12/Harwich-case-study-102821.pdf"
+],
+"modot": [
+"MoDOT Cost Estimate Guide (updated Jan 2026): new 2-lane minor $1.575M + $1.225M/mi; major $2.15M + $1.675M/mi; +20% misc/utilities",
+"https://epg.modot.org/forms/general_files/DE/Cost_Estimate_Guide_for_Scoping.pdf"
+],
+"compass": [
+"Compass International (2018): major 2-lane road, NE USA, ~$5.34M/mi",
+"https://compassinternational.net/blog/order-magnitude-road-highway-costs/"
+],
+"needham": [
+"Needham DPW planning-level estimate (Nov 2025): 20% contingency, 5%/yr inflation",
+"https://needhamma.gov/DocumentCenter/View/61372"
+],
+"rlb": [
+"RLB Quarterly Construction Cost Report Q4 2025, Boston: office prime $455-705/sf, secondary $270-405/sf; basement parking $140-190/sf (hard cost)",
+"https://www.rlb.com/wp-content/uploads/sites/4/2026/01/Q4-2025_QCR.pdf"
+],
+"rlb26": [
+"RLB Q3 2026 via Bidmere (Nov 2026): Boston office prime $470-745/sf, secondary $290-435/sf",
+"https://bidmere.com/resources/construction-cost-per-square-foot/"
+],
+"sand": [
+"Sandwich MA beach project grant application: $20/CY hopper-dredged, $35/CY trucked sand",
+"https://sandwichmass.org/DocumentCenter/View/353/Beach-Restoration-and-Resiliency-Project-Grant-Application-PDF"
+],
+"sand2": [
+"Edgartown South Beach (DredgeWire): $21/CY local dredged sand vs at least $72/CY imported",
+"https://dredgewire.com/south-beach-to-be-partly-repaired-for-summer/"
+],
+"gp": [
+"Great Point Lighthouse replica, Nantucket (1986): slightly over $1 million (Lighthouse Digest)",
+"https://www.lighthousedigest.com/Digest/StoryPage.cfm?StoryKey=4698"
+],
+"henlopen": [
+"Cape Henlopen Lighthouse replica proposal incl. keeper's house: close to $11 million (Lighthouse Digest)",
+"http://www.lighthousedigest.com/Digest/StoryPage.cfm?StoryKey=849"
+],
+"assessor": [
+"Town of Raynham assessor record, parcel 10A-16-0 (0 E Britannia St): $303,900, exempt",
+"https://www.raynhamma.gov/"
+]
+}
+},
+"phases": [
+[
+"P0",
+"Concept, VR model and public plan",
+"2026-07",
+"2027-03",
+"underway"
+],
+[
+"P1",
+"Lighthouse: Diocese deal (lease/easement)",
+"2026-12",
+"2027-12",
+"planned"
+],
+[
+"P1b",
+"Lighthouse: Raynham permits + build",
+"2027-10",
+"2029-06",
+"planned"
+],
+[
+"P2",
+"Two-town agreement + baseline studies (survey, sediment, wetland lines, NHESP)",
+"2027-03",
+"2029-03",
+"planned"
+],
+[
+"P3",
+"Lake permitting: MEPA, both ConComs, 401, Corps 404, Ch.91",
+"2028-06",
+"2031-06",
+"planned"
+],
+[
+"P4",
+"Lake restoration construction (seasonal stages)",
+"2031-07",
+"2036-12",
+"planned"
+],
+[
+"P5",
+"Ring road + beaches",
+"2033-04",
+"2037-10",
+"planned"
+],
+[
+"P6a",
+"Bank compound: land + design + permits",
+"2028-01",
+"2032-06",
+"planned"
+],
+[
+"P6b",
+"Bank compound: construction",
+"2032-07",
+"2036-12",
+"planned"
+]
+],
+"end": "2037-10",
+"end_range": "2035 (fast) - 2040 (slow)",
+"permits": [
+[
+"MA Wetlands Protection Act (MGL c.131 s.40; 310 CMR 10.00)",
+"Notice of Intent to BOTH the Taunton and Raynham Conservation Commissions -> Orders of Conditions; an Ecological Restoration Limited Project path (310 CMR 10.24(8)) may fit"
+],
+[
+"MEPA (301 CMR 11.00)",
+"Environmental Notification Form; large wetland alteration triggers a likely mandatory Environmental Impact Report"
+],
+[
+"Clean Water Act s.401 Water Quality Certification (MassDEP, 314 CMR 9.00)",
+"Needed for dredging / fill in waters and wetlands"
+],
+[
+"U.S. Army Corps of Engineers - Clean Water Act s.404",
+"Individual Permit likely at this scale (New England District)"
+],
+[
+"MGL Chapter 91 (310 CMR 9.00)",
+"Waterways licence if Fowling Pond is a great pond (natural pond over 10 acres) - MassDEP determination needed"
+],
+[
+"NHESP / MA Endangered Species Act (321 CMR 10.00)",
+"Check Priority Habitat maps; MESA review if mapped"
+],
+[
+"Local zoning + building permits (Raynham, Taunton)",
+"Lighthouse height / use; compound site plan review"
+]
+]
+}

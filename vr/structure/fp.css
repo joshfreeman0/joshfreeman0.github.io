@@ -1,0 +1,10 @@
+body{margin:0;background:#0b1820;color:#e8eef0;font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:18px}
+h1{color:#ffe08a;font-size:30px;margin:8px 0 4px}h2{color:#ffe08a;border-bottom:1px solid #c9a24a55;padding-bottom:4px;margin-top:32px}
+a{color:#7fe3ff}.sub{color:#9fb4bd}.play{background:#7a1f1f;color:#fff;font-weight:700;padding:8px 12px;border-radius:8px;margin:10px 0}
+.btns a{display:inline-block;background:#FFD700;color:#111;text-decoration:none;padding:9px 14px;border-radius:9px;margin:4px 6px 4px 0;font-weight:600}
+table{border-collapse:collapse;width:100%;font-size:15px}td,th{border-bottom:1px solid #ffffff1c;padding:7px 8px;vertical-align:top;text-align:left}th{color:#ffe9a8;background:#13303d}
+tr:nth-child(even) td{background:#ffffff08}.num{text-align:right;white-space:nowrap}.bar{height:22px;background:#23343c;border-radius:5px;overflow:hidden;min-width:120px}.bar i{display:block;height:100%}
+.done{background:#3d9b5a}.underway{background:#d9a93a}.planned{background:#3a7ca5}.card{background:#102733;border:1px solid #c9a24a55;border-radius:12px;padding:12px 14px;margin:10px 0}
+svg text{fill:#e8eef0;font-family:system-ui,sans-serif}.small{font-size:13px;color:#9fb4bd}
+@media print{body{background:#fff;color:#111}a{color:#114}th{background:#eee;color:#111}.btns{display:none}}

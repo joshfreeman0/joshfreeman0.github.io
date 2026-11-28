@@ -1,0 +1,139 @@
+{
+"updated": "2026-11-27",
+"note": "Honest status. VR builds are done; real-world items are at the concept stage. Nothing has been sent to the Diocese or either town.",
+"milestones": [
+[
+"vr-world",
+"VR: Fowling Pond world + restored lake model",
+"vr",
+"done",
+100
+],
+[
+"vr-lighthouse",
+"VR: lighthouse on the East Britannia St lot",
+"vr",
+"done",
+100
+],
+[
+"vr-bank",
+"VR: Bank of the United States (3rd ed.) compound + tower",
+"vr",
+"done",
+100
+],
+[
+"vr-raynham",
+"VR: Raynham spots (Center, Dunkin', lighthouse lot, Davol Park)",
+"vr",
+"done",
+100
+],
+[
+"vr-structure",
+"VR + web: structure chart, comparison, timeline wall, design overlay",
+"vr",
+"done",
+100
+],
+[
+"plan-doc",
+"Master plan, budget and timeline (this document)",
+"plan",
+"done",
+100
+],
+[
+"lh-proposal",
+"Lighthouse proposal PDF for the Diocese (draft for Josh)",
+"lighthouse",
+"underway",
+60
+],
+[
+"lh-contact",
+"Friendly first contact: St. Ann's pastor",
+"lighthouse",
+"planned",
+0
+],
+[
+"lh-diocese",
+"Diocese review: bishop + finance council + consultors",
+"lighthouse",
+"planned",
+0
+],
+[
+"lh-lease",
+"Signed lease or easement for the lot",
+"lighthouse",
+"planned",
+0
+],
+[
+"lh-permits",
+"Raynham zoning / building permits for the lighthouse",
+"lighthouse",
+"planned",
+0
+],
+[
+"lh-build",
+"Lighthouse built",
+"lighthouse",
+"planned",
+0
+],
+[
+"towns",
+"Taunton + Raynham intermunicipal agreement",
+"lake",
+"planned",
+0
+],
+[
+"studies",
+"Baseline studies: bathymetry, sediment, wetland lines, NHESP",
+"lake",
+"planned",
+0
+],
+[
+"permits",
+"MEPA, Orders of Conditions, 401, Corps 404, Ch.91",
+"lake",
+"planned",
+0
+],
+[
+"lake",
+"Lake restoration construction",
+"lake",
+"planned",
+0
+],
+[
+"ring",
+"Ring road + beaches",
+"lake",
+"planned",
+0
+],
+[
+"bank-land",
+"Bank compound: land + design + permits",
+"bank",
+"planned",
+0
+],
+[
+"bank-build",
+"Bank compound construction",
+"bank",
+"planned",
+0
+]
+]
+}

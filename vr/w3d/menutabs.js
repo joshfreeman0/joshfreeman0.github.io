@@ -36,9 +36,9 @@
     'w:raynham': ['gs-earth', 0], 'w:dunkin': ['gs-earth', 1], 'w:raynham-lighthouse': ['gs-earth', 1], 'w:davol-park': ['gs-earth', 1], 'w:bridgewater': ['gs-earth', 2], 'w:aldensquare': ['gs-earth', 3], 'w:walker': ['gs-earth', 4], placesbtn: ['gs-earth', 9, 'Places (Real Earth)'],
     'w:versailles': ['gs-vers', 0, 'Château (front court)'],
     rplgo: ['gs-space', 0, 'Red Planet Lounge (Mars)'], 'w:launchpad': ['gs-space', 1, 'Launch pad'], 'w:rockets': ['gs-space', 2], 'w:starfleet': ['gs-space', 3], 'w:saucer': ['gs-space', 4],
-    'w:founders': ['gs-exh', 0], 'w:hangar': ['gs-exh', 1, 'Drone Hangar (H18)'],
+    'w:founders': ['gs-exh', 0], 'w:hangar': ['gs-exh', 1, 'Drone Hangar (H18)'], 'w:structure': ['gs-exh', 30], 'w:plan': ['gs-exh', 31], designbtn: ['gs-exh', 32], svbtn: ['gs-earth', 8],
     friendsbtn: ['pp', 0], mpvoice: ['pp', 1], mpcount: ['pp', 2], voicerange: ['pp', 3], invitebtn: ['pp', 4], fpabtn: ['pp', 5], 'jf-fpc-come': ['pp', 6], 'jf-fpc-talk': ['pp', 7],
-    diabtn: ['rd', 0, 'DIA Papers (37 DIRDs)'], tesseractlink: ['rd', 1, 'Tesseract Program'], bankledgerlink: ['rd', 2],
+    diabtn: ['rd', 0, 'DIA Papers (37 DIRDs)'], tesseractlink: ['rd', 1, 'Tesseract Program'], bankledgerlink: ['rd', 2], structlink: ['rd', 3], planlink: ['rd', 4], overlaylink: ['rd', 5],
     speed: ['st-move', 0], reload: ['st-move', 1],
     tiltbtn: ['st-look', 0], skybtn: ['st-look', 1], nsndbtn: ['st-look', 2], watersoundbtn: ['st-look', 3], realearthbtn: ['st-look', 4], buildbtn: ['st-more', 0], helpbtn: ['st-more', 1, 'Help and credits']
   };
@@ -154,9 +154,9 @@
     'jfv-vers-open': ['earth', 5], 'jfv-bos-open': ['earth', 6], 'jfv-ldn-open': ['earth', 7], placesvr: ['earth', 9], 'jfv-bos-back': ['bos', 0], 'jfv-ldn-back': ['ldn', 0],
     'jfv-vers-back': ['vers', 0], 'w:versailles': ['vers', 1, 'Château'], 'w:versailles-mirrors': ['vers', 6, 'Hall of Mirrors'],
     'jfv-rplgo': ['space', 0], 'w:launchpad': ['space', 1, 'Launch pad'], 'w:rockets': ['space', 2, 'Rocket yard'], 'w:starfleet': ['space', 3, 'Star Fleet base'], 'w:saucer': ['space', 4], 'jfv-tessroom': ['space', 5],
-    'w:founders': ['exh', 0, 'Founders Hall'], 'w:hangar': ['exh', 1, 'Drone Hangar (H18)'],
+    'w:founders': ['exh', 0, 'Founders Hall'], 'w:hangar': ['exh', 1, 'Drone Hangar (H18)'], structurevr: ['exh', 30], planvr: ['exh', 31], designvr: ['exh', 32], svvr: ['earth', 8],
     mpvrvoice: ['people', 0], mpvrcount: ['people', 1], invite: ['people', 2], 'jfv-fpc-come': ['people', 3], 'jfv-fpc-talk': ['people', 4],
-    'jfv-dia': ['read', 0], tesseractvr: ['read', 1, 'Tesseract reader'], bankledgervr: ['read', 2, 'Bank Ledger'],
+    'jfv-dia': ['read', 0], tesseractvr: ['read', 1, 'Tesseract reader'], bankledgervr: ['read', 2, 'Bank Ledger'], structreadvr: ['read', 3], planreadvr: ['read', 4],
     speed: ['set', 0], fly: ['set', 1], reload: ['set', 2], skylabel: ['set', 3], nsndlabel: ['set', 4], realearthvr: ['set', 5], buildvrbtn: ['set', 6]
   };
   VERS.forEach(([k], i) => { if (k !== 'mirrors') PV['jfv-v-' + k] = ['vers', i + 2]; });

@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fowling Pond Structure &amp; Budget</title><meta name="description" content="How Fowling Pond is organized - chain of roles, open play-money budget, and a comparison with the Catholic Church.">
+<link rel="stylesheet" href="fp.css?v=1"></head><body><main>
+<h1>Fowling Pond Structure &amp; Budget</h1><div class="sub" id="upd"></div>
+<div class="btns"><a href="/vr/?spot=structure">See it in VR</a><a href="/vr/plan/">Master plan &amp; live progress</a><a href="/vr/plan/overlay/">Design overlay</a><a href="Fowling-Pond-Structure-and-Budget.pdf">PDF</a></div>
+<h2>Chain of roles</h2><div id="org"></div><table id="levels"><tr><th>Level</th><th>Who / what</th><th>Job</th><th>Term</th></tr></table>
+<h2>Advisory councils</h2><div id="councils"></div>
+<h2>Budget &amp; money flow</h2><div class="play" id="label"></div><div id="budget"></div>
+<h2>Written rules &amp; appeals</h2><ul id="rules"></ul>
+<h2>Catholic Church vs Fowling Pond</h2><table id="cmp"><tr><th>Topic</th><th>Catholic Church</th><th>Fowling Pond</th></tr></table><p class="small" id="corr"></p>
+<p class="small">Fowling Pond is Josh Freeman's VR world at joshfreeman.org/vr. The budget is play money on the Bank of the United States (3rd ed.) ledger - not legal tender, not real money.</p>
+</main><script>
+const E=(t,h,c)=>{const e=document.createElement(t);if(h!=null)e.innerHTML=h;if(c)e.className=c;return e},esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const M=n=>'$'+(n>=1e9?(n/1e9).toFixed(2)+' billion':(n/1e6).toFixed(1)+' million');
+function orgSVG(T){const rows=[];(function walk(o,d){Object.keys(o).forEach(k=>{rows.push([k,d]);const v=o[k];if(Array.isArray(v))v.forEach(x=>rows.push([x,d+1]));else walk(v,d+1);});})(T,0);
+ const cols=['#5a3d0c','#123e57','#17485e','#1d5468'],lv=[],h=34;let s='';const byD={};rows.forEach(r=>{(byD[r[1]]=byD[r[1]]||[]).push(r[0]);});
+ const W=1060,depth=Object.keys(byD).length;let y=10;const H=depth*70+20;
+ Object.keys(byD).forEach(d=>{const L=byD[d],w=Math.min(200,(W-20)/L.length-8);L.forEach((n,i)=>{const x=10+i*(w+8)+((W-20)-(L.length*(w+8)))/2;s+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${cols[Math.min(d,3)]}" stroke="#c9a24a"/><text x="${x+w/2}" y="${y+22}" text-anchor="middle" font-size="${w<110?11:13}">${esc(n.length>28?n.slice(0,27)+'…':n)}</text>`;});y+=70;});
+ return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Org chart">${s}</svg><p class="small">Rows: Founder &gt; Realms &gt; Regions &gt; Districts (Earth realm shown; other realms fill in the same way).</p>`;}
+fetch('data.json?v='+Date.now()).then(r=>r.json()).then(D=>{document.getElementById('upd').textContent='Updated '+D.updated;
+ document.getElementById('org').innerHTML=orgSVG(D.tree);const lt=document.getElementById('levels');D.levels.forEach(l=>{const tr=E('tr');l.forEach(c=>tr.appendChild(E('td',esc(c))));lt.appendChild(tr);});
+ const cc=document.getElementById('councils');D.councils.forEach(c=>cc.appendChild(E('div','<b>'+esc(c[0])+'</b> - '+esc(c[1]),'card')));
+ const B=D.budget;document.getElementById('label').textContent=B.label;let h='<p>'+esc(B.appropriation)+'</p><table><tr><th>Share</th><th class="num">%</th><th class="num">Play money / year</th><th>Rule</th></tr>';
+ B.split.forEach(s=>h+=`<tr><td>${esc(s[0])}</td><td class="num">${s[1]}%</td><td class="num">${M(15e9*s[1]/100)}</td><td>${esc(s[2])}</td></tr>`);h+='</table>';
+ h+='<div class="card"><b>Realm formula.</b> '+esc(B.realm_formula)+'</div><div class="card"><b>Upward share.</b> '+esc(B.upward)+'</div><div class="card"><b>Pond Pence.</b> '+esc(B.pence)+'</div>';
+ const pool=15e9*0.6;h+='<table><tr><th>Realm (example)</th><th class="num">Visit share</th><th class="num">Base (40% equal)</th><th class="num">Activity (60%)</th><th class="num">Total (play)</th></tr>';
+ B.example.forEach(r=>{const b=pool*0.4/4,a=pool*0.6*r[1]/100;h+=`<tr><td>${esc(r[0])}</td><td class="num">${r[1]}%</td><td class="num">${M(b)}</td><td class="num">${M(a)}</td><td class="num">${M(a+b)}</td></tr>`;});
+ h+='</table><p class="small">'+esc(B.example_note)+' Source of funds: '+esc(B.source)+'.</p>';document.getElementById('budget').innerHTML=h;
+ const ul=document.getElementById('rules');D.rules.forEach(r=>ul.appendChild(E('li',esc(r))));
+ const ct=document.getElementById('cmp');D.compare.forEach(r=>{const tr=E('tr');tr.appendChild(E('td','<b>'+esc(r[0])+'</b>'));tr.appendChild(E('td',esc(r[1])));tr.appendChild(E('td',esc(r[2])));ct.appendChild(tr);});
+ document.getElementById('corr').textContent=D.church_corrections;});
+</script></body></html>

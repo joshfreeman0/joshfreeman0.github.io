@@ -1,0 +1,190 @@
+{
+"title": "Fowling Pond Structure & Budget",
+"updated": "2026-11-27",
+"levels": [
+[
+"Founder",
+"Josh Freeman",
+"Sets the charter and final appeals. Bound by the published rules like everyone else.",
+"permanent; can delegate"
+],
+[
+"Realms",
+"Earth / Fowling Pond - Mars / Red Planet Lounge - Tesseract - Wampum World",
+"Each realm runs itself under the charter.",
+"Realm Steward: 1-year term, max 3 in a row"
+],
+[
+"Regions",
+"Raynham-Taunton - Boston & area - London - Versailles (Earth realm)",
+"Groups nearby districts; shares services.",
+"Region Warden: 1-year term"
+],
+[
+"Districts",
+"Pond compound - Bank compound - Lighthouse - Dunkin' - Davol Park - ...",
+"A place people visit; owns its own build + budget line.",
+"District Keeper: 6-month term"
+],
+[
+"Rooms",
+"Halls, vaults, terraces, shops, world rooms",
+"Smallest unit: an event, a shop, a room.",
+"Room Host: per event or 90 days"
+]
+],
+"tree": {
+"Founder (Josh)": {
+"Earth - Fowling Pond": {
+"Raynham-Taunton": [
+"Pond compound",
+"Bank compound",
+"Lighthouse",
+"Dunkin'",
+"Davol Park",
+"Raynham Center"
+],
+"Boston & area": [
+"Freedom Trail",
+"Harbor",
+"MIT / Harvard"
+],
+"London": [
+"City",
+"Westminster"
+],
+"Versailles": [
+"Chateau",
+"Gardens"
+]
+},
+"Mars - Red Planet Lounge": {},
+"Tesseract": {},
+"Wampum World": {}
+}
+},
+"councils": [
+[
+"Builders' Council",
+"Bots and builders who make the world (advises on what to build next). Meets in the open; notes published."
+],
+[
+"Citizens' Council",
+"Any signed-in visitor can join. Proposes ideas, votes in advisory polls, supplies appeal-panel members."
+],
+[
+"Treasury Audit Council",
+"2 rotating members (never the person spending). Checks the signed ledger every quarter and publishes the result."
+]
+],
+"budget": {
+"label": "PLAY MONEY - NOT LEGAL TENDER - FOR FOWLING POND VR USE ONLY",
+"source": "Bank of the United States (3rd ed.) play-money ledger, joshfreeman.org/vr/bank/ (signed, hash-chained, public)",
+"appropriation": "Each year the Treasury releases 0.01% of the $150 trillion play-money supply = $15 billion (play) to the Fowling Pond budget.",
+"split": [
+[
+"Reserve",
+10,
+"Rainy-day fund; capped at 3 years of budget; anything over the cap goes back to the Treasury"
+],
+[
+"Realms",
+60,
+"Formula below"
+],
+[
+"Commons",
+20,
+"Shared services: bank, maps, menus, safety, help"
+],
+[
+"Citizen grants",
+10,
+"Open applications; Citizens' Council shortlists, Audit Council checks"
+]
+],
+"realm_formula": "Realm share = 40% split equally between the 4 realms + 60% by each realm's share of visits last year. Regions get 70% of their realm's share (same formula), districts 70% of their region's; the rest stays at each level.",
+"upward": "Upward share: any income a room or district earns (play-money events, shops) sends a flat 10% up - 4% to the next level, 3% to its realm, 3% to the Reserve. Same rate for everyone, written down, no special assessments.",
+"pence": "Pond Pence: optional gifts to any level, listed publicly with the giver's chosen name or \"anonymous\".",
+"example": [
+[
+"Earth - Fowling Pond",
+55
+],
+[
+"Mars - Red Planet Lounge",
+20
+],
+[
+"Tesseract",
+15
+],
+[
+"Wampum World",
+10
+]
+],
+"example_note": "Example visit shares only (illustrative) - real shares come from the visit counter each year."
+},
+"rules": [
+"Written charter, published on the website; changes posted 14 days before they take effect",
+"Every allocation and transfer is a signed public ledger entry",
+"Term limits for every role except Founder; any role can be recalled by the level above or by a Citizens' Council petition",
+"Appeals: Room Host -> District Keeper -> Region Warden -> Appeals Panel (3 Citizens' Council members drawn by lot, none from the same chain) -> Founder (final, with written reasons)",
+"Quarterly public report: income, spending, reserve, audit result",
+"Conflicts of interest declared; nobody approves their own spending"
+],
+"compare": [
+[
+"Chain of command",
+"Parish -> diocese (bishop) -> Pope. The metropolitan archbishop has only vigilance over suffragan dioceses (c.436), not command.",
+"Founder -> Realm -> Region -> District -> Room, each with a written job and limits."
+],
+[
+"Size",
+"~5,300-5,430 bishops, ~2,260 dioceses, ~575 provinces (33 Latin provinces in the US).",
+"4 realms, a handful of regions, dozens of districts - small enough to see on one chart."
+],
+[
+"Coordination",
+"Bishops' conferences and regions coordinate but cannot command.",
+"Councils advise; their notes and votes are published."
+],
+[
+"Appointments",
+"Bishops appointed by the Pope, normally until age 75 (resignation offered).",
+"Named roles with terms (6 months - 1 year), renewable a set number of times, recallable."
+],
+[
+"Money up",
+"Parish assessment (cathedraticum, c.1263), diocesan support to the Holy See (c.1271), Peter's Pence, special collections; rates vary by diocese.",
+"One flat 10% upward share for everyone, written down, every transfer on a public ledger."
+],
+[
+"Transparency",
+"Many dioceses publish little; the Holy See publishes some summaries.",
+"Every allocation, balance and audit is public on the website and in VR."
+],
+[
+"Property",
+"Diocesan property is usually titled to the bishop as a corporation sole (e.g., Roman Catholic Bishop of Fall River). Large sales need consent (c.1292; US limits for Fall River $250k / $3.5M).",
+"Districts hold their builds in the open registry; nothing is owned by one person; transfers need the level above + audit sign-off."
+],
+[
+"Rules",
+"Code of Canon Law (1983) + local norms; complex.",
+"A short charter anyone can read in 10 minutes."
+],
+[
+"Appeals",
+"Recourse to the superior and to Roman dicasteries / tribunals; slow.",
+"Published 5-step appeals path with time limits (14 days per step)."
+],
+[
+"Speed",
+"Decisions can take months or years.",
+"Each level decides inside its own budget line without asking up."
+]
+],
+"church_corrections": "Church facts: ~575 provinces worldwide (each headed by a metropolitan archdiocese), 33 Latin-rite provinces in the US (50 states + DC). The Boston province covers Massachusetts, Maine, New Hampshire and Vermont. ~5,300-5,430 bishops, ~2,262-2,265 dioceses."
+}
