@@ -1,7 +1,7 @@
 /* Fowling Pond host for the shared companion module (staging). Mounts the companion under its own entity on the scene (not W3D.root),
    so she stays with you in guest rooms (FP_ROOMS) and after teleports. ?companion=0 turns it off; ?pick=<id> chooses a character. */
 const QS = new URLSearchParams(location.search);
-const MOD = new URL('../companion/companion.js?v=1', import.meta.url).href;
+const MOD = new URL('../companion/companion.js?v=1.2.6', import.meta.url).href;
 function playerId() { try { let id = localStorage.getItem('fpc.player'); if (!id) { id = 'p-' + Math.random().toString(36).slice(2, 10); localStorage.setItem('fpc.player', id); } return id; } catch (e) { return 'guest'; } }
 async function go() {
   if (QS.get('companion') === '0') return;

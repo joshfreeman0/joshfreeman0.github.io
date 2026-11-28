@@ -3,7 +3,7 @@
    Replies come from an LLM through a server-side proxy (Cloudflare Worker; the OpenRouter key never reaches the browser).
    See README.md next to this file. */
 const HERE = new URL('./', import.meta.url).href;
-export const VERSION = '1.2.5';
+export const VERSION = '1.2.6';
 export const DEFAULT_PROXY = 'https://fp-companion.tesseractprogram.workers.dev/chat';
 export const WORLDS = {
   earth: 'Earth, Fowling Pond: a restored pond in Raynham, Massachusetts, on real terrain. Above it stands an Egyptian-style concept bank compound (terrace pavilion, banking hall, vault, Josh\'s office, conservatory, sphinxes and temple gate). Around it: a pyramid park at Route 24 and I-495, a houseboat, the Pharos lighthouse, King\'s Pond and the Forge River, Vesta\'s house, a zoo, and a launch pad in Bridgewater with a rocket to Mars. Flying saucers visit other cities.',
@@ -414,16 +414,28 @@ class Companion {
   // ---------- passphrase ----------
   pass() { if (this.o.passphrase) return this.o.passphrase; try { const u = new URLSearchParams(location.search).get('fppass'); if (u) this.setPass(u); return localStorage.getItem('fpc.pass') || ''; } catch (e) { return ''; } }
   setPass(p) { try { localStorage.setItem('fpc.pass', String(p || '').trim().toLowerCase()); } catch (e) {} if (this._wantStart && this.pass()) { this._wantStart = false; this.beginTalk(); } }
+  showPassPrompt(reason) {
+    const name = (this.ch && this.ch.name) || 'Lila';
+    const hint = reason === 'wrong' ? 'That passphrase was not right. Try again.' : 'Enter the companion passphrase, then you can talk.';
+    if (this._passUi) { this._passUi.hint.textContent = hint; try { this._passUi.inp.focus(); this._passUi.inp.click(); } catch (e) {} return; }
+    const wrap = document.createElement('div'); wrap.className = 'fpc-pass'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Companion passphrase');
+    wrap.innerHTML = '<style>.fpc-pass{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.8);font:18px/1.35 system-ui,sans-serif;color:#fff;padding:24px;-webkit-tap-highlight-color:transparent}.fpc-pass .box{background:rgba(20,20,26,.97);border:1px solid #c9a24a;border-radius:14px;padding:22px;width:min(440px,94vw);text-align:center}.fpc-pass h2{margin:0 0 8px;font-size:22px;color:#ffe9a8}.fpc-pass p{margin:0 0 14px}.fpc-pass input{width:100%;box-sizing:border-box;font:20px/1.3 system-ui,sans-serif;padding:14px 12px;border-radius:8px;border:1px solid #c9a24a;background:#111;color:#fff}.fpc-pass button{margin-top:12px;width:100%;font:20px/1.3 system-ui,sans-serif;padding:14px 12px;border-radius:8px;border:1px solid #c9a24a;background:#c9a24a;color:#1a1408;font-weight:700}</style>' +
+      '<div class="box"><h2>Talk to ' + name + '</h2><p class="hint">' + hint + '</p><input class="pw" type="text" inputmode="text" enterkeyhint="done" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><button type="button" class="ok">OK</button></div>';
+    const inp = wrap.querySelector('.pw'), go = () => { const v = (inp.value || '').trim(); if (!v) { try { inp.focus(); } catch (e) {} return; } this.setPass(v); this.hidePassPrompt(); const next = this._afterPass; this._afterPass = null; if (this._wantStart) { this._wantStart = false; this.beginTalk(); } else if (typeof next === 'function') next(); else this.subtitle('Passphrase saved. You can talk now.', ' ', 4000); };
+    wrap.querySelector('.ok').onclick = go; inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); go(); } });
+    (document.body || document.documentElement).appendChild(wrap); this._passUi = {el: wrap, inp, hint: wrap.querySelector('.hint')}; this.cleanup.push(() => this.hidePassPrompt());
+    setTimeout(() => { try { inp.focus(); inp.click(); } catch (e) {} }, 50);
+  }
+  hidePassPrompt() { if (!this._passUi) return; try { this._passUi.el.remove(); } catch (e) {} this._passUi = null; }
   needPass(reason) { reason = reason || 'missing'; this.emit('error', {error: 'passphrase', reason});
     if (typeof this.o.onNeedPass === 'function') {   // host shows its own prompt (Mars: in-world VR keyboard)
       const self = this; let used = false;
       try { this.o.onNeedPass({reason, character: this.ch && {id: this.ch.id, name: this.ch.name},
-        submit(pass, retryText) { if (used || self.dead) return false; used = true; pass = String(pass || '').trim(); if (!pass) return false; self.setPass(pass); if (retryText) self.send(String(retryText)); return true; },
-        cancel() { used = true; }}); } catch (e) { console.warn('[fpc] onNeedPass', e); }
+        submit(pass, retryText) { if (used || self.dead) return false; used = true; pass = String(pass || '').trim(); if (!pass) return false; self.setPass(pass); self.hidePassPrompt(); if (retryText) self.send(String(retryText)); return true; },
+        cancel() { used = true; self.hidePassPrompt(); }}); } catch (e) { console.warn('[fpc] onNeedPass', e); }
       return; }
-    const txt = this.o.passPromptText;
-    if (!this.inXR && this.ui) { this.ui.el.classList.add('open'); this.subtitle(txt || 'Enter the companion passphrase in the box (bottom left), then talk to me again.', ' ', 7000); }
-    else this.subtitle(txt || 'I need the passphrase first. Take off the headset and enter it on the page (bottom left).', ' ', 7000); }
+    this.showPassPrompt(reason);
+    this.subtitle(reason === 'wrong' ? 'That passphrase was not right. Enter it in the box in the middle of the screen.' : 'Enter the companion passphrase in the box in the middle of the screen, then talk to me again.', ' ', 7000); }
 
   // ---------- listening (v1.2.5: hands-free turn-taking) ----------
   armListen(ms) { clearTimeout(this._listenArm); if (!this.handsFree || this.dead) return;
@@ -449,7 +461,7 @@ class Companion {
 
   async listen(hold, auto) {
     this.unlockAudio();
-    if (this.dead || this.rec || this.state === 'thinking' || this.speaking) return; if (!this.pass()) return this.needPass();
+    if (this.dead || this.rec || this.state === 'thinking' || this.speaking) return; if (!this.pass()) { this._afterPass = () => this.listen(); return this.needPass(); }
     if (!auto) this.stopSpeaking();
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     this.state = 'listening'; this.subtitle('Listening...', ' ', 20000); this.emit('listening'); this.syncMicBtn();
@@ -493,7 +505,7 @@ class Companion {
 
   // ---------- talking to the proxy ----------
   async send(text, audio) { this.unlockAudio();
-    if (!this.pass()) return this.needPass(); const c = this.ch; this.state = 'thinking'; this.subtitle(text ? text : '...', text ? 'You' : ' ', 20000);
+    if (!this.pass()) { this._afterPass = () => this.send(text, audio); return this.needPass(); } const c = this.ch; this.state = 'thinking'; this.subtitle(text ? text : '...', text ? 'You' : ' ', 20000);
     if (text) this.hist.push({role: 'user', content: String(text).slice(0, 800)});
     let res; try {
       const r = await fetch(this.proxy, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-FP-Pass': this.pass()}, body: JSON.stringify({
@@ -503,7 +515,7 @@ class Companion {
     } catch (e) { res = {status: 0, reply: ''}; }
     if (this.dead || this.ch !== c) return;
     this.state = 'idle';
-    if (res.status === 401) { if (text) this.hist.pop(); try { localStorage.removeItem('fpc.pass'); } catch (e) {} return this.needPass('wrong'); }
+    if (res.status === 401) { if (text) this.hist.pop(); try { localStorage.removeItem('fpc.pass'); } catch (e) {} this._afterPass = () => this.send(text, audio); return this.needPass('wrong'); }
     if (res.heard) { this.hist.push({role: 'user', content: res.heard}); this.emit('heard', {text: res.heard}); }
     if (!res.reply) { if (text) this.hist.pop(); this.subtitle(res.error === 'no speech' ? 'I didn\'t catch that.' : 'I can\'t reach my thoughts right now. Try again in a moment.', ' ', 4000); this.emit('error', {error: res.error || res.status}); return; }
     if (res.limited) { this.subtitle(res.reply, ' ', 5000); return; }
@@ -539,16 +551,17 @@ class Companion {
     return g2 || nat[0] || pool[0]; }
   speak(text) {
     this.subtitle(text); if (!text) return; this._lastSpoken = String(text);
+    if (!this.pass()) { this._afterPass = () => this.speak(text); return this.needPass(); }
     if (!this.voiceOn()) { this.speaking = true; this._speakGen = (this._speakGen || 0) + 1; const gen = this._speakGen; clearTimeout(this.spT); this.spT = setTimeout(() => this.afterSpeak(gen), 600 + text.length * 55); return; }
     this.stopSpeaking(true); this.speaking = true; this.emit('speaking'); this._speakGen = (this._speakGen || 0) + 1; const gen = this._speakGen;
-    this.fetchTts(text).then(blob => { if (this.dead || gen !== this._speakGen) return; if (blob) return this.playAudio(blob, gen); this.speakBrowser(text, gen); }).catch(e => { console.warn('[fpc] tts', e); if (!this.dead && gen === this._speakGen) this.speakBrowser(text, gen); });
+    this.fetchTts(text).then(blob => { if (this.dead || gen !== this._speakGen) return; if (blob && blob._noauth) { this.speaking = false; return; } if (blob) return this.playAudio(blob, gen); this.speakBrowser(text, gen); }).catch(e => { console.warn('[fpc] tts', e); if (!this.dead && gen === this._speakGen) this.speakBrowser(text, gen); });
     clearTimeout(this.spT); this.spT = setTimeout(() => { if (gen !== this._speakGen) return; const a = this.player; if (a && !a.paused && !a.ended) return; if (this.speaking) this.afterSpeak(gen); }, 8000 + text.length * 80);
   }
   ttsEndpoint() { return this.ttsUrl || (this.proxy || DEFAULT_PROXY).replace(/\/chat\/?$/, '/tts'); }
   async fetchTts(text) {
     const pass = this.pass(); if (!pass) return null;
     const res = await fetch(this.ttsEndpoint(), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-FP-Pass': pass }, body: JSON.stringify({ text, characterId: this.ch && this.ch.id, role: this.ch && this.ch.role, gender: this.ch && this.ch.gender }) });
-    if (res.status === 401) return null; if (!res.ok) throw new Error('tts ' + res.status);
+    if (res.status === 401) { try { localStorage.removeItem('fpc.pass'); } catch (e) {} this.needPass('wrong'); return {_noauth: true}; } if (!res.ok) throw new Error('tts ' + res.status);
     const blob = await res.blob(); if (!blob || blob.size < 200) return null; this.lastTts = { model: res.headers.get('X-FP-Tts-Model'), voice: res.headers.get('X-FP-Tts-Voice'), cost: res.headers.get('X-FP-Tts-Cost-Est'), bytes: blob.size }; return blob;
   }
   playAudio(blob, gen) {
@@ -587,7 +600,7 @@ class Companion {
 
   destroy() {
     for (const r of this.family.values()) { try { r.destroy(); } catch (e) {} } this.family.clear();
-    this.dead = true; clearTimeout(this._listenArm); this.stopSpeaking(); if (this._gate) { try { this._gate.remove(); } catch (e) {} this._gate = null; } if (this.rec) { try { this.rec.kind === 'sr' ? this.rec.r.abort() : this.rec.stop(); } catch (e) {} this.rec = null; }
+    this.dead = true; clearTimeout(this._listenArm); this.hidePassPrompt && this.hidePassPrompt(); this.stopSpeaking(); if (this._gate) { try { this._gate.remove(); } catch (e) {} this._gate = null; } if (this.rec) { try { this.rec.kind === 'sr' ? this.rec.r.abort() : this.rec.stop(); } catch (e) {} this.rec = null; }
     if (this.raf) cancelAnimationFrame(this.raf); for (const f of this.cleanup) { try { f(); } catch (e) {} } this.cleanup = [];
     if (this.holder) { if (this.holder.parent) this.holder.parent.remove(this.holder); dispose(this.holder); }
   }
