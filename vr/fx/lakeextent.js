@@ -1,17 +1,17 @@
-/* Restored Fowling Pond extent + ring road (live, Nov 27 2026).
+/* Restored Fowling Pond extent (live, Nov 28 2026).
    Water follows the pre-drainage outline (USGS 3DEP ≤58 ft ∪ NRCS muck/peat soils,
    ~660 acres / 1.9 mi, moderate confidence; Fobes 1793 “2 miles”) with MassDEP
    solid-waste landfills removed so the waterline is the restored shore, not later fill.
-   A 4-lane ring road (two lanes each way) sits 30–60 m back (nominal 45 m) with a
-   sand-to-grass shore strip. Streets that crossed the new water are clipped at the ring.
+   Original streets are kept; segments that fall in the new water end cleanly at the
+   shoreline. A thin 5–10 m grass edge meets the water (no ring road, no wide beach).
    Does not edit RPL, the companion module, or protected sites:
    temple, pyramid, launch pad, rivers, bank exterior, gold sun disc, lighthouse, boats.
    Those stay dry on a small island or shore if the new water would reach them. */
 (function () {
   'use strict';
   const W3D = window.W3D = window.W3D || {};
-  const SRC = '/vr/fx/lakeextent.json?v=1';
-  const WATER = 16.5, ROAD_W = 16, BUFFER = 45;
+  const SRC = '/vr/fx/lakeextent.json?v=2';
+  const WATER = 16.5, SHORE_W = 8;
   let J = null, mask = null, lakeTex = null, mw = 0, mh = 0, inLake = () => false;
 
   /* Register the spot immediately so ?spot=lake-extent works even if this file's
@@ -245,34 +245,13 @@
     return removed;
   }
 
-  function roadTex() {
-    const c = document.createElement('canvas'); c.width = 256; c.height = 64;
-    const g = c.getContext('2d');
-    g.fillStyle = '#3a3a3c'; g.fillRect(0, 0, 256, 64);
-    /* v=0..1 across 16 m width: edge, 2 lanes, yellow median, 2 lanes, edge */
-    const y = v => v * 64;
-    g.fillStyle = '#d8d8d4';
-    g.fillRect(0, y(0.02), 256, 2);
-    g.fillRect(0, y(0.97), 256, 2);
-    g.strokeStyle = '#d8d8d4'; g.lineWidth = 1.4; g.setLineDash([14, 12]);
-    g.beginPath(); g.moveTo(0, y(0.26)); g.lineTo(256, y(0.26)); g.stroke();
-    g.beginPath(); g.moveTo(0, y(0.74)); g.lineTo(256, y(0.74)); g.stroke();
-    g.setLineDash([]);
-    g.strokeStyle = '#e6c84a'; g.lineWidth = 2;
-    g.beginPath(); g.moveTo(0, y(0.485)); g.lineTo(256, y(0.485)); g.stroke();
-    g.beginPath(); g.moveTo(0, y(0.515)); g.lineTo(256, y(0.515)); g.stroke();
-    const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
-    t.anisotropy = 8; t.colorSpace = THREE.SRGBColorSpace; return t;
-  }
-
   function shoreTex() {
     const c = document.createElement('canvas'); c.width = 256; c.height = 64;
     const g = c.getContext('2d');
     const grd = g.createLinearGradient(0, 0, 0, 64);
-    grd.addColorStop(0, '#cbb890');   /* sand at the water */
-    grd.addColorStop(0.35, '#b8a878');
-    grd.addColorStop(0.7, '#6a8a4a');
-    grd.addColorStop(1, '#4d6e38');   /* grass toward the road */
+    grd.addColorStop(0, '#3f5c30');   /* slightly darker wet grass at the water */
+    grd.addColorStop(0.18, '#4a6a36');
+    grd.addColorStop(1, '#4d6e38');   /* ordinary grass inland */
     g.fillStyle = grd; g.fillRect(0, 0, 256, 64);
     const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4;
     t.colorSpace = THREE.SRGBColorSpace; return t;
@@ -307,8 +286,8 @@
   }
 
   function clipRoads(tries) {
-    /* Discard existing road-ribbon fragments that fall inside the ring's inner edge.
-       streets.js builds road-ribbons after W3D_READY (async json), so retry until they exist. */
+    /* Discard existing road-ribbon fragments that fall in the restored water, so original
+       streets end cleanly at the shoreline as dead ends. Retry until streets.js has built them. */
     let found = 0;
     W3D.root.traverse(o => { if (o.isMesh && /road-ribbons/i.test(o.name || '')) found++; });
     if (!found && (tries || 0) < 50) return setTimeout(() => clipRoads((tries || 0) + 1), 250);
@@ -319,7 +298,7 @@
     g.fillStyle = '#000'; g.fillRect(0, 0, mw, mh);
     g.fillStyle = '#fff';
     const X = x => (x - P.x0) / w * mw, Z = z => (z - P.z0) / d * mh;
-    const dilatePx = ((BUFFER - ROAD_W * 0.5 - 1) * mw / w);
+    const dilatePx = (2 * mw / w);  /* ~2 m past the waterline for a clean cutoff */
     g.lineJoin = 'round'; g.lineCap = 'round';
     g.lineWidth = Math.max(2, dilatePx * 2);
     g.beginPath();
@@ -365,27 +344,16 @@
     });
   }
 
-  function buildRing() {
-    const g = new THREE.Group(); g.name = 'lake-ring-road';
-    const yFn = (x, z) => {
-      const t = W3D.terrainH ? W3D.terrainH(x, z) : WATER + 1;
-      return (isFinite(t) ? t : WATER + 1) + 0.16;
-    };
-    const ring = ribbon(J.ring.xz, ROAD_W / 2, yFn, roadTex(), 'lake-ring', 0, 1);
-    if (ring) g.add(ring);
-    /* Shore strip between the water (~4 m out) and the inner edge of the ring (~37 m). */
-    const mid = [];
-    const inner = BUFFER - ROAD_W * 0.5;
-    const shoreW = Math.max(8, inner - 6);
-    /* Offset the shoreline outward by ~4 + shoreW/2 metres for the strip centreline. */
-    const shoreLine = offsetOut(J.shore[0], 4 + shoreW / 2);
-    const strip = ribbon(shoreLine, shoreW / 2, (x, z) => {
+  function buildShore() {
+    /* Thin 8 m grass edge where the ground meets the water. No ring road. */
+    const g = new THREE.Group(); g.name = 'lake-shore';
+    const shoreLine = offsetOut(J.shore[0], SHORE_W / 2);
+    const strip = ribbon(shoreLine, SHORE_W / 2, (x, z) => {
       const t = W3D.terrainH ? W3D.terrainH(x, z) : WATER + 0.05;
       return Math.max(WATER + 0.04, (isFinite(t) ? t : WATER) + 0.04);
     }, shoreTex(), 'lake-shore-strip', 0, 1);
     if (strip) { strip.renderOrder = 1; g.add(strip); }
     W3D.root.add(g);
-    return J.ring.miles;
   }
 
   function offsetOut(ring, dist) {
@@ -598,13 +566,13 @@
     clipTiles();
     cullTrees();
     clipRoads();
-    buildRing();
+    buildShore();
     addPlaque();
     addContractor();
     hookPlan();
     clipGround();
     addSpot();
-    console.log('lakeextent: ' + J.acres + ' ac, ring ' + J.ring.miles + ' mi, landfills removed: ' +
+    console.log('lakeextent: ' + J.acres + ' ac, no ring road, landfills removed: ' +
       (J.landfills_removed || []).map(l => l.name).join(', '));
   }
 })();
