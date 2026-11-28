@@ -1,0 +1,12 @@
+{
+  "comment": "Add a person only with their consent. Leave name, company, and photo blank for a generic figure. photo should be a public URL or a /vr-staging/ file they agreed to show in the public VR. Coordinates lx, lz, yaw are metres and degrees in the lodge's local frame ( +lx toward Mill Street, +lz toward the parking lot).",
+  "figures": [
+    {"id": "bar-1", "role": "member", "outfit": "legion-cap", "place": "bar", "lx": -16.2, "ly": 0, "lz": 1.6, "yaw": 90, "name": "", "company": "", "photo": ""},
+    {"id": "bar-2", "role": "guest", "outfit": "casual", "place": "bar", "lx": -16.2, "ly": 0, "lz": 3.4, "yaw": 90, "name": "", "company": "", "photo": ""},
+    {"id": "table-1", "role": "member", "outfit": "legion-cap", "place": "table", "lx": -4.2, "ly": 0, "lz": 3.2, "yaw": 200, "name": "", "company": "", "photo": ""},
+    {"id": "table-2", "role": "guest", "outfit": "casual", "place": "table", "lx": -2.4, "ly": 0, "lz": 3.8, "yaw": 20, "name": "", "company": "", "photo": ""},
+    {"id": "table-3", "role": "sal", "outfit": "sal-cap", "place": "table", "lx": 5.2, "ly": 0, "lz": -2.2, "yaw": 160, "name": "", "company": "", "photo": ""},
+    {"id": "table-4", "role": "sal", "outfit": "sal-vest", "place": "table", "lx": 6.8, "ly": 0, "lz": -1.5, "yaw": -20, "name": "", "company": "", "photo": ""},
+    {"id": "hall-1", "role": "guest", "outfit": "casual", "place": "hall", "lx": 10.5, "ly": 0, "lz": 2.4, "yaw": -90, "name": "", "company": "", "photo": ""}
+  ]
+}
