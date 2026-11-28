@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   const W3D = window.W3D = window.W3D || {};
-  const SRC = '/vr-staging/fx/lakeextent.json?v=5';
+  const SRC = '/vr-staging/fx/lakeextent.json?v=6';
   const WATER = 16.5, ROAD_W = 16, BUFFER = 45;
   let J = null, mask = null, lakeTex = null, mw = 0, mh = 0, inLake = () => false;
 
@@ -374,19 +374,38 @@
     });
   }
 
+
+  function gapRing(pts, avoid) {
+    if (!pts || pts.length < 2) return [];
+    const ax = avoid.x, az = avoid.z, r = avoid.r || 80;
+    const closed = pts.length > 2 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1];
+    const src = closed ? pts.slice(0, -1) : pts.slice();
+    const keep = src.map(p => Math.hypot(p[0] - ax, p[1] - az) >= r);
+    const runs = [];
+    let cur = [];
+    const flush = () => { if (cur.length >= 2) runs.push(cur); cur = []; };
+    src.forEach((p, i) => { if (keep[i]) cur.push(p); else flush(); });
+    flush();
+    if (closed && runs.length >= 2 && keep[0] && keep[src.length - 1]) {
+      const merged = runs[runs.length - 1].concat(runs[0]);
+      runs[0] = merged;
+      runs.pop();
+    }
+    return runs;
+  }
+
   function buildRing() {
     const g = new THREE.Group(); g.name = 'lake-ring-road';
     const yFn = (x, z) => {
       const t = W3D.terrainH ? W3D.terrainH(x, z) : WATER + 1;
       return (isFinite(t) ? t : WATER + 1) + 0.16;
     };
-    const ring = ribbon(J.ring.xz, ROAD_W / 2, yFn, roadTex(), 'lake-ring', 0, 1);
-    if (ring) g.add(ring);
-    if (J.driveway && J.driveway.xz) {
-      const dw = (J.driveway.width_m || 3.6) / 2;
-      const drive = ribbon(J.driveway.xz, dw, yFn, roadTex(), 'lake-home-drive', 0, 1);
-      if (drive) g.add(drive);
-    }
+    /* Gap the ring around the family home so it does not wrap the yard. */
+    const avoid = J.ring_avoid || { x: -705, z: 678, r: 80 };
+    gapRing(J.ring.xz, avoid).forEach((run, i) => {
+      const mesh = ribbon(run, ROAD_W / 2, yFn, roadTex(), i ? ('lake-ring-' + i) : 'lake-ring', 0, 1);
+      if (mesh) g.add(mesh);
+    });
     /* Shore strip between the water (~4 m out) and the inner edge of the ring (~37 m). */
     const mid = [];
     const inner = BUFFER - ROAD_W * 0.5;
