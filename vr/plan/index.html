@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fowling Pond Master Plan, Budget &amp; Timeline</title><meta name="description" content="Integrated plan to restore Fowling Pond (Taunton / Raynham, MA): lighthouse, lake, ring road, beaches and bank compound - budget, timeline and live progress.">
+<link rel="stylesheet" href="../structure/fp.css?v=1"></head><body><main>
+<h1>Fowling Pond Master Plan, Budget &amp; Timeline</h1><div class="sub">A concept plan by Josh Freeman for the pond shared by Taunton and Raynham, MA. Planning-level estimates only - not a quote, not an approved project. Nothing has been submitted to the Diocese or either town.</div>
+<div class="btns"><a href="/vr/?spot=plan">Timeline wall in VR</a><a href="overlay/">Design over satellite + Street View</a><a href="/vr/structure/">Structure &amp; budget</a><a href="Fowling-Pond-Master-Plan-Budget-Timeline.pdf">PDF</a></div>
+<h2>Live progress</h2><div class="small" id="pnote"></div><table id="prog"><tr><th>Milestone</th><th>Area</th><th>Status</th><th>Progress</th></tr></table>
+<h2>Timeline (Nov 2026 &gt; <span id="end"></span>)</h2><div id="gantt"></div>
+<h2>Phase 1: the lighthouse deal</h2><div class="card">The lighthouse goes on the Diocese of Fall River lot on East Britannia St, Raynham (owner: the Roman Catholic Bishop of Fall River, a corporation sole). Path: a friendly first talk with St. Ann's pastor &gt; the bishop with his finance council and college of consultors &gt; a ground lease or easement (preferred to a sale). The lot's assessed value is under the US bishops' canon 1292 minimum, so Holy See approval is not needed. Proposal PDF: in Josh's Fowling Pond folder.</div>
+<h2>Integrated budget</h2><div id="budget"></div>
+<h2>Permits</h2><table id="permits"><tr><th>Law / agency</th><th>What it means here</th></tr></table>
+<h2>Funding plan</h2><table id="fund"><tr><th>Source</th><th>Pays for</th></tr></table>
+<h2>Sources</h2><ol id="src" class="small"></ol>
+</main><script>
+const E=(t,h)=>{const e=document.createElement(t);if(h!=null)e.innerHTML=h;return e},esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const M=n=>n===0?'$0':'$'+(n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':Math.round(n).toLocaleString());
+Promise.all([fetch('plan.json?v='+Date.now()).then(r=>r.json()),fetch('../structure/progress.json?v='+Date.now()).then(r=>r.json())]).then(([P,G])=>{
+ document.getElementById('pnote').textContent=G.note+' Updated '+G.updated+'.';const pt=document.getElementById('prog');
+ G.milestones.forEach(m=>{const tr=E('tr');tr.innerHTML=`<td>${esc(m[1])}</td><td>${esc(m[2])}</td><td>${m[3]}</td><td><div class="bar"><i class="${m[3]}" style="width:${Math.max(2,m[4])}%"></i></div><span class="small">${m[4]}%</span></td>`;pt.appendChild(tr);});
+ document.getElementById('end').textContent=P.end+' (range '+P.end_range+')';
+ const y0=2026,y1=2038,X0=330,W=1060,x=s=>{const[a,b]=s.split('-').map(Number);return X0+(a+(b-1)/12-y0)/(y1-y0)*(W-X0-10)};let s='';for(let y=y0;y<=y1;y++){const xx=x(y+'-01');s+=`<line x1="${xx}" x2="${xx}" y1="18" y2="${30+P.phases.length*34}" stroke="#ffffff25"/><text x="${xx+3}" y="14" font-size="12">${y}</text>`;}
+ const nx=x('2026-11');s+=`<line x1="${nx}" x2="${nx}" y1="18" y2="${30+P.phases.length*34}" stroke="#ff6b6b" stroke-width="2"/>`;
+ P.phases.forEach((p,i)=>{const yy=26+i*34,c=p[4]=='done'?'#3d9b5a':p[4]=='underway'?'#d9a93a':'#3a7ca5';s+=`<text x="4" y="${yy+16}" font-size="12">${esc(p[1].length>48?p[1].slice(0,47)+'…':p[1])}</text><rect x="${x(p[2])}" y="${yy}" width="${Math.max(6,x(p[3])-x(p[2]))}" height="22" rx="4" fill="${c}"/>`;});
+ document.getElementById('gantt').innerHTML=`<svg viewBox="0 0 ${W} ${40+P.phases.length*34}" width="100%">${s}</svg><p class="small">Red line = now. Blue planned, gold underway, green done. Dates are estimates; permitting is the biggest unknown.</p>`;
+ const B=P.budget,S=B.sources;let h='<table><tr><th>Item</th><th class="num">Low</th><th class="num">Mid</th><th class="num">High</th><th>Basis</th></tr>';
+ B.items.forEach(it=>h+=`<tr><td>${esc(it.item)}</td>${it.cost.map(c=>`<td class="num">${M(c)}</td>`).join('')}<td class="small">${esc(it.note)} [${it.src.map(k=>Object.keys(S).indexOf(k)+1).join(', ')}]</td></tr>`);
+ const row=(n,a,b)=>h+=`<tr><td><b>${n}</b></td>${a.map(c=>`<td class="num"><b>${M(c)}</b></td>`).join('')}<td class="small">${b||''}</td></tr>`;
+ row('Construction subtotal',B.subtotal);row('Design, studies, permitting (10%)',B.design_permits,'['+(Object.keys(S).indexOf('concord')+1)+']');row('Contingency (20%)',B.contingency,'['+(Object.keys(S).indexOf('needham')+1)+']');row('TOTAL',B.total,esc(B.dollars));
+ h+='</table><div class="card"><b>Not included:</b> '+B.excluded.map(esc).join('; ')+'. Escalation: '+esc(B.adders[2][1])+'.</div>';document.getElementById('budget').innerHTML=h;
+ const pm=document.getElementById('permits');P.permits.forEach(r=>pm.appendChild(E('tr','<td><b>'+esc(r[0])+'</b></td><td>'+esc(r[1])+'</td>')));
+ const fd=document.getElementById('fund');B.funding.forEach(r=>fd.appendChild(E('tr','<td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td>')));
+ const sr=document.getElementById('src');Object.values(S).forEach(v=>sr.appendChild(E('li',esc(v[0])+' - <a href="'+v[1]+'">'+esc(v[1].replace(/^https?:\/\//,'').slice(0,60))+'</a>')));});
+</script></body></html>
