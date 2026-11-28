@@ -403,7 +403,7 @@ W3D.build = function (scene3, sceneEl) {
   return Promise.all([
     fetch(BASE + 'terrain_t4.u16?v=4').then(need).then(r => r.arrayBuffer()).then(step),
     fetch(BASE + 'trees_t5.f32?v=4').then(need).then(r => r.arrayBuffer()).then(step),
-    fetch(BASE + 'water_t.json?v=8').then(need).then(r => r.json()).then(step),
+    fetch(BASE + 'water_t.json?v=9').then(need).then(r => r.json()).then(step),
     fetch(BASE + 'ring_mid.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step),
     fetch(BASE + 'ring_far.i16?v=1').then(r => r.ok ? r.arrayBuffer() : null).catch(() => null).then(step)
   ]).then(([hb, tb, wj, rmid, rfar]) => {
@@ -643,8 +643,8 @@ function buildTrees(a) {
   const crownG = new THREE.IcosahedronGeometry(3.8, 0); crownG.scale(1, 0.85, 1); crownG.translate(0, 6.5, 0);
   mk(crownG, SK ? SK.decid(new THREE.MeshLambertMaterial({color: 0xffffff, flatShading: true}), {pivot: 6.5}) : new THREE.MeshLambertMaterial({color: 0xffffff, flatShading: true}), dec, 0, 1, ['#3d5a2a', '#46632e', '#3a5530', '#52683a', '#4a5e34']);
 }
-/* The real line passes under King Philip St (north) and E Britannia St (south) about 300 m back from the pond; it runs in a cutting
-   down to a tunnel portal just short of each road, then in tunnel under the road and the restored pond. Carves the core height grid. */
+/* The real line passes under the restored pond in a tunnel, then stays underground through the south-shore woods.
+   Portals sit in a cutting at each mouth (north of the pond, and just south of the woods). Carves the core height grid. */
 function carveRail(R) {
   if (!R || !R.portals || !heights) return; R.h0 = [];
   const Lc = R.cutLen || 150, D = R.cutDepth || 7.5;
@@ -825,7 +825,7 @@ function buildFootbridge(F) {
   for (const [x, z, y] of [[ax, az, yA], [bx, bz, yB]]) { const s = new THREE.Mesh(new THREE.BoxGeometry(W + 1.2, 1.2, 2.2), M.stone); s.position.set(x, y - 0.7, z); s.rotation.y = yaw; root.add(s); }
   W3D.footbridge = {a: F.a, b: F.b, yA, yB, top: yAt(0.5)};
 }
-function buildRail(R) { // real alignment (OSM: old rail line / South Coast Rail route); it passes under the restored pond in a tunnel with a portal at each shore
+function buildRail(R) { // real alignment (OSM: old rail line / South Coast Rail route); tunnel under the pond and the south-shore woods, portals at each mouth
   if (!R) return;
   const [pN, pS] = R.portals;
   R.portals.forEach(([x, z, a], i) => { // a = heading from the portal toward the pond; the portal sits in a cutting just short of the road above it
