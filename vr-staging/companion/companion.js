@@ -3,7 +3,7 @@
    Replies come from an LLM through a server-side proxy (Cloudflare Worker; the OpenRouter key never reaches the browser).
    See README.md next to this file. */
 const HERE = new URL('./', import.meta.url).href;
-export const VERSION = '1.2.6';
+export const VERSION = '1.2.7';
 export const DEFAULT_PROXY = 'https://fp-companion.tesseractprogram.workers.dev/chat';
 export const WORLDS = {
   earth: 'Earth, Fowling Pond: a restored pond in Raynham, Massachusetts, on real terrain. Above it stands an Egyptian-style concept bank compound (terrace pavilion, banking hall, vault, Josh\'s office, conservatory, sphinxes and temple gate). Around it: a pyramid park at Route 24 and I-495, a houseboat, the Pharos lighthouse, King\'s Pond and the Forge River, Vesta\'s house, a zoo, and a launch pad in Bridgewater with a rocket to Mars. Flying saucers visit other cities.',
@@ -412,8 +412,9 @@ class Companion {
   }
 
   // ---------- passphrase ----------
-  pass() { if (this.o.passphrase) return this.o.passphrase; try { const u = new URLSearchParams(location.search).get('fppass'); if (u) this.setPass(u); return localStorage.getItem('fpc.pass') || ''; } catch (e) { return ''; } }
-  setPass(p) { try { localStorage.setItem('fpc.pass', String(p || '').trim().toLowerCase()); } catch (e) {} if (this._wantStart && this.pass()) { this._wantStart = false; this.beginTalk(); } }
+  pass() { if (this.o.passphrase) return this.normPass(this.o.passphrase); try { const u = new URLSearchParams(location.search).get('fppass'); if (u) this.setPass(u); return this.normPass(localStorage.getItem('fpc.pass') || ''); } catch (e) { return ''; } }
+  normPass(s) { return String(s || '').replace(/[\u2018\u2019\u201A\u201B]/g, "'").replace(/[\u201C\u201D\u201E]/g, '"').replace(/[\u00A0\u202F\u2007\u2009\u200A\s]+/g, ' ').trim().toLowerCase(); }
+  setPass(p) { try { localStorage.setItem('fpc.pass', this.normPass(p)); } catch (e) {} }
   showPassPrompt(reason) {
     const name = (this.ch && this.ch.name) || 'Lila';
     const hint = reason === 'wrong' ? 'That passphrase was not right. Try again.' : 'Enter the companion passphrase, then you can talk.';
@@ -421,7 +422,7 @@ class Companion {
     const wrap = document.createElement('div'); wrap.className = 'fpc-pass'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Companion passphrase');
     wrap.innerHTML = '<style>.fpc-pass{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.8);font:18px/1.35 system-ui,sans-serif;color:#fff;padding:24px;-webkit-tap-highlight-color:transparent}.fpc-pass .box{background:rgba(20,20,26,.97);border:1px solid #c9a24a;border-radius:14px;padding:22px;width:min(440px,94vw);text-align:center}.fpc-pass h2{margin:0 0 8px;font-size:22px;color:#ffe9a8}.fpc-pass p{margin:0 0 14px}.fpc-pass input{width:100%;box-sizing:border-box;font:20px/1.3 system-ui,sans-serif;padding:14px 12px;border-radius:8px;border:1px solid #c9a24a;background:#111;color:#fff}.fpc-pass button{margin-top:12px;width:100%;font:20px/1.3 system-ui,sans-serif;padding:14px 12px;border-radius:8px;border:1px solid #c9a24a;background:#c9a24a;color:#1a1408;font-weight:700}</style>' +
       '<div class="box"><h2>Talk to ' + name + '</h2><p class="hint">' + hint + '</p><input class="pw" type="text" inputmode="text" enterkeyhint="done" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><button type="button" class="ok">OK</button></div>';
-    const inp = wrap.querySelector('.pw'), go = () => { const v = (inp.value || '').trim(); if (!v) { try { inp.focus(); } catch (e) {} return; } this.setPass(v); this.hidePassPrompt(); const next = this._afterPass; this._afterPass = null; if (this._wantStart) { this._wantStart = false; this.beginTalk(); } else if (typeof next === 'function') next(); else this.subtitle('Passphrase saved. You can talk now.', ' ', 4000); };
+    const inp = wrap.querySelector('.pw'), go = () => { const v = this.normPass(inp.value); if (!v) { try { inp.focus(); } catch (e) {} return; } this.unlockAudio(); this.setPass(v); this.hidePassPrompt(); this.showTalkStrip(); const next = this._afterPass; this._afterPass = null; if (this._wantStart || !this._greeted) { this._wantStart = false; this.beginTalk(); } else if (typeof next === 'function') next(); else this.subtitle('Passphrase saved. You can talk or type to me now.', ' ', 4000); };
     wrap.querySelector('.ok').onclick = go; inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); go(); } });
     (document.body || document.documentElement).appendChild(wrap); this._passUi = {el: wrap, inp, hint: wrap.querySelector('.hint')}; this.cleanup.push(() => this.hidePassPrompt());
     setTimeout(() => { try { inp.focus(); inp.click(); } catch (e) {} }, 50);
@@ -449,12 +450,30 @@ class Companion {
     d.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); this.unlockAudio(); this.beginTalk(); }, {once: true});
     (document.body || document.documentElement).appendChild(d); this._gate = d; this.cleanup.push(() => d.remove());
   }
+  isQuest() { return !!(this.o.quest || /OculusBrowser|Quest/i.test(navigator.userAgent || '')); }
+  needsTypeFallback() { return this.isQuest() || this._micFailed || Companion.srBroken || !(window.SpeechRecognition || window.webkitSpeechRecognition); }
+  showTalkStrip() {
+    if (this.dead || this.resident || this._talkUi) return;
+    const name = (this.ch && this.ch.name) || 'Lila';
+    const d = document.createElement('div'); d.className = 'fpc-type';
+    d.innerHTML = '<style>.fpc-type{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:9998;width:min(520px,94vw);font:18px/1.3 system-ui,sans-serif;color:#fff;-webkit-tap-highlight-color:transparent}.fpc-type .row{display:flex;gap:8px}.fpc-type input,.fpc-type button{font:inherit;padding:14px 12px;border-radius:10px;border:1px solid #c9a24a}.fpc-type input{flex:1;min-width:0;background:rgba(16,16,22,.96);color:#fff}.fpc-type button{background:#c9a24a;color:#1a1408;font-weight:700;min-width:5em}</style>' +
+      '<div class="row"><input class="txt" type="text" enterkeyhint="send" placeholder="Type to ' + name + '" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"><button type="button" class="snd">Send</button></div>';
+    const inp = d.querySelector('.txt'), send = () => { const v = (inp.value || '').trim(); if (!v) { try { inp.focus(); } catch (e) {} return; } inp.value = ''; this.unlockAudio(); this.send(v); };
+    d.querySelector('.snd').onclick = send; inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); send(); } });
+    d.addEventListener('pointerdown', () => this.unlockAudio(), {passive: true});
+    (document.body || document.documentElement).appendChild(d); this._talkUi = {el: d, inp}; this.cleanup.push(() => { try { d.remove(); } catch (e) {} this._talkUi = null; });
+  }
+  hideTalkStrip() { if (!this._talkUi) return; try { this._talkUi.el.remove(); } catch (e) {} this._talkUi = null; }
   async beginTalk() {
     if (this._gate) { try { this._gate.remove(); } catch (e) {} this._gate = null; }
     this.unlockAudio(); this.handsFree = true; this.syncMicBtn();
-    try { const st = await navigator.mediaDevices.getUserMedia({audio: true}); st.getTracks().forEach(t => t.stop()); } catch (e) {}
-    if (!this.pass()) { this._wantStart = true; return this.needPass(); }
-    if (!this._greeted) { this._greeted = true; const n = (this.ch && this.ch.name) || 'Lila'; this.speak('Hi, it\'s ' + n + '. I\'m here with you — go ahead and talk to me.'); }
+    // Do not await the mic here: on Quest the mic is often already held by voice chat, and waiting would block her greeting (no bubble, no voice).
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({audio: true}).then(st => st.getTracks().forEach(t => t.stop())).catch(() => { this._micFailed = true; this.showTalkStrip(); });
+    }
+    if (!this.pass()) { this._wantStart = true; this.showTalkStrip(); return this.needPass(); }
+    this.showTalkStrip();
+    if (!this._greeted) { this._greeted = true; const n = (this.ch && this.ch.name) || 'Lila'; this.speak('Hi, it\'s ' + n + '. I\'m here with you — go ahead and talk or type to me.'); }
     else this.armListen(200);
   }
   syncMicBtn() { const b = this.ui && this.ui.mic; if (!b) return; b.textContent = this.handsFree ? 'Mic' : 'Mic off'; b.title = this.handsFree ? 'Listening automatically — tap to pause' : 'Microphone paused — tap to listen'; }
@@ -490,7 +509,8 @@ class Companion {
   async listenWav(hold) {
     // no browser speech recognition (Quest Browser, Firefox): record a short clip, the proxy transcribes it
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({audio: {channelCount: 1, echoCancellation: true, noiseSuppression: true}});
+      const mic = navigator.mediaDevices.getUserMedia({audio: {channelCount: 1, echoCancellation: true, noiseSuppression: true}});
+      const stream = await Promise.race([mic, new Promise((_, rej) => setTimeout(() => rej(new Error('mic-timeout')), 4000))]);
       const ac = new (window.AudioContext || window.webkitAudioContext)(), src = ac.createMediaStreamSource(stream), pr = ac.createScriptProcessor(4096, 1, 1), bufs = [];
       let voiced = 0, quiet = 0; const t0 = performance.now();
       pr.onaudioprocess = e => { const d = e.inputBuffer.getChannelData(0); bufs.push(new Float32Array(d)); let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] * d[i]; const rms = Math.sqrt(s / (d.length / 4));
@@ -498,10 +518,10 @@ class Companion {
         const el = (performance.now() - t0) / 1000; if (el > 9 || (!hold && voiced > 0.3 && quiet > 1.1) || (!hold && el > 6 && voiced < 0.1)) this.stopListen(); };
       src.connect(pr); pr.connect(ac.destination);
       this.rec = {kind: 'wav', hold, t0, stop: () => { pr.disconnect(); src.disconnect(); stream.getTracks().forEach(t => t.stop()); const rate = ac.sampleRate; ac.close(); return voiced > 0.15 ? wav16k(bufs, rate) : null; }};
-    } catch (e) { this.state = 'idle'; this.rec = null; this.subtitle('I can\'t hear you: microphone not available. You can type to me on the page instead.', ' ', 6000); this.emit('error', {error: 'mic'}); }
+    } catch (e) { this.state = 'idle'; this.rec = null; this._micFailed = true; this.showTalkStrip(); this.subtitle('I can\'t hear the microphone. Type to me in the box at the bottom of the screen.', ' ', 8000); this.emit('error', {error: 'mic'}); }
   }
   stopListen() { const r = this.rec; if (!r) return; if (r.kind === 'sr') { try { r.r.stop(); } catch (e) {} return; }
-    this.rec = null; const b64 = r.stop(); if (!b64) { this.state = 'idle'; if (this.handsFree && !this.dead) { this.armListen(400); return; } this.subtitle('I didn\'t catch that.', ' ', 2500); return; } this.send(null, b64); }
+    this.rec = null; const b64 = r.stop(); if (!b64) { this.state = 'idle'; this._emptyListen = (this._emptyListen || 0) + 1; if (this._emptyListen >= 2 || this.needsTypeFallback()) { this.showTalkStrip(); this.subtitle('I didn\'t catch that. Type to me in the box at the bottom of the screen.', ' ', 8000); return; } if (this.handsFree && !this.dead) { this.armListen(400); return; } this.subtitle('I didn\'t catch that.', ' ', 2500); return; } this._emptyListen = 0; this.send(null, b64); }
 
   // ---------- talking to the proxy ----------
   async send(text, audio) { this.unlockAudio();
@@ -600,7 +620,7 @@ class Companion {
 
   destroy() {
     for (const r of this.family.values()) { try { r.destroy(); } catch (e) {} } this.family.clear();
-    this.dead = true; clearTimeout(this._listenArm); this.hidePassPrompt && this.hidePassPrompt(); this.stopSpeaking(); if (this._gate) { try { this._gate.remove(); } catch (e) {} this._gate = null; } if (this.rec) { try { this.rec.kind === 'sr' ? this.rec.r.abort() : this.rec.stop(); } catch (e) {} this.rec = null; }
+    this.dead = true; clearTimeout(this._listenArm); this.hidePassPrompt && this.hidePassPrompt(); this.hideTalkStrip && this.hideTalkStrip(); this.stopSpeaking(); if (this._gate) { try { this._gate.remove(); } catch (e) {} this._gate = null; } if (this.rec) { try { this.rec.kind === 'sr' ? this.rec.r.abort() : this.rec.stop(); } catch (e) {} this.rec = null; }
     if (this.raf) cancelAnimationFrame(this.raf); for (const f of this.cleanup) { try { f(); } catch (e) {} } this.cleanup = [];
     if (this.holder) { if (this.holder.parent) this.holder.parent.remove(this.holder); dispose(this.holder); }
   }
