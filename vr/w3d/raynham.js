@@ -285,9 +285,9 @@ function buildDunkin() {
   const mp = [-1096.4, -983.2], my = tH(mp[0], mp[1]), mYaw = Math.atan2(DK.U[0], DK.U[1]) - 0.38;
   obox(G, mp[0] - 0.9 * Math.cos(mYaw), my + 0.9, mp[1] + 0.9 * Math.sin(mYaw), 0.12, 1.8, 0.12, mYaw, C(0x2a2a2c)); obox(G, mp[0] + 0.9 * Math.cos(mYaw), my + 0.9, mp[1] - 0.9 * Math.sin(mYaw), 0.12, 1.8, 0.12, mYaw, C(0x2a2a2c));
   obox(G, mp[0], my + 1.75, mp[1], 2.3, 1.25, 0.12, mYaw, C(0x2a2a2c));
-  // parked cars: four in the front row, one in the side lot, door bay left clear
+  // parked cars: removed Nov 27 (Josh: 'too cartoonish') - flat toy boxes; the real lot shows on the Google tiles around the cutout
   const cars = [[1, 0.03, 0xb8bcc2], [1, 0.33, 0x1f3a66], [1, 0.62, 0xe8e8e6], [0, 0.3, 0x8c1c1c], [2, 0.4, 0x2f3236]];
-  for (const [ri, t, c] of cars) { const [p0, p1, p2, p3] = dk.rows[ri], a = [p0[0] + (p3[0] - p0[0]) * t, p0[1] + (p3[1] - p0[1]) * t], b = [p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t];
+  if (0) for (const [ri, t, c] of cars) { const [p0, p1, p2, p3] = dk.rows[ri], a = [p0[0] + (p3[0] - p0[0]) * t, p0[1] + (p3[1] - p0[1]) * t], b = [p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t];
     const cx = (a[0] + b[0]) / 2, cz = (a[1] + b[1]) / 2, yw = Math.atan2(b[0] - a[0], b[1] - a[1]), y0 = tH(cx, cz);
     const at = (f, s) => [cx + Math.sin(yw) * f + Math.cos(yw) * s, cz + Math.cos(yw) * f - Math.sin(yw) * s];
     obox(G, cx, y0 + 0.62, cz, 1.8, 0.62, 4.5, yw, C(c)); const cc = at(-0.25, 0); obox(G, cc[0], y0 + 1.18, cc[1], 1.6, 0.52, 2.3, yw, C(0x2a3440));
@@ -357,14 +357,14 @@ function updateArrows(cx, cz) {
 
 /* ---------- route board (clickable kiosk in the lot) ---------- */
 function buildKiosk(sc) {
-  const k = document.createElement('a-entity'), y = tH(1246.3, -1185.4); k.setAttribute('position', '1246.3 ' + (y + 0.05).toFixed(2) + ' -1185.4'); k.setAttribute('rotation', '0 69 0'); k.id = 'raynham-kiosk';
+  const k = document.createElement('a-entity'), y = tH(1246.3, -1185.4); k.setAttribute('position', '1246.3 ' + (y + 0.05).toFixed(2) + ' -1185.4'); k.setAttribute('rotation', '0 69 0'); k.setAttribute('scale', '0.75 0.75 0.75'); k.id = 'raynham-kiosk';
   const H = 0.2 * (D.routes.length + 2) + 0.3, top = 0.7 + H;
   const bg = document.createElement('a-plane'); bg.className = 'btn'; bg.dataset.blocker = '1'; bg.setAttribute('width', 3.3); bg.setAttribute('height', H); bg.setAttribute('position', '0 ' + (0.7 + H / 2).toFixed(2) + ' -0.01'); bg.setAttribute('material', 'shader:flat;color:#0b1d26;opacity:0.9;transparent:true'); k.appendChild(bg);
   const post = document.createElement('a-box'); post.setAttribute('width', 0.15); post.setAttribute('depth', 0.15); post.setAttribute('height', 0.72); post.setAttribute('position', '0 0.36 -0.05'); post.setAttribute('color', '#4a4f56'); k.appendChild(post);
   const t = document.createElement('a-text'); t.setAttribute('value', 'RAYNHAM ROUTES - pick one to ride'); t.setAttribute('align', 'center'); t.setAttribute('color', '#FFD700'); t.setAttribute('width', 3.2); t.setAttribute('wrap-count', 44); t.setAttribute('position', '0 ' + (top - 0.2).toFixed(2) + ' 0.01'); k.appendChild(t);
   D.routes.forEach((r, i) => { const p = document.createElement('a-plane'); p.className = 'btn'; p.setAttribute('width', 3.1); p.setAttribute('height', 0.17); p.setAttribute('position', '0 ' + (top - 0.45 - i * 0.2).toFixed(2) + ' 0.01');
-    p.setAttribute('material', 'shader:flat;color:' + (i % 2 ? '#ffe08a' : '#FFD700'));
-    const tx = document.createElement('a-text'); tx.setAttribute('value', r.n + '. ' + r.name + '  (' + r.km + ' km)'); tx.setAttribute('align', 'center'); tx.setAttribute('color', '#111'); tx.setAttribute('width', 3.0); tx.setAttribute('wrap-count', 66); tx.setAttribute('position', '-0.02 0 0.005'); p.appendChild(tx);
+    p.setAttribute('material', 'shader:flat;color:' + (i % 2 ? '#1c3d4c' : '#163240'));
+    const tx = document.createElement('a-text'); tx.setAttribute('value', r.n + '. ' + r.name + '  (' + r.km + ' km)'); tx.setAttribute('align', 'center'); tx.setAttribute('color', '#e8eef0'); tx.setAttribute('width', 3.0); tx.setAttribute('wrap-count', 66); tx.setAttribute('position', '-0.02 0 0.005'); p.appendChild(tx);
     p.addEventListener('click', () => startRide(r.n)); k.appendChild(p); });
   sc.appendChild(k); return k;
 }
@@ -399,11 +399,12 @@ function tickRide(dt) {
 }
 
 /* ---------- spots + menu ---------- */
+const reOn = () => { const RE = W3D.realEarth; if (RE && !RE.on && !window.JFVR_LITE && RE.setOn) RE.setOn(true); };   // Nov 27: Raynham reads as real Google 3D tiles
 const SP = {
-  raynham: () => { W3D.teleportTo(SPOT.x, undefined, SPOT.z, SPOT.yaw); }, 'raynham-center': () => SP.raynham(), 'raynham-routes': () => SP.raynham(),
-  'st-anns': () => { W3D.teleportTo(1296, undefined, -1352, -72); }, collettis: () => { W3D.teleportTo(1318, undefined, -748, -105); }
+  raynham: () => { reOn(); W3D.teleportTo(SPOT.x, undefined, SPOT.z, SPOT.yaw); }, 'raynham-center': () => SP.raynham(), 'raynham-routes': () => SP.raynham(),
+  'st-anns': () => { reOn(); W3D.teleportTo(1296, undefined, -1352, -72); }, collettis: () => { reOn(); W3D.teleportTo(1318, undefined, -748, -105); }
 };
-SP.dunkin = () => { const p = dkAt(6.8, -10); W3D.teleportTo(p[0], undefined, p[1], 54.4); }; SP['dunkin-raynham'] = SP.dunkin;
+SP.dunkin = () => { reOn(); const p = dkAt(6.8, -10); W3D.teleportTo(p[0], undefined, p[1], 54.4); }; SP['dunkin-raynham'] = SP.dunkin;
 for (let i = 1; i <= 13; i++) SP['raynham-route-' + i] = () => { const go = () => D ? startRide(i) : setTimeout(go, 400); go(); };
 (function reg() { if (!W3D.spots) return setTimeout(reg, 300); Object.assign(W3D.spots, SP); W3D.spots['st-ann'] = SP['st-anns']; })();
 function menus() {

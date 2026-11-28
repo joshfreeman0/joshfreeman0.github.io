@@ -1,0 +1,46 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fowling Pond design overlay - satellite + Street View</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>html,body{margin:0;height:100%;background:#0b1820;color:#e8eef0;font:15px/1.4 system-ui,sans-serif}#top{padding:8px 12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#102733;border-bottom:1px solid #c9a24a66}
+#top b{color:#ffe08a}#wrap{display:flex;height:calc(100% - 56px)}#map{flex:1.4;min-height:300px}#side{flex:1;display:flex;flex-direction:column;border-left:1px solid #c9a24a55;min-width:280px}
+#sv{position:relative;flex:1;background:#081218}#sv iframe{position:absolute;inset:0;width:100%;height:100%;border:0}#sketch{position:absolute;inset:0;pointer-events:none}#info{padding:10px 12px;font-size:14px}
+a{color:#7fe3ff}.btn{background:#FFD700;color:#111;padding:7px 11px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block}.lg i{display:inline-block;width:14px;height:10px;margin:0 4px 0 10px;border-radius:2px}
+@media(max-width:760px){#wrap{flex-direction:column;height:auto}#map{height:58vh}#side{min-height:60vh;border-left:0;border-top:1px solid #c9a24a55}}</style></head><body>
+<div id="top"><b>Fowling Pond: my design over the real place</b><label>Design opacity <input id="op" type="range" min="0" max="100" value="65"></label>
+<span class="lg"><i style="background:#39c6ff"></i>restored lake<i style="background:#ffa63d"></i>ring road (concept)<i style="background:#ffe7a3"></i>beaches<i style="background:#fff"></i>lighthouse<i style="background:#ffd76a"></i>bank compound</span>
+<a href="/vr/plan/">Plan</a> <a href="/vr/?spot=plan">VR</a></div>
+<div id="wrap"><div id="map"></div><div id="side"><div id="sv"><canvas id="sketch"></canvas></div><div id="info">Tap anywhere on the map for Street View there. The semi-transparent sketch over the Street View box shows which way each planned feature is and how far.</div></div></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/vr/w3d/gk.js?v=1"></script>
+<script>
+const SV_EMBED = !!window.JFVR_SV_EMBED;   // turns on when the Maps Embed API (free) is enabled for the site key
+const map = L.map('map', {zoomControl: true}).setView([41.928, -71.07], 14);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom: 19, attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community'}).addTo(map);
+const layers = []; let D = null, marker = null;
+const st = (c, o) => Object.assign({color: c, weight: 3, fillColor: c}, o || {});
+fetch('../design.json?v=' + Date.now()).then(r => r.json()).then(d => { D = d;
+  layers.push(L.polygon(d.lake.ll, st('#39c6ff', {fillOpacity: 0.35})).bindPopup('Restored lake (~' + d.lake.acres + ' acres, concept) - inside the historic pond bed'));
+  layers.push(L.polygon(d.ring.ll, st('#ffa63d', {fill: false, weight: 6, dashArray: '10 6'})).bindPopup('Ring road (~' + d.ring.miles + ' mi concept line; routed around existing homes in design)'));
+  d.beaches.forEach(b => layers.push(L.circle(b.ll, st('#ffe7a3', {radius: 28, fillOpacity: 0.6})).bindPopup('Beach + pull-off (concept)')));
+  layers.push(L.circle(d.lighthouse.ll, st('#ffffff', {radius: 18, fillOpacity: 0.7})).bindPopup(d.lighthouse.label));
+  const b = d.bank.ll, dl = 80 / 111072, dn = 95 / 82939; layers.push(L.rectangle([[b[0] - dl, b[1] - dn], [b[0] + dl, b[1] + dn]], st('#ffd76a', {fillOpacity: 0.3})).bindPopup(d.bank.label));
+  layers.forEach(l => l.addTo(map)); setOp(); map.fitBounds(L.polygon(d.ring.ll).getBounds().pad(0.08));
+  const q = new URLSearchParams(location.search); if (q.get('lat')) pick(+q.get('lat'), +q.get('lon')); });
+function setOp() { const o = document.getElementById('op').value / 100; layers.forEach(l => l.setStyle({opacity: o, fillOpacity: o * (l.options.fill === false ? 0 : l instanceof L.Polygon ? 0.5 : 0.8)})); }
+document.getElementById('op').oninput = setOp;
+const R = Math.PI / 180, dist = (a, b) => { const x = (b[1] - a[1]) * Math.cos((a[0] + b[0]) / 2 * R) * 111320, y = (b[0] - a[0]) * 110574; return [Math.hypot(x, y), (Math.atan2(x, y) / R + 360) % 360]; };
+function nearestOn(P, p) { let best = null; P.forEach(q => { const d = dist(p, q); if (!best || d[0] < best[0]) best = d; }); return best; }
+function pick(lat, lon) { const p = [lat, lon]; if (marker) marker.remove(); marker = L.marker(p).addTo(map);
+  const sv = document.getElementById('sv'), link = 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' + lat.toFixed(6) + ',' + lon.toFixed(6);
+  const old = sv.querySelector('iframe'); if (old) old.remove();
+  if (SV_EMBED && window.JFVR_GK) { const f = document.createElement('iframe'); f.loading = 'lazy'; f.allowFullscreen = true; f.src = 'https://www.google.com/maps/embed/v1/streetview?key=' + window.JFVR_GK + '&location=' + lat + ',' + lon + '&fov=90'; sv.insertBefore(f, sv.firstChild); }
+  if (!D) return; const items = [['Lighthouse', nearestOn([D.lighthouse.ll], p), '#ffffff'], ['Bank compound', nearestOn([D.bank.ll], p), '#ffd76a'], ['Lake shore', nearestOn(D.lake.ll, p), '#39c6ff'], ['Ring road', nearestOn(D.ring.ll, p), '#ffa63d']];
+  const cv = document.getElementById('sketch'), w = cv.width = sv.clientWidth, h = cv.height = sv.clientHeight, g = cv.getContext('2d'); g.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2, rr = Math.min(w, h) * 0.36; g.globalAlpha = 0.85; g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, rr, 0, 7); g.stroke();
+  g.fillStyle = '#fff'; g.font = 'bold 14px system-ui'; g.textAlign = 'center'; g.fillText('N', cx, cy - rr - 6);
+  items.forEach(([n, d, c]) => { const a = (d[1] - 90) * R, x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr; g.strokeStyle = c; g.lineWidth = 4; g.beginPath(); g.moveTo(cx, cy); g.lineTo(x, y); g.stroke();
+    g.fillStyle = 'rgba(8,24,32,0.8)'; g.fillRect(x - 70, y - 12, 140, 22); g.fillStyle = c; g.font = '13px system-ui'; g.fillText(n + ' ' + (d[0] < 1000 ? Math.round(d[0]) + ' m' : (d[0] / 1000).toFixed(1) + ' km'), x, y + 4); });
+  if (!SV_EMBED) { g.fillStyle = '#e8eef0'; g.font = '14px system-ui'; g.fillText('Design sketch for this spot', cx, 22); }
+  document.getElementById('info').innerHTML = (SV_EMBED ? '' : 'Embedded Street View turns on once the free Maps Embed API is enabled for the site key. ') + '<a class="btn" target="_blank" rel="noopener" href="' + link + '">Open Street View here</a> <span style="opacity:.7">(' + lat.toFixed(5) + ', ' + lon.toFixed(5) + ')</span>'; }
+map.on('click', e => pick(e.latlng.lat, e.latlng.lng));
+</script></body></html>

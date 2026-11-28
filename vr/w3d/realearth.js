@@ -283,7 +283,7 @@ function topAt(x, z, now) { const T = RE.tiles; _rc.set(_o.set(x, 3000, z), _d.s
 function tileBlocked(x, z, y) {
   if (!oursOn || !RE.tiles) return false; const c = HC.get(key(x, z)); if (!c || c.y === null) return false;
   const g = W3D.terrainH ? W3D.terrainH(x, z) : 0; return c.y > y + 0.6 && c.y - g > 2.5 && maskAt(x, z) < 0.5; }
-RE.tileBlocked = tileBlocked; RE.setNight = n => { clipU.jfNi.value = n; };
+RE.setOn = setOn; RE.tileBlocked = tileBlocked; RE.setNight = n => { clipU.jfNi.value = n; };
 (function hookCity() { let cb = W3D.cityBlocked || null; const comb = (x, z, y) => (cb && (!oursOn || KEEP3D[W3D.cities && W3D.cities.current && W3D.cities.current()] || maskAt(x, z) >= 0.5) ? cb(x, z, y) : false) || tileBlocked(x, z, y);   // hidden city blocks outside the kept square don't block
   try { Object.defineProperty(W3D, 'cityBlocked', {configurable: true, get: () => comb, set: v => { cb = v; }}); } catch (e) {} })();
 function collide(t, sc) {
@@ -382,6 +382,9 @@ AFRAME.registerSystem('w3d-realearth', {
       if (R0 && far !== rootHid) { if (far && R0.visible) { R0.visible = false; rootHid = true; } else if (!far) { if (rootHid && !city) R0.visible = true; rootHid = false; } } }
     skyTint(sc, show && cityA && ANCH[cityA].flat);
     if (show) {
+      { /* Nov 27 realism: sharper tiles at street level around the Raynham / Taunton spots (Center, Dunkin', lighthouse lot, Davol Park) */
+        const near = RE.anchor === 'home' && _c.y < 160 && (Math.hypot(_c.x - 1236, _c.z + 1180) < 2200 || Math.hypot(_c.x + 1100, _c.z + 1000) < 900 || Math.hypot(_c.x + 933, _c.z - 568) < 900 || Math.hypot(_c.x + 3425, _c.z - 3620) < 900);
+        T.errorTarget = near ? (LITE ? 56 : QUEST ? 34 : 14) : (LITE ? 72 : QUEST ? 40 : 24); }
       T.setCamera(cam); T.setResolutionFromRenderer(cam, sc.renderer); cam.updateMatrixWorld(); T.update();
       fallback(t, sc, show);
       const gnd0 = W3D.groundAt ? W3D.groundAt(_c.x, _c.z, -1e4) : 0, gnd = RE.gY != null && (RE.anchor !== 'home' || !isFinite(gnd0)) ? RE.gY : gnd0, alt = Math.max(0, _c.y - (isFinite(gnd) ? gnd : 0));

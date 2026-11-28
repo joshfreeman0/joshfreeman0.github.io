@@ -4,7 +4,7 @@
 "budget": {
 "items": [
 {
-"item": "Lighthouse tower (phase 1)",
+"item": "Lighthouse (phase 1): full-size Pharos, ~319 ft (per the Raynham Lighthouse Proposal)",
 "qty": [
 1,
 1,
@@ -12,20 +12,19 @@
 ],
 "unit": "tower",
 "rates": [
-1000000.0,
-2900000.0,
-11000000.0
+24000000.0,
+40000000.0,
+70000000.0
 ],
 "cost": [
-1000000,
-2900000,
-11000000
+24000000,
+40000000,
+70000000
 ],
 "src": [
-"gp",
-"henlopen"
+"proposal"
 ],
-"note": "Low = Great Point 1986 price; mid = same in 2026 dollars (CPI x~2.9, estimate); high = Cape Henlopen-style with keeper's house"
+"note": "Proposal estimate; a one-third-scale tower (~106 ft) would be ~$4-15M. Operating ~$0.5-2M/yr not included"
 },
 {
 "item": "Lighthouse lot: lease/easement (preferred) or purchase at assessed value",
@@ -197,24 +196,24 @@
 }
 ],
 "subtotal": [
-125783620,
-324087756,
-1156345380
+148783620,
+361187756,
+1215345380
 ],
 "design_permits": [
-12578362,
-32408776,
-115634538
+14878362,
+36118776,
+121534538
 ],
 "contingency": [
-27672396,
-71299306,
-254395984
+32732396,
+79461306,
+267375984
 ],
 "total": [
-166034378,
-427795838,
-1526375902
+196394378,
+476767838,
+1604255902
 ],
 "dollars": "2026 US dollars, planning-level (Class 5) estimate; not a quote",
 "adders": [
@@ -329,13 +328,9 @@
 "Edgartown South Beach (DredgeWire): $21/CY local dredged sand vs at least $72/CY imported",
 "https://dredgewire.com/south-beach-to-be-partly-repaired-for-summer/"
 ],
-"gp": [
-"Great Point Lighthouse replica, Nantucket (1986): slightly over $1 million (Lighthouse Digest)",
-"https://www.lighthousedigest.com/Digest/StoryPage.cfm?StoryKey=4698"
-],
-"henlopen": [
-"Cape Henlopen Lighthouse replica proposal incl. keeper's house: close to $11 million (Lighthouse Digest)",
-"http://www.lighthousedigest.com/Digest/StoryPage.cfm?StoryKey=849"
+"proposal": [
+"Raynham Lighthouse Proposal (Fowling Pond Drive folder, Nov 27 2026): full-size Pharos ~319 ft, $24M low / $40M mid / $70M high; one-third scale ~$4-15M",
+"https://drive.google.com/file/d/1DVN8RvVwA89ylMamvB58jtE6r38mSd2b/view"
 ],
 "assessor": [
 "Town of Raynham assessor record, parcel 10A-16-0 (0 E Britannia St): $303,900, exempt",
@@ -436,8 +431,12 @@
 "Check Priority Habitat maps; MESA review if mapped"
 ],
 [
+"FAA 14 CFR Part 77 (Form 7460-1)",
+"Tall-structure notice; at ~319 ft the tower is ~7 ft over the airport surface - lower it ~10 ft or get a no-hazard determination"
+],
+[
 "Local zoning + building permits (Raynham, Taunton)",
-"Lighthouse height / use; compound site plan review"
+"Raynham height limit (40 ft max) means a special permit / variance for the lighthouse; compound site plan review"
 ]
 ]
 }
