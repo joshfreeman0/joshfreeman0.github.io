@@ -10,9 +10,9 @@
 (function () {
   'use strict';
   const W3D = window.W3D = window.W3D || {};
-  const SRC = '/vr-staging/fx/lakeextent.json?v=1';
+  const SRC = '/vr-staging/fx/lakeextent.json?v=2';
   const WATER = 16.5, ROAD_W = 16, BUFFER = 45;
-  let J = null, mask = null, mw = 0, mh = 0, inLake = () => false;
+  let J = null, mask = null, lakeTex = null, mw = 0, mh = 0, inLake = () => false;
 
   /* Register the spot immediately so ?spot=lake-extent works even if this file's
      assets finish after W3D.build() calls goWorld(arrivalSpot()). */
@@ -114,8 +114,7 @@
     const tex = new THREE.CanvasTexture(c);
     tex.flipY = false; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
     tex.generateMipmaps = false; tex.minFilter = tex.magFilter = THREE.LinearFilter;
-    tex.needsUpdate = true;
-    return tex;
+    tex.needsUpdate = true; lakeTex = tex; return tex;
   }
 
   function findPondMesh() {
@@ -195,7 +194,7 @@
     W3D.gHooks.push((x, z, y, g) => inLake(x, z) ? WATER - 0.2 : null);
 
     W3D.root.traverse(o => {
-      if (!o.isMesh || !o.geometry || !/terrain/i.test(o.name || '')) return;
+      if (!o.isMesh || !o.geometry || !/^(terrain|ring-mid|ring-far)$/i.test(o.name || '')) return;
       const pos = o.geometry.attributes.position;
       if (!pos) return;
       const wr = o.matrixWorld;
@@ -204,7 +203,7 @@
       for (let i = 0; i < pos.count; i++) {
         v.fromBufferAttribute(pos, i).applyMatrix4(wr);
         if (!inLake(v.x, v.z)) continue;
-        if (v.y > WATER - 0.35) { pos.setY(i, pos.getY(i) - (v.y - (WATER - 0.35))); ch = true; }
+        if (v.y > WATER - 0.8) { pos.setY(i, pos.getY(i) - (v.y - (WATER - 0.8))); ch = true; }
       }
       if (ch) { pos.needsUpdate = true; o.geometry.computeBoundingBox(); o.geometry.computeBoundingSphere(); }
     });
@@ -231,7 +230,8 @@
   function cullTrees() {
     let removed = 0;
     W3D.root.traverse(o => {
-      if (!o.isInstancedMesh || o.count < 50) return;
+      if (!o.isInstancedMesh) return;
+      if (o.count < 20 && !/grass|cover|plant|tree/i.test(o.name || '')) return;
       const e = o.instanceMatrix.array; let ch = false;
       for (let i = 0; i < o.count; i++) {
         const off = i * 16, x = e[off + 12], z = e[off + 14];
@@ -454,6 +454,115 @@
     W3D.root.add(post);
   }
 
+  function hookDiscard(mat, tex, P) {
+    if (!mat || mat.userData.lakeGroundClip) return;
+    mat.userData.lakeGroundClip = 1;
+    const prev = mat.onBeforeCompile, prevKey = mat.customProgramCacheKey ? mat.customProgramCacheKey.bind(mat) : () => '';
+    const uClip = { value: tex }, uRect = { value: new THREE.Vector4(P.x0, P.z0, P.x1 - P.x0, P.z1 - P.z0) };
+    mat.onBeforeCompile = (sh, r) => {
+      if (prev) prev.call(mat, sh, r);
+      sh.uniforms.lakeClip = uClip; sh.uniforms.lakeRect = uRect;
+      sh.vertexShader = 'varying vec2 vLakeW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n{ vec4 lw = modelMatrix * vec4(transformed, 1.0); vLakeW = lw.xz; }');
+      sh.fragmentShader = 'uniform sampler2D lakeClip; uniform vec4 lakeRect; varying vec2 vLakeW;\n' +
+        sh.fragmentShader.replace(/void\s+main\s*\(\s*\)\s*\{/,
+          'void main() {\n  vec2 lu = (vLakeW - lakeRect.xy) / lakeRect.zw;\n  if (lu.x > 0.0 && lu.x < 1.0 && lu.y > 0.0 && lu.y < 1.0 && texture2D(lakeClip, lu).g > 0.5) discard;\n');
+    };
+    mat.customProgramCacheKey = () => prevKey() + '|lakegnd';
+    mat.needsUpdate = true;
+  }
+
+  function clipGround() {
+    /* Hide leftover landfill berms, dark pits and stepped ground that still poked through the water. */
+    const P = J.pond, tex = lakeTex; if (!P || !tex) return;
+    W3D.root.traverse(o => {
+      if (!o.isMesh || !o.material) return;
+      const n = o.name || '';
+      if (/fowling-pond|lake-ring|lake-shore|water|kings-pond|river/i.test(n)) return;
+      if (!/^(terrain|ring-mid|ring-far|grass-tufts|riverbank)$/i.test(n) && !/grass|cover|swale/i.test(n)) return;
+      [].concat(o.material).forEach(m => hookDiscard(m, tex, P));
+    });
+  }
+
+  function addContractor() {
+    const C = J.contractor; if (!C || !C.sign) return;
+    const x = C.sign[0], z = C.sign[1];
+    const gh = W3D.terrainH ? W3D.terrainH(x, z) : WATER + 1.5;
+    const y0 = Math.max(isFinite(gh) ? gh : WATER + 1.5, WATER + 0.4);
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 512;
+    const g = c.getContext('2d');
+    g.fillStyle = '#f3efe4'; g.fillRect(0, 0, 1024, 512);
+    g.strokeStyle = '#1a3a6b'; g.lineWidth = 16; g.strokeRect(14, 14, 996, 484);
+    g.fillStyle = '#1a3a6b'; g.textAlign = 'center';
+    g.font = 'bold 48px Helvetica, Arial, sans-serif';
+    g.fillText('Pond construction:', 512, 160);
+    g.font = 'bold 40px Helvetica, Arial, sans-serif';
+    g.fillText('Extreme Pool & Construction Services LLC', 512, 240);
+    g.font = '36px Helvetica, Arial, sans-serif';
+    g.fillText(C.website, 512, 360);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const grp = new THREE.Group(); grp.name = 'pond-contractor-sign';
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.7), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, side: THREE.DoubleSide }));
+    board.position.set(0, 2.15, 0);
+    grp.add(board);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.2, 0.12), new THREE.MeshBasicMaterial({ color: 0x4a3a28 }));
+    post.position.set(-1.5, 1.1, 0); grp.add(post.clone());
+    const post2 = post.clone(); post2.position.set(1.5, 1.1, 0); grp.add(post2);
+    grp.position.set(x, y0, z);
+    grp.rotation.y = Math.PI;   // face north, toward the lake
+    W3D.root.add(grp);
+    W3D.keepOut = (W3D.keepOut || []).concat([{ x: x, z: z, r: 6, name: 'pond contractor sign' }]);
+  }
+
+  function addContractorPanel() {
+    const C = J.contractor; if (!C) return true;
+    if (W3D.root.getObjectByName('fp-contractor-panel')) return true;
+    const ex = W3D.root.getObjectByName('fp-structure-exhibit');
+    if (!ex) return false;
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 320;
+    const g = c.getContext('2d');
+    g.fillStyle = 'rgba(8,24,32,0.9)'; g.fillRect(0, 0, 1024, 320);
+    g.strokeStyle = '#7fe3ff'; g.lineWidth = 6; g.strokeRect(3, 3, 1018, 314);
+    g.fillStyle = '#e8f7ff'; g.textAlign = 'center';
+    g.font = 'bold 40px Helvetica, Arial, sans-serif';
+    g.fillText('Pond contractor', 512, 80);
+    g.font = '32px Helvetica, Arial, sans-serif';
+    g.fillText('Pond construction:', 512, 145);
+    g.fillText('Extreme Pool & Construction Services LLC', 512, 200);
+    g.font = '30px Helvetica, Arial, sans-serif';
+    g.fillText(C.website, 512, 260);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 1.15), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, transparent: true }));
+    board.name = 'fp-contractor-panel';
+    const box = new THREE.Box3().setFromObject(ex);
+    const cx = (box.min.x + box.max.x) / 2, cz = box.max.z + 2.2;
+    const y = (W3D.terrainH ? W3D.terrainH(cx, cz) : box.min.y) + 1.7;
+    board.position.set(cx, y, cz);
+    W3D.root.add(board);
+    return true;
+  }
+
+  function hookPlan() {
+    /* Exhibit is built lazily on first visit to ?spot=structure or ?spot=plan. Wrap those spots and keep trying. */
+    const wrap = fn => {
+      const w = function () {
+        const r = fn.apply(this, arguments);
+        setTimeout(addContractorPanel, 400);
+        setTimeout(addContractorPanel, 2000);
+        return r;
+      };
+      w._cHook = 1;
+      return w;
+    };
+    (function tick(n) {
+      if (addContractorPanel()) return;
+      ['structure', 'plan', 'fp-structure', 'master-plan', 'timeline'].forEach(k => {
+        const fn = W3D.spots && W3D.spots[k];
+        if (typeof fn === 'function' && !fn._cHook) W3D.spots[k] = wrap(fn);
+      });
+      if ((n || 0) < 60) setTimeout(() => tick((n || 0) + 1), 500);
+    })(0);
+  }
+
   function addSpot() {
     const s = J.spot || { x: 0, y: 520, z: 400, yaw: 0 };
     const go = () => {
@@ -491,6 +600,9 @@
     clipRoads();
     buildRing();
     addPlaque();
+    addContractor();
+    hookPlan();
+    clipGround();
     addSpot();
     console.log('lakeextent: ' + J.acres + ' ac, ring ' + J.ring.miles + ' mi, landfills removed: ' +
       (J.landfills_removed || []).map(l => l.name).join(', '));
